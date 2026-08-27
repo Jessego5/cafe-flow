@@ -126,7 +126,9 @@ class EventLog:
                 "event_id": event_id,
                 "scenario": self.scenario,
                 "seed": self.seed,
-                "is_simulated": self.is_simulated,
+                # the log's flag is a floor, not an override: a live log carries
+                # simulated orders alongside real ones and must not unflag them.
+                "is_simulated": event.is_simulated or self.is_simulated,
             }
         )
         self._events.append(stamped)

@@ -1,0 +1,96 @@
+"""Runtime settings and the wall clock.
+
+The app runs on wall-clock time; the simulator runs on virtual time. Both write
+`t_s` as seconds since local midnight in the cafe's timezone, which is what lets
+`analysis/metrics.py` read either log without knowing where it came from.
+
+Servers run UTC and class schedules are local, so every conversion goes through
+`cafe.timezone` from params. Timestamps are stored UTC and rendered local.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import date, datetime, timedelta
+from enum import StrEnum
+from functools import lru_cache
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from core.params import Params, load_params
+
+__all__ = ["Env", "Settings", "settings", "get_params", "now_utc", "day_seconds", "service_date"]
+
+ROOT = Path(__file__).resolve().parents[1]
+SECONDS_PER_DAY = 24 * 60 * 60
+
+
+class Env(StrEnum):
+    DEV = "dev"
+    DEMO = "demo"
+    PILOT = "pilot"
+
+    @property
+    def allows_simulated_orders(self) -> bool:
+        """A simulated order on the bar during a real rush destroys trust in
+        the tool permanently, so `pilot` refuses them at the API."""
+        return self is not Env.PILOT
+
+
+class Settings:
+    """Read once from the environment. Nothing here has a silent default that
+    could point a pilot at a dev database."""
+
+    def __init__(self) -> None:
+        self.env = Env(os.environ.get("CAFE_ENV", Env.DEV))
+        self.db_path = Path(os.environ.get("CAFE_DB", ROOT / "out" / "cafe.db"))
+        self.param_files = [
+            Path(p) for p in os.environ.get("CAFE_PARAMS", str(ROOT / "params" / "base.yaml")).split(":")
+        ]
+        self.web_dist = Path(os.environ.get("CAFE_WEB_DIST", ROOT / "web" / "dist"))
+        self.heartbeat_s = float(os.environ.get("CAFE_SSE_HEARTBEAT_S", "15"))
+
+    @property
+    def db_url(self) -> str:
+        return f"sqlite:///{self.db_path}"
+
+    def __repr__(self) -> str:
+        return f"Settings(env={self.env}, db={self.db_path})"
+
+
+settings = Settings()
+
+
+@lru_cache(maxsize=1)
+def get_params() -> Params:
+    return load_params(*settings.param_files)
+
+
+def now_utc() -> datetime:
+    return datetime.now(ZoneInfo("UTC"))
+
+
+def cafe_zone(params: Params) -> ZoneInfo:
+    return ZoneInfo(params.cafe.timezone)
+
+
+def local(params: Params, moment: datetime | None = None) -> datetime:
+    return (moment or now_utc()).astimezone(cafe_zone(params))
+
+
+def day_seconds(params: Params, moment: datetime | None = None) -> float:
+    """Seconds since local midnight — the same clock the simulator uses."""
+    here = local(params, moment)
+    midnight = here.replace(hour=0, minute=0, second=0, microsecond=0)
+    return (here - midnight).total_seconds()
+
+
+def service_date(params: Params, moment: datetime | None = None) -> date:
+    """The cafe's local business date, which is not the server's UTC date."""
+    return local(params, moment).date()
+
+
+def at_local_time(params: Params, on: date, seconds: float) -> datetime:
+    """Local business date + seconds since midnight -> an aware UTC datetime."""
+    midnight = datetime.combine(on, datetime.min.time(), tzinfo=cafe_zone(params))
+    return (midnight + timedelta(seconds=seconds)).astimezone(ZoneInfo("UTC"))

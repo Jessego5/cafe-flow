@@ -12,12 +12,35 @@ Build order and acceptance criteria live in
     .venv/bin/python -m pip install -r requirements.txt
     .venv/bin/python -m pytest tests -q
 
+## Running the app
+
+    cd web && npm install && npm run build && cd ..
+    .venv/bin/python -m uvicorn app.main:app --reload
+
+| Path | View |
+|---|---|
+| `/` | student: menu, cart, order status |
+| `/bar` | barista: live queue, one tap per transition |
+| `/pickup` | display: order numbers ready for collection |
+
+The API keeps the unprefixed paths (`/menu`, `/orders`, `/orders/{id}`,
+`/orders/{id}/transition`, `/queue`, `/display`, `/slots`, `/stream`, `/config`).
+For frontend work, `cd web && npm run dev` proxies them to uvicorn on :8000.
+
+`CAFE_ENV` selects the environment (`dev`, `demo`, `pilot`); `pilot` rejects
+simulated orders at the API. `CAFE_DB` and `CAFE_PARAMS` (colon separated,
+merged left to right) point at the database and the config.
+
+Payment and auth are stubbed, and stay that way: neither bears on the research
+question.
+
 ## Status
 
 | Milestone | State |
 |---|---|
 | M1 shared core | done |
-| M2 app skeleton | not started |
+| M2 app skeleton | done |
+| M2.5 ship the skeleton | not started |
 
 ## Parameters
 

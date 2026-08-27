@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # avoids a cycle: core.types imports State from here
     from core.events import EventLog
     from core.types import Order
 
-__all__ = ["State", "LEGAL", "TERMINAL", "IllegalTransition", "transition"]
+__all__ = ["State", "LEGAL", "TERMINAL", "IllegalTransition", "place", "transition"]
 
 
 class State(StrEnum):
@@ -72,6 +72,45 @@ class IllegalTransition(Exception):
         self.order_id = order_id
         self.from_state = from_state
         self.to_state = to_state
+
+
+
+def place(
+    order: "Order",
+    at: float,
+    actor: str = "customer",
+    *,
+    log: "EventLog | None" = None,
+    **payload: Any,
+) -> Event:
+    """The order's first event: it came into existence.
+
+    Creation has no from-state, so it is not a transition, but it still has to
+    be an event — `placed` is the left-hand side of the conservation identity
+    and nothing may be counted from mutable state (ground rule 4).
+    """
+    current = State(order.state)
+    if current is not State.PLACED:
+        raise IllegalTransition(order.order_id, current, State.PLACED)
+
+    event = Event(
+        seq=PENDING_SEQ,
+        event_id="",
+        t_s=at,
+        type=EventType.STATE_CHANGE,
+        order_id=order.order_id,
+        customer_id=order.customer_id,
+        from_state=None,
+        to_state=State.PLACED,
+        actor=actor,
+        channel=order.channel,
+        is_simulated=order.is_simulated,
+        payload=payload,
+    )
+    if log is not None:
+        event = log.append(event)
+    order.history.append(event)
+    return event
 
 
 def transition(

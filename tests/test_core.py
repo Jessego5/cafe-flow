@@ -440,3 +440,29 @@ def test_core_has_no_magic_numbers(root):
                     continue
                 offences.append(f"{path.name}:{node.lineno} -> {node.value}")
     assert offences == [], "\n".join(offences)
+
+
+def test_placement_is_an_event_with_no_from_state(params):
+    log = EventLog("t", 1)
+    order = _order(params)
+    from core.states import place
+
+    event = place(order, at=42.0, log=log)
+    assert event.from_state is None
+    assert event.to_state == State.PLACED
+    assert order.state is State.PLACED
+    assert order.entered_at(State.PLACED) == 42.0
+
+    transition(order, State.ACCEPTED, at=50.0, log=log)
+    with pytest.raises(IllegalTransition):
+        place(order, at=60.0, log=log)
+    assert len(log) == 2
+
+
+def test_a_live_log_does_not_unflag_a_simulated_order(params):
+    log = EventLog("live", None, is_simulated=False)
+    real = make_order("o1", params, lines=[("drip", None)])
+    fake = make_order("o2", params, lines=[("drip", None)], is_simulated=True)
+    transition(real, State.ACCEPTED, at=1.0, log=log)
+    transition(fake, State.ACCEPTED, at=1.0, log=log)
+    assert [event.is_simulated for event in log] == [False, True]
