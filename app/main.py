@@ -19,7 +19,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_params, service_date, settings
 from app.db import ensure_slots, get_engine, init_db, seed_menu, session_scope
-from app.routes import barista_router, menu_router, orders_router, slots_router
+from app.routes import (
+    barista_router,
+    health_router,
+    menu_router,
+    orders_router,
+    slots_router,
+)
 from app.stream import router as stream_router
 
 log = logging.getLogger("cafe")
@@ -54,6 +60,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.include_router(health_router)
     app.include_router(menu_router)
     app.include_router(orders_router)
     app.include_router(slots_router)

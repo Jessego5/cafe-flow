@@ -40,7 +40,18 @@ question.
 |---|---|
 | M1 shared core | done |
 | M2 app skeleton | done |
-| M2.5 ship the skeleton | not started |
+| M2.5 ship the skeleton | built, not yet deployed |
+| M3 simulator engine | not started |
+
+## Deploying
+
+One always-on machine with a persistent disk, SQLite replicated by Litestream.
+The runbook, the environment table and the SSE gotchas are in
+[deploy/README.md](deploy/README.md).
+
+    docker build -f deploy/Dockerfile -t cafe-flow .
+    docker run -p 8080:8080 -v cafe_data:/data cafe-flow
+    docker run --rm --entrypoint /usr/local/bin/verify-restore.sh cafe-flow
 
 ## Parameters
 

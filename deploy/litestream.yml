@@ -1,0 +1,28 @@
+# Continuous replication of the order log.
+#
+# The event log is the only source of truth for every metric in the project, so
+# for a pilot, losing it means losing the research data. Litestream ships the
+# WAL to object storage every few seconds; `entrypoint.sh` restores from it when
+# a machine boots with an empty volume.
+#
+# Environment (set as Fly secrets, expanded by litestream at startup):
+#   LITESTREAM_BUCKET             bucket name
+#   LITESTREAM_ENDPOINT           S3 endpoint; for Cloudflare R2,
+#                                 https://<account>.r2.cloudflarestorage.com
+#   LITESTREAM_ACCESS_KEY_ID      credentials
+#   LITESTREAM_SECRET_ACCESS_KEY
+#   FLY_APP_NAME                  set by Fly; keeps demo and pilot apart
+
+dbs:
+  - path: ${CAFE_DB}
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: ${FLY_APP_NAME}/cafe.db
+        endpoint: ${LITESTREAM_ENDPOINT}
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        # a pilot day is worth keeping well past the pilot
+        retention: 720h
+        snapshot-interval: 6h
+        sync-interval: 1s

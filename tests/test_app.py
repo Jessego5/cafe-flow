@@ -386,3 +386,40 @@ def test_only_core_writes_the_event_log(root):
                 if name in {"emit", "OrderEventRow"}:
                     offences.append(f"{path.relative_to(root)}:{node.lineno} calls {name}")
     assert offences == []
+
+
+# --------------------------------------------------------------------------
+# health
+# --------------------------------------------------------------------------
+
+
+def test_healthz_reports_a_reachable_writable_database(client):
+    body = client.get("/healthz").json()
+    assert body["ok"] is True
+    assert body["event_log_readable"] is True
+    assert body["event_log_writable"] is True
+    assert body["events"] == 0
+    assert body["provenance"] == "provenance: 100% assumed"
+
+
+def test_healthz_does_not_append_to_the_event_log(client):
+    place(client, LATTE)
+    before = client.get("/healthz").json()["events"]
+    client.get("/healthz")
+    assert client.get("/healthz").json()["events"] == before == 1
+
+
+def test_healthz_fails_loudly_when_the_database_is_gone(client, app_env):
+    import app.db as db
+
+    db._engine = None
+    app_env.db_path = app_env.db_path.parent / "read-only" / "cafe.db"
+    app_env.db_path.parent.mkdir(parents=True, exist_ok=True)
+    app_env.db_path.parent.chmod(0o500)
+    try:
+        response = client.get("/healthz")
+        assert response.status_code == 503
+        assert "error" in response.json()
+    finally:
+        app_env.db_path.parent.chmod(0o700)
+        db._engine = None

@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Simulator and analysis (M3-M8)
+simpy>=4.1
+numpy>=1.26
+pandas>=2.2
+pyarrow>=16.0
+matplotlib>=3.8
+
+# HTTP replay (M9) and tests
+httpx>=0.27
+pytest>=8.0

@@ -33,6 +33,7 @@ __all__ = [
     "OrderItemRow",
     "OrderEventRow",
     "SlotRow",
+    "HealthRow",
     "DbEventLog",
     "get_engine",
     "init_db",
@@ -153,6 +154,20 @@ class OrderEventRow(SQLModel, table=True):
             wall_ts=self.wall_ts,
             payload=self.payload or {},
         )
+
+
+class HealthRow(SQLModel, table=True):
+    """One row, rewritten by every health check.
+
+    The check needs to prove the database file is writable — a read-only volume
+    and a full disk both fail here — without appending to `order_events`, which
+    may only ever contain real transitions.
+    """
+
+    __tablename__ = "health"
+
+    id: int = Field(default=1, primary_key=True)
+    checked_at: datetime
 
 
 class SlotRow(SQLModel, table=True):
