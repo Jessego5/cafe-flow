@@ -82,10 +82,17 @@ def deep_merge(base: Mapping[str, Any], overlay: Mapping[str, Any]) -> dict[str,
 
     Lists are replaced wholesale on purpose: a half-overridden staffing plan or
     class-block schedule is never what an overlay means.
+
+    A `null` in an overlay removes the key. An experiment that replaces the
+    espresso bar with one machine has to be able to say that the old stations
+    are gone, not leave them defined and unused. Deleting something a menu item
+    still points at fails validation, loudly, by name.
     """
     out = dict(base)
     for key, value in overlay.items():
-        if key in out and isinstance(out[key], Mapping) and isinstance(value, Mapping):
+        if value is None:
+            out.pop(key, None)
+        elif key in out and isinstance(out[key], Mapping) and isinstance(value, Mapping):
             out[key] = deep_merge(out[key], value)
         else:
             out[key] = value
@@ -202,9 +209,16 @@ class StationParams(_Strict):
 
 
 class TaskSpec(_Strict):
+    """One item's demand at one station.
+
+    `oz` and `shots` may be zero: a station that charges for both still gets a
+    task from a drink that needs only one of them, and saying so explicitly
+    beats leaving the dimension out and having validation guess.
+    """
+
     station: str
-    oz: float | None = Field(default=None, gt=0)
-    shots: int | None = Field(default=None, gt=0)
+    oz: float | None = Field(default=None, ge=0)
+    shots: int | None = Field(default=None, ge=0)
 
 
 class VariantParams(_Strict):

@@ -1,0 +1,93 @@
+# Hypothesis: the espresso bar is one Schaerer super-automatic.
+#
+# The machine photographed on 2026-08-27 carries a Schaerer logo, twin bean
+# hoppers and a touchscreen, and no group heads or portafilters are visible
+# anywhere in the frames. Schaerer builds super-automatics almost exclusively.
+# If that is what it is, two things follow that the base config gets wrong:
+#
+#   1. There is no pitcher. Milk is drawn per drink through a refrigerated
+#      line, so there is nothing to batch. `batch_key` disappears, and with it
+#      the plan's core throughput mechanism.
+#   2. Grinding, extraction and frothing are one cycle on one machine. The
+#      separate steam wand and group head collapse into a single serialised
+#      resource that every espresso drink queues on — iced ones included, since
+#      they skip the frothing but not the shot.
+#
+# Run this against the base config to cost both readings before going back with
+# a camera. Whichever the machine turns out to be, one of these is already the
+# answer.
+#
+#   python -m sim.experiments --compare
+#
+# UNCONFIRMED, and what would confirm it: the model number on the front panel
+# or the sticker on the back. Cycle times below are assumed.
+
+meta:
+  scenario: superauto
+  source: assumed
+
+stations:
+  # gone: there is no pitcher and no separate group
+  steam_wand: null
+  group_head: null
+
+  espresso_machine:
+    capacity: 1          # one machine, one drink at a time
+    shot_s: 18           # grind, tamp, extract
+    per_6oz_s: 9         # frothed milk, straight into the cup
+    source: assumed
+    # deliberately no batch_key: nothing to batch without a pitcher
+
+bottleneck_station: espresso_machine
+
+# Every drink that touched the old espresso bar, restated. `oz: 0` means the
+# cycle pours no milk; `shots: 0` means it froths without pulling a shot.
+menu:
+  espresso:
+    tasks: [ { station: espresso_machine, shots: 1, oz: 0 } ]
+
+  americano:
+    tasks: [ { station: espresso_machine, shots: 2, oz: 0 } ]
+
+  cappuccino:
+    tasks: [ { station: espresso_machine, shots: 1, oz: 6 } ]
+
+  latte:
+    variants:
+      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 20 }
+      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+                       { station: cold_bar } ], assembly_s: 15 }
+
+  vanilla_latte:
+    variants:
+      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 25 }
+      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+                       { station: cold_bar } ], assembly_s: 20 }
+
+  caramel_macchiato:
+    variants:
+      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 30 }
+      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+                       { station: cold_bar } ], assembly_s: 25 }
+
+  mocha:
+    variants:
+      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 28 }
+      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+                       { station: cold_bar } ], assembly_s: 22 }
+
+  white_chocolate_mocha:
+    variants:
+      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 28 }
+      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+                       { station: cold_bar } ], assembly_s: 22 }
+
+  # Milk-only drinks: the machine froths without pulling a shot.
+  matcha_latte:
+    tasks: [ { station: espresso_machine, shots: 0, oz: 8 } ]
+
+  chai_latte:
+    tasks: [ { station: espresso_machine, shots: 0, oz: 8 } ]
+
+  cocoa:
+    tasks: [ { station: espresso_machine, shots: 0, oz: 8 } ]

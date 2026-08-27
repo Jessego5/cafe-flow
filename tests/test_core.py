@@ -522,3 +522,49 @@ def test_a_live_log_does_not_unflag_a_simulated_order(params):
     transition(real, State.ACCEPTED, at=1.0, log=log)
     transition(fake, State.ACCEPTED, at=1.0, log=log)
     assert [event.is_simulated for event in log] == [False, True]
+
+
+def test_an_overlay_can_remove_a_station(root, tmp_path):
+    """An experiment that replaces the espresso bar has to be able to say the
+    old stations are gone, not leave them defined and unused."""
+    overlay = tmp_path / "drop.yaml"
+    overlay.write_text(
+        "stations:\n  blender: { capacity: 1, run_s: 90 }\n"
+    )
+    added = load_params(root / "params" / "base.yaml", overlay)
+    assert "blender" in added.stations
+
+    remover = tmp_path / "remove.yaml"
+    remover.write_text("stations:\n  blender: null\n")
+    removed = load_params(root / "params" / "base.yaml", overlay, remover)
+    assert "blender" not in removed.stations
+
+
+def test_removing_a_station_a_menu_item_needs_fails_loudly(root, tmp_path):
+    overlay = tmp_path / "remove.yaml"
+    overlay.write_text("stations:\n  steam_wand: null\n")
+    with pytest.raises(ConfigError) as exc:
+        load_params(root / "params" / "base.yaml", overlay)
+    assert "steam_wand" in str(exc.value)
+
+
+def test_a_zero_dimension_costs_nothing(params, tmp_path, root):
+    """A cycle that charges per shot and per ounce still has to price a drink
+    that uses one and not the other."""
+    overlay = tmp_path / "combined.yaml"
+    overlay.write_text(
+        "stations:\n"
+        "  combined: { capacity: 1, shot_s: 18, per_6oz_s: 9 }\n"
+        "menu:\n"
+        "  espresso:\n"
+        "    tasks: [ { station: combined, shots: 1, oz: 0 } ]\n"
+        "  americano:\n"
+        "    tasks: [ { station: combined, shots: 2, oz: 0 } ]\n"
+    )
+    merged = load_params(root / "params" / "base.yaml", overlay)
+    model = StationCapacityModel(merged, station_name="combined")
+
+    single = make_item("espresso", merged, order_id="o", item_id="a")
+    double = make_item("americano", merged, order_id="o", item_id="b")
+    assert model.cost(single) == 18.0
+    assert model.cost(double) == 36.0

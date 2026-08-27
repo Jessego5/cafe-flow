@@ -42,7 +42,8 @@ question.
 | M2 app skeleton | done |
 | M2.5 ship the skeleton | built, not yet deployed |
 | M3 simulator engine | done |
-| M4 metrics | not started |
+| M4 metrics | partial: waits, throughput, utilisation |
+| M7 experiments | partial: named arms, no sweeps yet |
 
 ## Deploying
 
@@ -62,6 +63,15 @@ the door. So this project does not build a competing student ordering app. The
 student view is a demo; the deliverable is the simulator, the observations, and
 a barista-side queue that batches and reorders work the existing system does
 not. `customers.preorder_adoption` is an observable here, not a sweep.
+
+## Comparing arms
+
+An arm is a set of parameter overlays. `params/experiments/superauto.yaml`
+holds the second reading of the espresso bar, in case the Schaerer in the
+photographs is a super-automatic: no pitcher, so nothing batches, and the wand
+and group head collapse into one serialised machine.
+
+    python -m sim.experiments --arms manual_bar,superauto --seeds 20
 
 ## Parameters
 
