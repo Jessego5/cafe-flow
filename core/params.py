@@ -50,6 +50,12 @@ SOURCES: tuple[str, ...] = ("assumed", "published", "observed", "fitted")
 
 FROM_STAFFING = "from_staffing"
 
+#: Keys that decide what shape a mapping has. An overlay that changes one is
+#: describing a different thing, not amending this one, so it replaces the
+#: mapping instead of merging into it: swapping a lognormal for a constant must
+#: not leave the lognormal's median and sigma behind.
+SHAPE_KEYS: tuple[str, ...] = ("dist",)
+
 # Station cost terms. A station's service time is the sum of the terms it
 # declares. `scale` names the Task attribute the term is multiplied by, and
 # `per` says whether the term is paid once per order, once per batch, or once
@@ -92,16 +98,29 @@ def deep_merge(base: Mapping[str, Any], overlay: Mapping[str, Any]) -> dict[str,
     espresso bar with one machine has to be able to say that the old stations
     are gone, not leave them defined and unused. Deleting something a menu item
     still points at fails validation, loudly, by name.
+
+    A mapping whose shape key changes is replaced rather than merged; see
+    SHAPE_KEYS.
     """
     out = dict(base)
     for key, value in overlay.items():
         if value is None:
             out.pop(key, None)
         elif key in out and isinstance(out[key], Mapping) and isinstance(value, Mapping):
-            out[key] = deep_merge(out[key], value)
+            out[key] = (
+                dict(value)
+                if _changes_shape(out[key], value)
+                else deep_merge(out[key], value)
+            )
         else:
             out[key] = value
     return out
+
+
+def _changes_shape(base: Mapping[str, Any], overlay: Mapping[str, Any]) -> bool:
+    return any(
+        key in overlay and overlay[key] != base.get(key) for key in SHAPE_KEYS
+    )
 
 
 class _Strict(BaseModel):

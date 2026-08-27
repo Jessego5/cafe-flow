@@ -27,6 +27,11 @@ from core.params import FROM_STAFFING, Params, load_params
 from core.states import LOST, State, place, transition
 from core.types import Channel, Order, Task, TaskKind
 from sim.arrivals import Arrival, generate_arrivals
+from sim.balking import (
+    estimate_wait_s,
+    nominal_seconds_per_order,
+    observable_queue_depth,
+)
 from sim.policies import Pending, Policy, make_policy
 
 __all__ = ["Barista", "Cafe", "RunResult", "run", "event_path"]
@@ -106,6 +111,7 @@ class Cafe:
         # that decides what to run together. Everything else is worked directly
         # by whoever is holding the order.
         self.policy = make_policy(self.params)
+        self._nominal: dict[int, float] = {}
         self.grouping = [
             name for name, station in self.params.stations.items() if station.groups_work
         ]
@@ -328,11 +334,8 @@ class Cafe:
                 barista = yield self.crew.get()
         return barista
 
-    def serve(self, order: Order):
-        """One order, from the register to the handoff shelf."""
-        self.orders[order.order_id] = order
-        place(order, at=self.env.now, actor="customer", log=self.log)
-
+    def serve(self, order: Order, arrival: Arrival):
+        """One placed order, from the register to the handoff shelf."""
         # The register is priced by the capacity model rather than read off one
         # field, so the published "transaction plus a few seconds an item"
         # shape applies here and in slot accounting alike.
@@ -367,8 +370,41 @@ class Cafe:
             if barista is not None:
                 self.crew.put(barista)
 
-        # Walk-ups are standing at the shelf; the handoff refinements that make
-        # this a real delay are an M10 question.
+        yield from self.hand_over(order, arrival)
+
+    def hand_over(self, order: Order, arrival: Arrival):
+        """Getting the drink to the person, or discovering they have gone.
+
+        Someone who ordered ahead collects at the time they asked for, so a
+        pre-order made early sits on the shelf rather than being handed to
+        nobody. A walk-up whose drink finally appears after their time budget
+        has run out has already left for class; the cafe made it anyway, which
+        is precisely the cost.
+        """
+        if arrival.wanted_at_s is not None and arrival.wanted_at_s > self.env.now:
+            yield self.env.timeout(arrival.wanted_at_s - self.env.now)
+
+        if arrival.no_show:
+            transition(
+                order, State.ABANDONED, at=self.env.now, actor="customer", log=self.log,
+                reason="no_show", margin_cents=order.margin_cents,
+            )
+            return
+
+        # A pre-order's lead time is not waiting: they asked for it at a
+        # particular time and turned up then. Their patience is spent from when
+        # they arrive to collect, not from when they tapped the order in an
+        # hour earlier.
+        joined_s = arrival.wanted_at_s if arrival.preordered else order.placed_at_s
+        waited_s = self.env.now - joined_s
+        if waited_s > arrival.time_budget_s:
+            transition(
+                order, State.ABANDONED, at=self.env.now, actor="customer", log=self.log,
+                reason="out_of_time", waited_s=waited_s,
+                time_budget_s=arrival.time_budget_s, margin_cents=order.margin_cents,
+            )
+            return
+
         transition(order, State.PICKED_UP, at=self.env.now, actor="customer", log=self.log)
 
     def admit(self, arrival: Arrival):
@@ -395,7 +431,57 @@ class Cafe:
             customer_id=arrival.customer_id,
             is_simulated=True,
         )
-        yield self.env.process(self.serve(order))
+        order.promised_at_s = arrival.wanted_at_s
+        self.orders[order.order_id] = order
+        place(
+            order, at=self.env.now, actor="customer", log=self.log,
+            price_cents=order.price_cents,
+            margin_cents=order.margin_cents,
+            items=[item.drink for item in order.items],
+        )
+
+        if self.balks(arrival, order):
+            return
+
+        yield self.env.process(self.serve(order, arrival))
+
+    def nominal_wait_per_person(self) -> float:
+        """Cached per staffing level: it walks the whole menu to work out what
+        an average order is worth."""
+        baristas = self.params.baristas_at(self.env.now)
+        if baristas not in self._nominal:
+            self._nominal[baristas] = nominal_seconds_per_order(self.params, baristas)
+        return self._nominal[baristas]
+
+    def balks(self, arrival: Arrival, order: Order) -> bool:
+        """Does this customer look at the line and leave?
+
+        Someone who ordered ahead has already committed and never balks, which
+        is the whole of the pre-order case. The estimate is recorded on the
+        event because the balk count and the margin behind it are the revenue
+        argument, and both have to be readable from the log alone.
+        """
+        if arrival.channel is not Channel.WALKUP:
+            return False
+
+        # the line they are looking at, not counting themselves
+        depth = observable_queue_depth(
+            other.state
+            for order_id, other in self.orders.items()
+            if order_id != order.order_id
+        )
+        estimate_s = estimate_wait_s(depth, self.nominal_wait_per_person())
+        if estimate_s <= arrival.balk_tolerance_s:
+            return False
+
+        transition(
+            order, State.BALKED, at=self.env.now, actor="customer", log=self.log,
+            estimated_wait_s=estimate_s,
+            queue_depth=depth,
+            tolerance_s=arrival.balk_tolerance_s,
+            margin_cents=order.margin_cents,
+        )
+        return True
 
 
 @dataclass

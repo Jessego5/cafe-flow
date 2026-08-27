@@ -18,6 +18,7 @@ from pathlib import Path
 from statistics import mean, stdev
 
 from analysis.metrics import (
+    balk_count_and_lost_margin,
     busiest_window,
     crew_utilisation,
     peak_throughput,
@@ -58,6 +59,16 @@ ARMS: dict[str, Arm] = {
         "superauto",
         ("params/experiments/superauto.yaml",),
         "one Schaerer super-automatic; no pitcher, so nothing batches",
+    ),
+    "adoption": Arm(
+        "adoption",
+        ("params/experiments/adoption.yaml",),
+        "30% order ahead, so that share never sees the line",
+    ),
+    "adoption_batched": Arm(
+        "adoption_batched",
+        ("params/experiments/adoption.yaml", "params/experiments/batch.yaml"),
+        "both: ordering ahead and running compatible work together",
     ),
     "batched": Arm(
         "batched",
@@ -102,8 +113,13 @@ def run_arm(arm: Arm, seeds: list[int], *, base: str = BASE) -> ArmResult:
         log = day.log
         window = busiest_window(log)
         waits = wait_percentiles(log, window=window)
+        # split out, because an arm that moves people between channels changes
+        # who the aggregate is averaging over
+        by_channel = wait_percentiles(log, window=window, by_channel=True)
+        walkup = by_channel.get("walkup", {})
         utilisation = station_utilisation(log, params, window=window)
         counts = state_counts(log)
+        losses = balk_count_and_lost_margin(log)
 
         result.rows.append(
             {
@@ -111,10 +127,18 @@ def run_arm(arm: Arm, seeds: list[int], *, base: str = BASE) -> ArmResult:
                 "orders": counts.get("placed", 0),
                 "served": counts.get("picked_up", 0),
                 "in_flight": counts.get("in_flight", 0),
+                "balked": losses["balked"],
+                "abandoned": losses["abandoned"],
+                "lost_fraction": losses["lost_fraction"],
+                "lost_margin_cents": losses["lost_margin_cents"],
+                "captured_margin_cents": losses["captured_margin_cents"],
                 "peak_from_s": window.start_s if window else None,
                 "wait_p50_s": waits["p50"],
                 "wait_p90_s": waits["p90"],
                 "wait_p95_s": waits["p95"],
+                "wait_p50_walkup_s": walkup.get("p50"),
+                "wait_p90_walkup_s": walkup.get("p90"),
+                "walkups": walkup.get("n", 0),
                 "throughput_per_h": peak_throughput(log),
                 "bottleneck": params.bottleneck_station,
                 "bottleneck_util": utilisation.get(params.bottleneck_station, 0.0),
@@ -137,29 +161,34 @@ def render(results: list[ArmResult]) -> str:
         lines.append(f"{result.arm.name}: {result.arm.note}")
         lines.append(f"  {report.caption()}   bottleneck: {result.params.bottleneck_station}")
 
-    header = f"{'arm':<12}{'orders':>8}{'wait p50':>10}{'wait p90':>12}{'wait p95':>12}" \
-             f"{'peak /h':>10}{'busiest station':>20}{'busy':>8}{'crew':>8}"
+    header = (
+        f"{'arm':<20}{'orders':>7}{'walkup p50':>12}{'walkup p90':>13}"
+        f"{'served':>8}{'lost':>7}{'margin':>9}{'busiest station':>16}{'busy':>7}"
+    )
     lines += ["", header, "-" * len(header)]
 
     for result in results:
         orders, _ = result.summary("orders")
-        p50, p50_ci = result.summary("wait_p50_s")
-        p90, p90_ci = result.summary("wait_p90_s")
-        p95, p95_ci = result.summary("wait_p95_s")
-        rate, _ = result.summary("throughput_per_h")
+        served, _ = result.summary("served")
+        p50, p50_ci = result.summary("wait_p50_walkup_s")
+        p90, p90_ci = result.summary("wait_p90_walkup_s")
+        lost, _ = result.summary("lost_fraction")
+        captured, _ = result.summary("captured_margin_cents")
         busy, _ = result.summary("busiest_util")
-        crew, _ = result.summary("crew_util")
         station = result.rows[0]["busiest_station"] if result.rows else "-"
         lines.append(
-            f"{result.arm.name:<12}{orders:>8.0f}"
-            f"{p50 / 60:>7.1f}±{p50_ci / 60:<2.1f}"
-            f"{p90 / 60:>9.1f}±{p90_ci / 60:<2.1f}"
-            f"{p95 / 60:>9.1f}±{p95_ci / 60:<2.1f}"
-            f"{rate:>10.1f}{station:>20}{busy:>8.1%}{crew:>8.1%}"
+            f"{result.arm.name:<20}{orders:>7.0f}"
+            f"{p50 / 60:>9.1f}±{p50_ci / 60:<2.1f}"
+            f"{p90 / 60:>10.1f}±{p90_ci / 60:<2.1f}"
+            f"{served:>8.0f}{lost:>7.0%}{captured / 100:>9,.0f}{station:>16}{busy:>7.0%}"
         )
 
     lines.append("")
-    lines.append("waits in minutes, over the busiest hour, mean of seeds with a 95% interval")
+    lines.append(
+        "walk-up waits in minutes over the busiest hour, since that is the queue "
+        "people actually stand in;\nmargin in dollars kept across the day; mean of "
+        "seeds with a 95% interval"
+    )
     return "\n".join(lines)
 
 

@@ -58,6 +58,17 @@ rapid-cook oven, which would be several times faster.
 here, so this is a count, not a sweep: how many pickups come off the mobile
 shelf versus the register during one peak.
 
+It has moved up this list. On the assumed numbers, ordering ahead is worth more
+than any scheduling change: it keeps the customers who would otherwise take one
+look at the line and leave.
+
+### 6a. Balks, which are now the whole revenue case
+
+`observations/balks.csv`. The model says roughly a quarter to a third of peak
+demand walks out, and that is where the money is, not in the length of the
+queue. Standing near the door for one rush and counting the people who look and
+leave is the highest-value hour anyone can spend on this project.
+
 ### 7. Service times, mix, queue lengths and balks
 
 The `observations/*.csv` contract in `campus-cafe-ordering-plan.md`, read by

@@ -36,6 +36,7 @@ __all__ = [
     "crew_utilisation",
     "state_counts",
     "busiest_window",
+    "balk_count_and_lost_margin",
 ]
 
 SECONDS_PER_HOUR = 3600.0
@@ -370,3 +371,53 @@ def state_counts(log: Iterable[Event] | EventLog) -> dict[str, int]:
         1 for state in final.values() if not State.is_terminal(State(state))
     )
     return dict(counts)
+
+
+def balk_count_and_lost_margin(
+    log: Iterable[Event] | EventLog,
+    params: Params | None = None,
+    *,
+    window: Interval | None = None,
+) -> dict:
+    """What the queue cost, in customers and in money.
+
+    Read from the log alone: the margin behind an order is written onto the
+    event when it is placed and again when it is lost, so this needs no access
+    to the menu and works the same on a real day as on a simulated one. `params`
+    is accepted for the signature the plan fixes and is not required.
+
+    A balk is someone who looked at the line and left. An abandonment is someone
+    who ordered, waited, and was gone by the time it was ready — the cafe made
+    that one, so it cost ingredients as well as the sale.
+    """
+    events = _within(_events(log), window)
+
+    placed = 0
+    offered_cents = 0
+    lost: dict[str, int] = defaultdict(int)
+    lost_cents: dict[str, int] = defaultdict(int)
+
+    for event in events:
+        if event.type is not EventType.STATE_CHANGE:
+            continue
+        if event.to_state == State.PLACED:
+            placed += 1
+            offered_cents += int(event.payload.get("margin_cents", 0))
+        elif event.to_state in (State.BALKED, State.ABANDONED):
+            reason = event.payload.get("reason") or str(event.to_state)
+            lost[reason] += 1
+            lost_cents[reason] += int(event.payload.get("margin_cents", 0))
+
+    total_lost = sum(lost.values())
+    total_lost_cents = sum(lost_cents.values())
+    return {
+        "placed": placed,
+        "balked": lost.get(str(State.BALKED), 0),
+        "abandoned": total_lost - lost.get(str(State.BALKED), 0),
+        "lost": total_lost,
+        "lost_fraction": total_lost / placed if placed else 0.0,
+        "by_reason": dict(lost),
+        "lost_margin_cents": total_lost_cents,
+        "offered_margin_cents": offered_cents,
+        "captured_margin_cents": offered_cents - total_lost_cents,
+    }

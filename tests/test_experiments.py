@@ -98,8 +98,13 @@ def test_both_arms_run_and_conserve():
         assert len(result.rows) == len(seeds)
         for row in result.rows:
             assert row["orders"] > 0
-            assert row["served"] + row["in_flight"] == row["orders"]
+            # people leave now, so the identity has more terms than it did
+            assert (
+                row["served"] + row["in_flight"] + row["balked"] + row["abandoned"]
+                == row["orders"]
+            )
             assert row["wait_p90_s"] > 0
+            assert 0 < row["captured_margin_cents"] < row["orders"] * 100_00
 
 
 def test_the_arms_face_identical_demand():

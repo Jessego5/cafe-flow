@@ -14,6 +14,7 @@ import numpy as np
 
 from core.params import SECONDS_PER_MINUTE, Params
 from core.types import Channel, Line
+from sim.balking import draw_channel, preorder_lead_s, sample_minutes
 
 __all__ = ["Arrival", "generate_arrivals", "class_block_size"]
 
@@ -22,7 +23,12 @@ SECONDS_PER_HOUR = 3600.0
 
 @dataclass(frozen=True, slots=True)
 class Arrival:
-    """One customer showing up, with the order they intend to place."""
+    """One customer, with the order they intend to place and what they will
+    put up with to get it.
+
+    `at_s` is when the order is *placed*. For someone ordering ahead that is a
+    class block earlier than `wanted_at_s`, which is when they turn up for it.
+    """
 
     customer_id: str
     order_id: str
@@ -30,10 +36,18 @@ class Arrival:
     channel: Channel
     lines: tuple[Line, ...]
     source: str  # which class block, or "background"
+    balk_tolerance_s: float = float("inf")
+    time_budget_s: float = float("inf")
+    wanted_at_s: float | None = None
+    no_show: bool = False
 
     @property
     def size(self) -> int:
         return len(self.lines)
+
+    @property
+    def preordered(self) -> bool:
+        return self.channel is Channel.PREORDER
 
 
 def class_block_size(block, capture_rate: float) -> int:
@@ -109,20 +123,58 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
         )
 
     times.sort(key=lambda pair: pair[0])
+    lead_s = preorder_lead_s(params)
 
-    arrivals: list[Arrival] = []
-    for at_s, source in times:
-        if not opens <= at_s < closes:
+    drawn: list[Arrival] = []
+    for wanted_at_s, source in times:
+        if not opens <= wanted_at_s < closes:
             continue
-        index = len(arrivals)
-        arrivals.append(
+
+        # Fixed draw order, and every draw made for every customer even when
+        # the answer is discarded: a conditional draw would make the seed mean
+        # different things for different people.
+        lines = _draw_lines(params, rng)
+        channel = draw_channel(params, rng)
+        tolerance_s = sample_minutes(params.customers.balk_tolerance_min, rng) * SECONDS_PER_MINUTE
+        budget_s = sample_minutes(params.customers.time_budget_min, rng) * SECONDS_PER_MINUTE
+        no_show = rng.random() < params.customers.no_show_rate
+
+        placed_at_s = (
+            max(opens, wanted_at_s - lead_s)
+            if channel is Channel.PREORDER
+            else wanted_at_s
+        )
+
+        drawn.append(
             Arrival(
-                customer_id=f"c{index:05d}",
-                order_id=f"o{index:05d}",
-                at_s=at_s,
-                channel=Channel.WALKUP,
-                lines=_draw_lines(params, rng),
+                customer_id="",
+                order_id="",
+                at_s=placed_at_s,
+                channel=channel,
+                lines=lines,
                 source=source,
+                balk_tolerance_s=tolerance_s,
+                time_budget_s=budget_s,
+                wanted_at_s=wanted_at_s,
+                no_show=no_show and channel is Channel.PREORDER,
             )
         )
-    return arrivals
+
+    # Ordering ahead moves someone earlier in the day, so identities are only
+    # settled once the whole day is in placement order.
+    drawn.sort(key=lambda arrival: (arrival.at_s, arrival.wanted_at_s))
+    return [
+        Arrival(
+            customer_id=f"c{index:05d}",
+            order_id=f"o{index:05d}",
+            at_s=arrival.at_s,
+            channel=arrival.channel,
+            lines=arrival.lines,
+            source=arrival.source,
+            balk_tolerance_s=arrival.balk_tolerance_s,
+            time_budget_s=arrival.time_budget_s,
+            wanted_at_s=arrival.wanted_at_s,
+            no_show=arrival.no_show,
+        )
+        for index, arrival in enumerate(drawn)
+    ]

@@ -1,0 +1,17 @@
+# Arm B: some of the queue orders ahead instead of standing in it.
+#
+# Not hypothetical here. Transact mobile ordering is already deployed at this
+# cafe, so this fraction is something to count at the pickup shelf rather than
+# a knob to sweep. 0.3 is a placeholder until someone does.
+#
+# Someone who ordered ahead has committed and never balks, and they place their
+# order a class block early — which is the "shift demand into the trough" half
+# of the research question.
+
+meta:
+  scenario: adoption
+  source: assumed
+
+customers:
+  preorder_adoption: 0.3
+  source: assumed

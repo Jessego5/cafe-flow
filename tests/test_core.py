@@ -650,3 +650,25 @@ def test_the_report_breaks_down_every_source(params):
     detail = params.provenance_report().detail()
     assert detail.startswith("provenance: ")
     assert "observed" in detail and "published" in detail and "assumed" in detail
+
+
+def test_swapping_a_distribution_does_not_leave_the_old_one_behind(root, tmp_path):
+    """An overlay that changes a mapping's shape is describing a different
+    thing, not amending this one."""
+    overlay = tmp_path / "constant.yaml"
+    overlay.write_text(
+        "customers:\n"
+        "  balk_tolerance_min: { dist: constant, value: 4.0 }\n"
+    )
+    merged = load_params(root / "params" / "base.yaml", overlay)
+    assert merged.customers.balk_tolerance_min.dist == "constant"
+    assert merged.customers.balk_tolerance_min.value == 4.0
+    assert not hasattr(merged.customers.balk_tolerance_min, "median")
+
+    # amending the same shape still merges
+    tweak = tmp_path / "tweak.yaml"
+    tweak.write_text("customers:\n  balk_tolerance_min: { median: 4.0 }\n")
+    amended = load_params(root / "params" / "base.yaml", tweak)
+    assert amended.customers.balk_tolerance_min.dist == "lognormal"
+    assert amended.customers.balk_tolerance_min.median == 4.0
+    assert amended.customers.balk_tolerance_min.sigma == 0.45
