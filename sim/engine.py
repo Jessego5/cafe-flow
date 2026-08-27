@@ -32,7 +32,8 @@ from sim.balking import (
     nominal_seconds_per_order,
     observable_queue_depth,
 )
-from sim.policies import Pending, Policy, make_policy
+from core.policies import Policy, make_policy
+from sim.policies import Pending
 
 __all__ = ["Barista", "Cafe", "RunResult", "run", "event_path"]
 
@@ -549,7 +550,9 @@ def run(
     until = float(params.meta.end_s if until_s is None else until_s)
 
     rng = np.random.default_rng(seed)
-    log = EventLog(scenario=scenario, seed=seed, is_simulated=True)
+    log = EventLog(
+        scenario=scenario, seed=seed, is_simulated=True, policy=params.policy.name
+    )
     env = simpy.Environment(initial_time=float(params.meta.start_s))
 
     cafe = Cafe(env=env, params=params, rng=rng, log=log)

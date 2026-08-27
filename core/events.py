@@ -52,6 +52,9 @@ class Event(BaseModel):
     is_simulated: bool = False
     scenario: str = ""
     seed: int | None = None
+    # which scheduler was in force. A week of logs spanning two policies is
+    # uninterpretable without it, and it cannot be recovered afterwards.
+    policy: str | None = None
     wall_ts: datetime | None = None     # UTC; None in the simulator
     payload: dict[str, Any] = Field(default_factory=dict)
 
@@ -78,10 +81,12 @@ class EventLog:
         seed: int | None = None,
         *,
         is_simulated: bool = False,
+        policy: str | None = None,
     ) -> None:
         self.scenario = scenario
         self.seed = seed
         self.is_simulated = is_simulated
+        self.policy = policy
         self._events: list[Event] = []
 
     def __len__(self) -> int:
@@ -110,6 +115,7 @@ class EventLog:
             type=type,
             scenario=self.scenario,
             seed=self.seed,
+            policy=self.policy,
             is_simulated=self.is_simulated,
             **fields,
         )
@@ -126,6 +132,7 @@ class EventLog:
                 "event_id": event_id,
                 "scenario": self.scenario,
                 "seed": self.seed,
+                "policy": event.policy or self.policy,
                 # the log's flag is a floor, not an override: a live log carries
                 # simulated orders alongside real ones and must not unflag them.
                 "is_simulated": event.is_simulated or self.is_simulated,

@@ -283,3 +283,58 @@ def test_items_on_one_order_are_worked_one_after_another(batching):
     ]
     assert len(cycles) == 3
     assert all(event.payload["size"] == 1 for event in cycles)
+
+
+# --------------------------------------------------------------------------
+# the same scheduler on both sides
+# --------------------------------------------------------------------------
+
+
+def test_the_scheduler_lives_in_core(request):
+    """Ground rule 2: if the app and the simulator could disagree about what to
+    make next, the logic is in the wrong place. `core` must stay importable
+    without the simulator."""
+    import ast
+
+    source = (request.config.rootpath / "core" / "policies.py").read_text()
+    imports = [
+        name.split(".")[0]
+        for node in ast.walk(ast.parse(source))
+        for name in (
+            [alias.name for alias in node.names]
+            if isinstance(node, ast.Import)
+            else [node.module or ""] if isinstance(node, ast.ImportFrom) else []
+        )
+    ]
+    assert "simpy" not in imports
+    assert "sim" not in imports
+    assert "app" not in imports
+
+
+def test_the_simulator_and_the_bar_use_the_same_policy_object(batching):
+    from core.policies import BatchPolicy
+    from core.policies import make_policy as core_make
+    from sim.policies import make_policy as sim_make
+
+    assert sim_make is core_make
+    assert isinstance(core_make(batching), BatchPolicy)
+
+
+def test_the_plan_covers_every_waiting_item_exactly_once(params, batching):
+    from core.policies import make_policy, plan_batches
+
+    queue = [
+        _pending(params, "panini_press", "bacon_egg_cheese_bagel", index=index)
+        for index in range(5)
+    ]
+    for policy in (make_policy(params), make_policy(batching)):
+        plan = plan_batches(policy, "panini_press", queue, 0.0)
+        flattened = [entry for batch in plan for entry in batch]
+        assert len(flattened) == len(queue)
+        assert {id(entry) for entry in flattened} == {id(entry) for entry in queue}
+
+
+def test_every_event_names_the_scheduler_in_force(params, batching):
+    """A week of logs spanning two policies is uninterpretable without it."""
+    assert {event.policy for event in run(params, 0).log} == {"fifo"}
+    assert {event.policy for event in run(batching, 0).log} == {"batch_milk"}

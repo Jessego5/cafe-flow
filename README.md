@@ -20,7 +20,7 @@ Build order and acceptance criteria live in
 | Path | View |
 |---|---|
 | `/` | student: menu, cart, order status |
-| `/bar` | barista: live queue, one tap per transition |
+| `/bar` | barista: live queue, one tap per transition, what to run together |
 | `/pickup` | display: order numbers ready for collection |
 
 The API keeps the unprefixed paths (`/menu`, `/orders`, `/orders/{id}`,
@@ -44,6 +44,7 @@ question.
 | M3 simulator engine | done |
 | M4 metrics | partial: waits, throughput, utilisation, lost margin |
 | M5 policies | partial: fifo and batching, no bounded reorder yet |
+| M10 findings back into the app | partial: the bar runs the measured policy |
 | M6 balking and channel choice | done |
 | M7 experiments | partial: named arms, no sweeps yet |
 
@@ -65,6 +66,18 @@ the door. So this project does not build a competing student ordering app. The
 student view is a demo; the deliverable is the simulator, the observations, and
 a barista-side queue that batches and reorders work the existing system does
 not. `customers.preorder_adoption` is an observable here, not a sweep.
+
+## One scheduler, two runtimes
+
+`core/policies.py` decides what to make next and what to make together. The
+simulator and the bar both run it, selected by `policy.name` in the config, so
+a policy an experiment measured is the policy the bar is shown — not a second
+implementation that has to be kept in step. Every event records which scheduler
+was in force, because a week of logs spanning two policies is uninterpretable
+without it.
+
+`GET /queue` returns the resulting suggestions and what each is worth in
+bottleneck-seconds. They are advisory: the barista decides.
 
 ## Comparing arms
 

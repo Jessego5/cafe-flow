@@ -15,6 +15,32 @@ const NEXT = {
 
 const LATE_S = 300
 
+// The scheduler's advice, from the same policy the experiments measured.
+// Advisory: the barista decides, this says what it would be worth.
+function Together({ batches }) {
+  if (!batches || batches.length === 0) return null
+  return (
+    <section className="together">
+      {batches.map((batch, index) => (
+        <div className="card run-together" key={`${batch.station}-${index}`}>
+          <div className="spread">
+            <strong>Run together · {batch.station.replace(/_/g, ' ')}</strong>
+            <span className="muted">saves {Math.round(batch.saving_s)}s</span>
+          </div>
+          <div className="row wrap">
+            {batch.items.map((item) => (
+              <span className="chip" key={item.order_id + item.drink}>
+                <span className="number">#{item.number}</span> {item.drink.replace(/_/g, ' ')}
+                {item.milk_type ? ` · ${item.milk_type}` : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 function Card({ order, since, onMove, busy }) {
   const next = NEXT[order.state]
   const waiting = order.waiting_s + since
@@ -68,12 +94,14 @@ function App() {
   }
 
   const orders = data ? data.orders : []
+  const batches = data ? data.batches : []
 
   return (
     <>
       <header className="bar">
         <h1>Bar queue</h1>
         <div className="row">
+          {data && <span className="pill">{data.policy.replace(/_/g, ' ')}</span>}
           {data && data.showing_simulated && <span className="pill sim">{data.env}</span>}
           <span className={connected ? 'pill live' : 'pill down'}>
             {connected ? 'live' : 'not connected'}
@@ -83,6 +111,7 @@ function App() {
       <main>
         {error && <p className="error">{error}</p>}
         {actionError && <p className="error">{actionError}</p>}
+        <Together batches={batches} />
         {orders.length === 0 ? (
           <p className="empty">{data ? 'Queue is clear.' : 'Loading…'}</p>
         ) : (

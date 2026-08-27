@@ -132,6 +132,7 @@ class OrderEventRow(SQLModel, table=True):
     channel: str | None = None
     is_simulated: bool = False
     scenario: str = ""
+    policy: str | None = None
     wall_ts: datetime | None = None
     payload: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
 
@@ -153,6 +154,7 @@ class OrderEventRow(SQLModel, table=True):
             is_simulated=self.is_simulated,
             scenario=self.scenario,
             seed=None,
+            policy=self.policy,
             wall_ts=self.wall_ts,
             payload=self.payload or {},
         )
@@ -250,8 +252,17 @@ class DbEventLog(EventLog):
     never announces something a rollback would erase.
     """
 
-    def __init__(self, session: Session, scenario: str = "live", *, is_simulated: bool = False) -> None:
-        super().__init__(scenario=scenario, seed=None, is_simulated=is_simulated)
+    def __init__(
+        self,
+        session: Session,
+        scenario: str = "live",
+        *,
+        is_simulated: bool = False,
+        policy: str | None = None,
+    ) -> None:
+        super().__init__(
+            scenario=scenario, seed=None, is_simulated=is_simulated, policy=policy
+        )
         self.session = session
         self.published: list[Event] = []
 
@@ -270,6 +281,7 @@ class DbEventLog(EventLog):
             channel=event.channel,
             is_simulated=event.is_simulated or self.is_simulated,
             scenario=self.scenario,
+            policy=event.policy or self.policy,
             wall_ts=event.wall_ts or now_utc(),
             payload=dict(event.payload),
         )
@@ -284,6 +296,7 @@ class DbEventLog(EventLog):
                 "scenario": self.scenario,
                 "seed": None,
                 "is_simulated": row.is_simulated,
+                "policy": row.policy,
                 "wall_ts": row.wall_ts,
             }
         )

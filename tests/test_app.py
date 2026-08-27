@@ -29,6 +29,8 @@ from app.db import (
 from core.menu import make_item, service_seconds
 from core.states import State
 
+from tests.conftest import BASE_YAML as BASE_YAML_PATH
+
 LATTE = {"drink": "latte", "milk_type": "oat"}
 DRIP = {"drink": "drip_coffee"}
 
@@ -457,3 +459,96 @@ def test_healthz_fails_loudly_when_the_database_is_gone(client, app_env):
     finally:
         app_env.db_path.parent.chmod(0o700)
         db._engine = None
+
+
+# --------------------------------------------------------------------------
+# the bar runs the policy the experiments measured
+# --------------------------------------------------------------------------
+
+
+def test_the_queue_names_the_scheduler_in_force(client):
+    body = client.get("/queue").json()
+    assert body["policy"] == get_params().policy.name
+    assert body["batches"] == []          # nothing queued, nothing to group
+
+    order = place(client, LATTE)
+    with session_scope() as session:
+        rows = session.exec(select(OrderEventRow)).all()
+    assert {row.policy for row in rows} == {get_params().policy.name}
+    assert order["order_id"]
+
+
+def test_fifo_suggests_nothing_to_run_together(client):
+    for _ in range(3):
+        place(client, {"drink": "bacon_egg_cheese_bagel"})
+    assert client.get("/queue").json()["batches"] == []
+
+
+def test_the_bar_is_told_what_to_run_together(app_env, tmp_path, monkeypatch):
+    """The payoff of keeping the scheduler in core: the policy an experiment
+    measured is the policy the bar is shown, not a second implementation."""
+    from fastapi.testclient import TestClient
+
+    from app.config import get_params as fresh
+    from app.main import create_app
+
+    overlay = tmp_path / "batch.yaml"
+    overlay.write_text("policy:\n  name: batch_milk\n  source: assumed\n")
+    monkeypatch.setattr(app_env, "param_files", [BASE_YAML_PATH, overlay])
+    fresh.cache_clear()
+
+    with TestClient(create_app()) as batching:
+        for lines in (
+            [{"drink": "bacon_egg_cheese_bagel"}],
+            [{"drink": "latte", "milk_type": "oat", "variant": "hot"}],
+            [{"drink": "sausage_egg_cheese"}],
+            [{"drink": "latte", "milk_type": "oat", "variant": "hot"}],
+            [{"drink": "latte", "milk_type": "whole", "variant": "hot"}],
+        ):
+            assert batching.post("/orders", json={"lines": lines}).status_code == 201
+
+        body = batching.get("/queue").json()
+        assert body["policy"] == "batch_milk"
+
+        by_station = {batch["station"]: batch for batch in body["batches"]}
+        assert set(by_station) == {"panini_press", "steam_wand"}
+
+        press = by_station["panini_press"]
+        assert press["size"] == 2
+        assert press["saving_s"] == get_params().station("panini_press").run_s
+
+        wand = by_station["steam_wand"]
+        assert wand["key"] == "oat"                     # never mixes milks
+        assert {item["milk_type"] for item in wand["items"]} == {"oat"}
+
+        # the finding, visible on the bar: the press is where batching pays
+        assert press["saving_s"] > 10 * wand["saving_s"]
+
+        # a suggestion never claims work already on the shelf
+        for batch in body["batches"]:
+            for item in batch["items"]:
+                assert item["number"] in {order["number"] for order in body["orders"]}
+
+
+def test_a_finished_order_drops_out_of_the_suggestions(app_env, tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.config import get_params as fresh
+    from app.main import create_app
+
+    overlay = tmp_path / "batch.yaml"
+    overlay.write_text("policy:\n  name: batch_milk\n  source: assumed\n")
+    monkeypatch.setattr(app_env, "param_files", [BASE_YAML_PATH, overlay])
+    fresh.cache_clear()
+
+    with TestClient(create_app()) as batching:
+        first = batching.post(
+            "/orders", json={"lines": [{"drink": "bacon_egg_cheese_bagel"}]}
+        ).json()
+        batching.post("/orders", json={"lines": [{"drink": "sausage_egg_cheese"}]})
+        assert batching.get("/queue").json()["batches"]
+
+        for state in ("accepted", "in_progress", "ready"):
+            batching.post(f"/orders/{first['order_id']}/transition", json={"to": state})
+
+        assert batching.get("/queue").json()["batches"] == []

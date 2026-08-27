@@ -2,15 +2,100 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from fastapi import APIRouter
 from sqlmodel import select
 
 from app.config import day_seconds, get_params, service_date, settings
-from app.db import OrderItemRow, OrderRow, open_orders, session_scope
+from app.db import OrderItemRow, OrderRow, hydrate, open_orders, session_scope
 from app.routes.common import order_payload
+from core.capacity import StationCapacityModel
+from core.params import Params
+from core.policies import make_policy, plan_batches
 from core.states import State
+from core.types import Item
 
 router = APIRouter(tags=["barista"])
+
+
+@dataclass(slots=True)
+class QueuedItem:
+    """One item on the bar waiting for a station that can run several at once.
+
+    This is the app's carrier for `core.policies`: the simulator passes one
+    holding a SimPy event, the bar passes one holding a row. The scheduler that
+    sees them is the same code either way, which is the point — a policy
+    measured in an experiment is the policy the bar runs, not a reimplementation
+    of it.
+    """
+
+    item: Item
+    submitted_at: float
+    order_id: str
+    number: int
+
+
+def suggested_batches(rows, params: Params, now_s: float) -> list[dict]:
+    """What the bar could run together right now, and what it would save.
+
+    Advisory only. The barista decides; this says what the scheduler would do
+    and what it is worth, in the same bottleneck-seconds the capacity model and
+    the simulator use.
+    """
+    policy = make_policy(params)
+    suggestions: list[dict] = []
+
+    for name, station in params.stations.items():
+        if not station.groups_work:
+            continue
+
+        model = StationCapacityModel(params, name)
+        pending: list[QueuedItem] = []
+        for row, item_rows in rows:
+            if State(row.state) is State.READY:      # already on the shelf
+                continue
+            for item in hydrate(row, item_rows, params).items:
+                if item.tasks_at(name):
+                    pending.append(
+                        QueuedItem(
+                            item=item,
+                            submitted_at=row.placed_at_s,
+                            order_id=row.order_id,
+                            number=row.number,
+                        )
+                    )
+        if not pending:
+            continue
+
+        for batch in plan_batches(policy, name, pending, now_s):
+            if len(batch) < 2:
+                continue
+            items = [entry.item for entry in batch]
+            saving_s = sum(model.cost(item) for item in items) - model.batch_cost(items)
+            if saving_s <= 0:
+                continue
+            suggestions.append(
+                {
+                    "station": name,
+                    "size": len(batch),
+                    "saving_s": round(saving_s, 1),
+                    "key": model.batch_value(items[0]),
+                    "items": [
+                        {
+                            "order_id": entry.order_id,
+                            "number": entry.number,
+                            "drink": entry.item.drink,
+                            "milk_type": entry.item.milk_type,
+                            "variant": entry.item.variant,
+                        }
+                        for entry in batch
+                    ],
+                }
+            )
+
+    suggestions.sort(key=lambda batch: -batch["saving_s"])
+    return suggestions
 
 
 @router.get("/queue")
@@ -26,12 +111,15 @@ async def get_queue() -> dict:
             session, include_simulated=include_simulated, on=service_date(params)
         )
         orders = [order_payload(row, items, now_s=now_s) for row, items in rows]
+        batches = suggested_batches(rows, params, now_s)
 
     return {
         "now_s": now_s,
         "env": str(settings.env),
         "showing_simulated": include_simulated,
+        "policy": params.policy.name,
         "orders": orders,
+        "batches": batches,
     }
 
 

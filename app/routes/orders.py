@@ -125,7 +125,10 @@ async def create_order(
             row = persist_order(
                 session, order, params, number=number, on=on, bottleneck_cost_s=cost_s
             )
-            log = DbEventLog(session, scenario=str(settings.env), is_simulated=is_simulated)
+            log = DbEventLog(
+                session, scenario=str(settings.env), is_simulated=is_simulated,
+                policy=params.policy.name,
+            )
             place(
                 order,
                 at=now_s,
@@ -209,7 +212,10 @@ async def move_order(order_id: str, body: TransitionIn) -> dict:
             payload["idempotent"] = True
             return payload
 
-        log = DbEventLog(session, scenario=str(settings.env), is_simulated=row.is_simulated)
+        log = DbEventLog(
+            session, scenario=str(settings.env), is_simulated=row.is_simulated,
+            policy=params.policy.name,
+        )
         try:
             transition(order, body.to, at=now_s, actor=body.actor, log=log)
         except IllegalTransition as exc:
