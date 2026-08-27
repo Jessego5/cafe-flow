@@ -1,0 +1,20 @@
+# Shared core (M1)
+pydantic>=2.7
+pyyaml>=6.0
+
+# App (M2, M2.5)
+fastapi>=0.111
+sqlmodel>=0.0.18
+sse-starlette>=2.1
+uvicorn[standard]>=0.30
+
+# Simulator and analysis (M3-M8)
+simpy>=4.1
+numpy>=1.26
+pandas>=2.2
+pyarrow>=16.0
+matplotlib>=3.8
+httpx>=0.27
+
+# Tests
+pytest>=8.0

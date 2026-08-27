@@ -1,0 +1,99 @@
+# Campus Cafe Order-Ahead — base parameter file.
+#
+# Ground rule 1: no magic numbers outside this file.
+# Ground rule 3: every parameter carries provenance. `source` on a mapping
+#   applies to that mapping and everything beneath it unless overridden.
+#   At M8, params/observed.yaml overlays this file and flips the touched
+#   subtrees to `source: observed` (or `fitted`).
+
+meta:
+  scenario: base_assumed
+  seed: 42
+  sim_start: "07:00"
+  sim_end: "15:00"
+  source: assumed
+
+cafe:
+  name: Campus Cafe
+  timezone: America/Chicago     # class blocks and slot boundaries are local
+  source: assumed
+
+stations:
+  source: assumed
+  register:    { capacity: from_staffing, base_s: 35 }
+  steam_wand:  { capacity: 1, setup_s: 10, per_6oz_s: 15,
+                 batch_key: milk_type, max_batch_oz: 32 }
+  group_head:  { capacity: 2, shot_s: 25 }
+  blender:     { capacity: 1, run_s: 90, blocking: true }
+  cold_tap:    { capacity: 99, pour_s: 8 }
+  oven:        { capacity: 1, run_s: 180, batch_size: 6 }
+
+# Which station gates slot capacity. Set from the M8 findings.
+# If this turns out to be `register`, swap the name — no code changes.
+bottleneck_station: steam_wand
+
+staffing:
+  - { from: "07:00", to: "10:00", baristas: 2, source: assumed }
+  - { from: "10:00", to: "13:00", baristas: 3, source: assumed }
+  - { from: "13:00", to: "15:00", baristas: 2, source: assumed }
+
+menu:
+  source: assumed
+  latte:
+    price_cents: 500
+    cogs_cents: 130
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ]
+    assembly_s: 20
+  drip:       { price_cents: 250, cogs_cents: 40,  requires_milk: false,
+                tasks: [ { station: cold_tap } ], assembly_s: 5 }
+  cold_brew:  { price_cents: 450, cogs_cents: 90,  requires_milk: false,
+                tasks: [ { station: cold_tap } ], assembly_s: 8 }
+  cappuccino: { price_cents: 475, cogs_cents: 120, requires_milk: true,
+                tasks: [ { station: steam_wand, oz: 6 },
+                         { station: group_head, shots: 1 } ], assembly_s: 18 }
+  blended:    { price_cents: 600, cogs_cents: 170, requires_milk: true,
+                tasks: [ { station: blender } ], assembly_s: 15 }
+  pastry:     { price_cents: 350, cogs_cents: 110, requires_milk: false,
+                tasks: [ { station: oven } ], assembly_s: 5 }
+
+mix:
+  drink: { latte: 0.38, drip: 0.18, cold_brew: 0.16,
+           cappuccino: 0.12, blended: 0.08, pastry: 0.08 }
+  milk:  { whole: 0.32, oat: 0.38, skim: 0.14, almond: 0.16 }
+  attach_rate: 0.15
+  source: assumed
+
+arrivals:
+  class_blocks:
+    - { ends_at: "08:50", sections: 8,  avg_enrollment: 28 }
+    - { ends_at: "09:50", sections: 14, avg_enrollment: 30 }
+    - { ends_at: "10:50", sections: 16, avg_enrollment: 32 }
+    - { ends_at: "11:50", sections: 12, avg_enrollment: 30 }
+    - { ends_at: "12:50", sections: 10, avg_enrollment: 28 }
+  capture_rate: 0.055          # FITTED AT M8 — primary calibration knob
+  offset_min: 3.0
+  sigma_min: 2.5
+  background_per_hour: 8
+  source: assumed
+
+customers:
+  time_budget_min:    { dist: lognormal, median: 9.0, sigma: 0.5 }
+  balk_tolerance_min: { dist: lognormal, median: 7.0, sigma: 0.45 }
+  preorder_adoption: 0.0
+  no_show_rate: 0.03
+  source: assumed
+
+policy:
+  name: fifo                   # fifo | batch_milk | bounded_reorder
+  lookahead_s: 180
+  reorder_window_s: 180
+  starvation_guard_s: 300
+  source: assumed
+
+slots:
+  enabled: false               # turned on at M10 if findings support it
+  width_min: 5
+  walkup_reserve_fraction: 0.30
+  min_lead_time_min: 10
+  source: assumed
