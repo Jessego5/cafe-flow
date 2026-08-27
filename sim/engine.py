@@ -1,0 +1,329 @@
+"""The discrete-event harness, built on the same `core/` the app uses.
+
+Virtual time: a simulated day runs in milliseconds because the clock jumps from
+event to event. That is the whole reason the experiments cannot go through HTTP.
+
+The modelling decision that matters most is here. A drink needs **a barista and
+a station**. With two baristas and one steam wand, the wand contends and the
+baristas block; in a small cafe the same human takes the order and pulls the
+shot, so the register competes for barista time even when it is not the nominal
+bottleneck. Modelling stations as independent parallel servers would invalidate
+every result the project produces.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+import simpy
+
+from core.capacity import StationCapacityModel
+from core.events import EventLog, EventType
+from core.menu import make_order
+from core.params import FROM_STAFFING, Params, load_params
+from core.states import LOST, State, place, transition
+from core.types import Channel, Order, Task, TaskKind
+from sim.arrivals import Arrival, generate_arrivals
+
+__all__ = ["Barista", "Cafe", "RunResult", "run", "event_path"]
+
+REGISTER = "register"
+
+
+class Barista:
+    """One worker.
+
+    A barista is held for the whole of a piece of work and seizes stations from
+    inside that hold, so they are never parallel with themselves. Baristas come
+    from a pool sized by the staffing plan; going off shift means being taken
+    out of the pool, not disappearing mid-drink.
+    """
+
+    def __init__(self, cafe: "Cafe", index: int) -> None:
+        self.cafe = cafe
+        self.name = f"barista-{index}"
+
+    def __repr__(self) -> str:
+        return self.name
+
+    def work(self, task: Task, order: Order, *, station: str | None = None, kind: str = "prep"):
+        """Do one timed piece of work, seizing the station if there is one."""
+        env, cafe = self.cafe.env, self.cafe
+        station_name = station if station is not None else task.station
+
+        if station_name is None:                      # assembly: hands only
+            cafe.emit_station(EventType.STATION_START, order, task, self, None, kind)
+            yield env.timeout(task.duration_s)
+            cafe.emit_station(EventType.STATION_END, order, task, self, None, kind)
+            return
+
+        resource = cafe.stations[station_name]
+        with resource.request() as slot:
+            yield slot
+            cafe.emit_station(EventType.STATION_START, order, task, self, station_name, kind)
+            yield env.timeout(task.duration_s)
+            cafe.emit_station(EventType.STATION_END, order, task, self, station_name, kind)
+
+
+@dataclass
+class Cafe:
+    """Resources, staffing, and the service process.
+
+    Everything it knows about drinks it asks `core/` for: what work an item
+    implies, how long it takes, and which state moves are legal.
+    """
+
+    env: simpy.Environment
+    params: Params
+    rng: np.random.Generator
+    log: EventLog
+
+    stations: dict[str, simpy.Resource] = field(init=False)
+    crew: simpy.Store = field(init=False)
+    orders: dict[str, Order] = field(init=False, default_factory=dict)
+    bench: list[Barista] = field(init=False, default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.stations = {
+            name: simpy.Resource(self.env, capacity=self.params.station_capacity(name))
+            for name in self.params.stations
+        }
+        self.capacity_model = StationCapacityModel(self.params)
+
+        # The crew is a pool of identified workers rather than an anonymous
+        # counter, so the log can say which barista did what.
+        self.bench = [Barista(self, index) for index in range(self.params.max_baristas)]
+        self.crew = simpy.Store(self.env, capacity=self.params.max_baristas)
+        self.orders = {}
+
+    # ---- staffing ------------------------------------------------------
+
+    def staffing(self):
+        """Track the staffing plan by holding spare workers off the floor.
+
+        Off-shift baristas are taken out of the pool the moment they are free;
+        nobody is pulled off a drink they are already making.
+        """
+        held: list[Barista] = []
+        for block in sorted(self.params.staffing, key=lambda b: b.from_s):
+            if self.env.now < block.from_s:
+                yield self.env.timeout(block.from_s - self.env.now)
+
+            while len(self.bench) - len(held) < block.baristas:
+                self.bench.append(Barista(self, len(self.bench)))
+            wanted = block.baristas
+
+            while len(held) > self.params.max_baristas - wanted:
+                self.crew.put(held.pop())
+            while len(held) < self.params.max_baristas - wanted:
+                held.append((yield self.crew.get()))
+
+    def open_the_doors(self) -> None:
+        for barista in self.bench:
+            self.crew.put(barista)
+        self.env.process(self.staffing())
+
+    # ---- events --------------------------------------------------------
+
+    def emit_station(
+        self,
+        kind: EventType,
+        order: Order,
+        task: Task,
+        barista: Barista,
+        station: str | None,
+        label: str,
+    ) -> None:
+        self.log.emit(
+            kind,
+            self.env.now,
+            order_id=order.order_id,
+            item_id=task.item_id,
+            customer_id=order.customer_id,
+            station=station,
+            actor=barista.name,
+            channel=order.channel,
+            payload={"kind": label, "duration_s": task.duration_s},
+        )
+
+    # ---- the service process ------------------------------------------
+
+    def serve(self, order: Order):
+        """One order, from the register to the handoff shelf."""
+        self.orders[order.order_id] = order
+        place(order, at=self.env.now, actor="customer", log=self.log)
+
+        register = self.params.station(REGISTER)
+        register_task = Task(
+            item_id=order.items[0].item_id,
+            order_id=order.order_id,
+            station=REGISTER,
+            kind=TaskKind.PREP,
+            duration_s=register.base_s or 0.0,
+        )
+
+        # The crew is never handed back with `yield`: a generator that yields
+        # from `finally` cannot be closed, and the harness closes every
+        # unfinished order when the day is cut off at closing time. Putting a
+        # worker back can never block — the pool is exactly as large as the
+        # bench — so the plain call is both correct and safe to unwind.
+        barista: Barista = yield self.crew.get()
+        try:
+            yield from barista.work(register_task, order, station=REGISTER, kind="register")
+            transition(order, State.ACCEPTED, at=self.env.now, actor=barista.name, log=self.log)
+        finally:
+            self.crew.put(barista)
+
+        barista = yield self.crew.get()
+        try:
+            transition(order, State.IN_PROGRESS, at=self.env.now, actor=barista.name, log=self.log)
+            for item in order.items:
+                for task in item.tasks:
+                    yield from barista.work(task, order, kind=str(task.kind))
+            transition(order, State.READY, at=self.env.now, actor=barista.name, log=self.log)
+        finally:
+            self.crew.put(barista)
+
+        # Walk-ups are standing at the shelf; the handoff refinements that make
+        # this a real delay are an M10 question.
+        transition(order, State.PICKED_UP, at=self.env.now, actor="customer", log=self.log)
+
+    def admit(self, arrival: Arrival):
+        """Wait for the customer, then start serving them."""
+        if arrival.at_s > self.env.now:
+            yield self.env.timeout(arrival.at_s - self.env.now)
+
+        self.log.emit(
+            EventType.ARRIVAL,
+            self.env.now,
+            order_id=arrival.order_id,
+            customer_id=arrival.customer_id,
+            channel=arrival.channel,
+            actor="customer",
+            payload={"source": arrival.source, "lines": arrival.size},
+        )
+
+        order = make_order(
+            arrival.order_id,
+            self.params,
+            lines=list(arrival.lines),
+            channel=arrival.channel,
+            placed_at_s=self.env.now,
+            customer_id=arrival.customer_id,
+            is_simulated=True,
+        )
+        yield self.env.process(self.serve(order))
+
+
+@dataclass
+class RunResult:
+    """One simulated day."""
+
+    params: Params
+    scenario: str
+    seed: int
+    log: EventLog
+    arrivals: list[Arrival]
+    orders: dict[str, Order]
+    until_s: float
+
+    def census(self) -> dict[str, int]:
+        """The conservation identity, as counts.
+
+        placed == picked_up + balked + abandoned + cancelled + in_flight
+        """
+        counts: dict[str, int] = {str(state): 0 for state in State}
+        for order in self.orders.values():
+            counts[str(order.state)] += 1
+
+        terminal = counts[State.PICKED_UP] + sum(counts[str(state)] for state in LOST)
+        in_flight = len(self.orders) - terminal
+        return {
+            "placed": len(self.orders),
+            "picked_up": counts[State.PICKED_UP],
+            "balked": counts[State.BALKED],
+            "abandoned": counts[State.ABANDONED],
+            "cancelled": counts[State.CANCELLED],
+            "in_flight_at_end": in_flight,
+        }
+
+    def conserved(self) -> bool:
+        census = self.census()
+        return census["placed"] == (
+            census["picked_up"]
+            + census["balked"]
+            + census["abandoned"]
+            + census["cancelled"]
+            + census["in_flight_at_end"]
+        )
+
+
+def event_path(scenario: str, seed: int, out_dir: str | Path = "out") -> Path:
+    return Path(out_dir) / f"events_{scenario}_{seed}.parquet"
+
+
+def run(
+    params: Params,
+    seed: int | None = None,
+    *,
+    scenario: str | None = None,
+    until_s: float | None = None,
+    arrivals: list[Arrival] | None = None,
+) -> RunResult:
+    """Simulate one day.
+
+    One generator, created here and passed down, is the whole of the randomness
+    (ground rule 5): same params and same seed give a byte-identical log.
+    """
+    seed = params.meta.seed if seed is None else seed
+    scenario = scenario or params.meta.scenario
+    until = float(params.meta.end_s if until_s is None else until_s)
+
+    rng = np.random.default_rng(seed)
+    log = EventLog(scenario=scenario, seed=seed, is_simulated=True)
+    env = simpy.Environment(initial_time=float(params.meta.start_s))
+
+    cafe = Cafe(env=env, params=params, rng=rng, log=log)
+    cafe.open_the_doors()
+
+    demand = generate_arrivals(params, rng) if arrivals is None else list(arrivals)
+    for arrival in demand:
+        env.process(cafe.admit(arrival))
+
+    env.run(until=until)
+
+    return RunResult(
+        params=params,
+        scenario=scenario,
+        seed=seed,
+        log=log,
+        arrivals=demand,
+        orders=cafe.orders,
+        until_s=until,
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Simulate one cafe day.")
+    parser.add_argument("--params", nargs="+", default=["params/base.yaml"])
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--scenario", default=None)
+    parser.add_argument("--out", default="out")
+    args = parser.parse_args()
+
+    params = load_params(*args.params)
+    result = run(params, args.seed, scenario=args.scenario)
+    path = result.log.write_parquet(event_path(result.scenario, result.seed, args.out))
+
+    census = result.census()
+    print(f"{result.scenario} seed={result.seed}  {params.provenance_report().caption()}")
+    print(f"  arrivals {len(result.arrivals)}  events {len(result.log)}  -> {path}")
+    print("  " + "  ".join(f"{key}={value}" for key, value in census.items()))
+    print(f"  conserved: {result.conserved()}  digest {result.log.digest()[:16]}")
+
+
+if __name__ == "__main__":
+    main()
