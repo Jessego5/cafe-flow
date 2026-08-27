@@ -128,9 +128,18 @@ class StationCapacityModel:
     def item_oz(self, item: Item) -> float:
         return sum(task.oz or 0.0 for task in item.tasks_at(self.station_name))
 
+    @property
+    def order_scoped(self) -> bool:
+        """Does this station handle whole orders rather than named tasks?
+
+        The register does: no menu item lists it, but every order goes through
+        it and every item on the order is rung up.
+        """
+        return self.station.base_s is not None
+
     def touches(self, item: Item) -> bool:
         """Does this item do any work at this station?"""
-        return bool(item.tasks_at(self.station_name))
+        return bool(item.tasks_at(self.station_name)) or self.order_scoped
 
     def group(self, items: Sequence[Item], batch_id_prefix: str = "b") -> list[Batch]:
         """Split items into the batches this station would actually run.
@@ -204,7 +213,21 @@ class StationCapacityModel:
     # ---- seconds -------------------------------------------------------
 
     def _item_seconds(self, item: Item) -> float:
-        """Per-item terms only, summed over this item's tasks at the station."""
+        """Per-item terms, summed over this item's tasks at the station.
+
+        An order-scoped station has no named tasks, so its flat per-item terms
+        are charged once for the item itself: the register's few seconds an item
+        are paid whether or not the item involves any work there.
+        """
+        tasks = item.tasks_at(self.station_name)
+        if not tasks:
+            if not self.order_scoped:
+                return 0.0
+            return sum(
+                seconds
+                for seconds, per, attr in self.station.cost_terms.values()
+                if per == PER_ITEM and attr is None
+            )
         return sum(
             task_seconds(
                 self.station,
@@ -212,7 +235,7 @@ class StationCapacityModel:
                 shots=task.shots,
                 include_batch_terms=False,
             )
-            for task in item.tasks_at(self.station_name)
+            for task in tasks
         )
 
     def _batch_terms(self) -> float:

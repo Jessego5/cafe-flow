@@ -3,12 +3,26 @@
 # Provenance (ground rule 3). `source` on a mapping applies to everything
 # beneath it; `source_of` overrides individual keys in that same mapping.
 #
-#   observed  read off the menu boards photographed 2026-08-27
-#   assumed   placeholder, to be replaced at M8
+#   observed   read off the menu boards photographed 2026-08-27
+#   published  a conventional figure from an industry or vendor source, cited
+#              at the parameter
+#   assumed    still a guess
 #
-# Item names, prices and the hot/iced offer are observed. Every duration,
-# capacity, mix fraction and staffing level below is still assumed: the boards
-# say what is sold, not how long it takes or who is working.
+# Service times are published figures where a conventional one exists. What no
+# source can supply is this cafe's own demand: the mix, the hot/iced split, the
+# capture rate and the staffing plan are all still assumed.
+#
+# Sources
+#   espresso extraction 25-30s      Specialty Coffee Association standard
+#     https://www.espressocoffeeshopusa.com/blog/post/26-espresso-extraction-time-perfect-25-30-second-shot
+#   steaming a pitcher 30-45s       home-barista.com / Breville barista guides
+#     https://www.home-barista.com/espresso-guide-frothing-milk.html
+#   panini press 3-5 min, 1-2 at a time, 10-15 sandwiches/hour
+#     https://www.gofoodservice.com/guides/panini-sandwich-grill-buying-guide
+#   register 40s per transaction plus 3s per item
+#     https://www.possolutions.com.au/blog/how-fast-is-your-pos-system-and-what-to-do-about-it
+#   Peet's medium (16oz) latte is a double: 140mg caffeine at 70mg a shot
+#     https://www.caffeineinformer.com/caffeine-content/peets-latte
 
 meta:
   scenario: ground_truth_assumed
@@ -39,15 +53,23 @@ stations:
   # A 30-item board with customisations. `from_staffing` assumes whoever takes
   # the order also makes drinks; if the cafe runs a dedicated cashier this
   # becomes a fixed capacity and the register stops competing for barista time.
-  register:      { capacity: from_staffing, base_s: 40 }
+  # The trade quotes register time as a fixed transaction plus a few seconds an
+  # item, which is exactly this shape.
+  register:      { capacity: from_staffing, base_s: 40, per_item_s: 3,
+                   source_of: { base_s: published, per_item_s: published } }
 
   # Hot milk only. Iced drinks never touch it, which is why the hot/iced split
   # decides how much milk batching is worth at all.
-  steam_wand:    { capacity: 1, setup_s: 10, per_6oz_s: 15,
-                   batch_key: milk_type, max_batch_oz: 32 }
+  # 12oz of milk in 12 + 13*2 = 38s, inside the 30-45s a barista is quoted for
+  # a pitcher. A 32oz pitcher therefore holds two medium drinks, not four.
+  steam_wand:    { capacity: 1, setup_s: 12, per_6oz_s: 13,
+                   batch_key: milk_type, max_batch_oz: 32,
+                   source_of: { setup_s: published, per_6oz_s: published } }
 
   # The shot pulls on its own while the barista steams the next pitcher.
-  group_head:    { capacity: 2, shot_s: 25, attended: false }
+  # SCA standard extraction is 25-30s; the shot pulls while the barista steams.
+  group_head:    { capacity: 2, shot_s: 27, attended: false,
+                   source_of: { shot_s: published } }
 
   # Ice, cold milk, syrups: the iced-drink build bar.
   cold_bar:      { capacity: 2, pour_s: 12 }
@@ -57,7 +79,11 @@ stations:
 
   # Close the lid and walk away. A pressed sandwich occupies the press, not a
   # person — and it goes on occupying it until someone comes back for it.
-  panini_press:  { capacity: 1, run_s: 240, batch_size: 3, attended: false }
+  # 3-5 minutes a sandwich, one or two at a time. Run one at a time that is
+  # 10-15 sandwiches an hour, which is the published throughput of a single
+  # 14-inch grill and the FIFO baseline here.
+  panini_press:  { capacity: 1, run_s: 240, batch_size: 2, attended: false,
+                   source_of: { run_s: published, batch_size: published } }
 
   food_counter:  { capacity: 2, run_s: 90 }
 
@@ -108,7 +134,7 @@ menu:
     price_cents: 575
     cogs_cents: 120
     requires_milk: true
-    tasks: [ { station: steam_wand, oz: 6 }, { station: group_head, shots: 1 } ]
+    tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 2 } ]
     assembly_s: 18
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -118,9 +144,9 @@ menu:
     requires_milk: true
     default_variant: hot
     variants:
-      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+      hot:  { tasks: [ { station: steam_wand, oz: 12 }, { station: group_head, shots: 2 } ],
               assembly_s: 20 }
-      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+      iced: { tasks: [ { station: group_head, shots: 2 }, { station: cold_bar } ],
               assembly_s: 15 }
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -130,9 +156,9 @@ menu:
     requires_milk: true
     default_variant: hot
     variants:
-      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+      hot:  { tasks: [ { station: steam_wand, oz: 12 }, { station: group_head, shots: 2 } ],
               assembly_s: 25 }
-      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+      iced: { tasks: [ { station: group_head, shots: 2 }, { station: cold_bar } ],
               assembly_s: 20 }
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -142,9 +168,9 @@ menu:
     requires_milk: true
     default_variant: iced
     variants:
-      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+      hot:  { tasks: [ { station: steam_wand, oz: 12 }, { station: group_head, shots: 2 } ],
               assembly_s: 30 }
-      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+      iced: { tasks: [ { station: group_head, shots: 2 }, { station: cold_bar } ],
               assembly_s: 25 }
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -154,9 +180,9 @@ menu:
     requires_milk: true
     default_variant: hot
     variants:
-      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+      hot:  { tasks: [ { station: steam_wand, oz: 12 }, { station: group_head, shots: 2 } ],
               assembly_s: 28 }
-      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+      iced: { tasks: [ { station: group_head, shots: 2 }, { station: cold_bar } ],
               assembly_s: 22 }
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -166,9 +192,9 @@ menu:
     requires_milk: true
     default_variant: hot
     variants:
-      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+      hot:  { tasks: [ { station: steam_wand, oz: 12 }, { station: group_head, shots: 2 } ],
               assembly_s: 28 }
-      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+      iced: { tasks: [ { station: group_head, shots: 2 }, { station: cold_bar } ],
               assembly_s: 22 }
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -216,7 +242,7 @@ menu:
     price_cents: 600
     cogs_cents: 150
     requires_milk: true
-    tasks: [ { station: steam_wand, oz: 8 } ]
+    tasks: [ { station: steam_wand, oz: 12 } ]
     assembly_s: 30
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -224,7 +250,7 @@ menu:
     price_cents: 600
     cogs_cents: 145
     requires_milk: true
-    tasks: [ { station: steam_wand, oz: 8 } ]
+    tasks: [ { station: steam_wand, oz: 12 } ]
     assembly_s: 25
     source_of: { price_cents: observed, requires_milk: observed }
 
@@ -256,7 +282,7 @@ menu:
     price_cents: 470
     cogs_cents: 110
     requires_milk: true
-    tasks: [ { station: steam_wand, oz: 8 } ]
+    tasks: [ { station: steam_wand, oz: 12 } ]
     assembly_s: 20
     source_of: { price_cents: observed, requires_milk: observed }
 

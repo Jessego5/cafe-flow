@@ -76,13 +76,15 @@ and group head collapse into one serialised machine.
 
 ## Parameters
 
-Item names, prices and the board's hot/iced offer are `observed`. Every
-duration, capacity, mix fraction and staffing level is still `assumed`; see
+Item names, prices and the board's hot/iced offer are `observed`. Service times
+are `published`, cited at each parameter. Mix, hot/iced split, capture rate and
+staffing are still `assumed`; see
 [observations/README.md](observations/README.md) for what to count and in what
 order. Overlays merge left to right:
 
     from core.params import load_params
     params = load_params("params/base.yaml", "params/observed.yaml")
-    params.provenance_report().caption()   # 'provenance: 81% assumed'
+    params.provenance_report().detail()
+    # 'provenance: 79% assumed, 2% published, 19% observed'
 
 Calibration at M8 writes `params/observed.yaml` and changes no Python.

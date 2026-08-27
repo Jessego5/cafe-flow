@@ -40,8 +40,13 @@ __all__ = [
     "deep_merge",
 ]
 
-Source = Literal["assumed", "observed", "fitted"]
-SOURCES: tuple[str, ...] = ("assumed", "observed", "fitted")
+#: Where a parameter came from.
+#:   assumed   a guess, to be replaced
+#:   published a conventional figure from an industry or vendor source
+#:   observed  measured at this cafe
+#:   fitted    tuned to match observations
+Source = Literal["assumed", "published", "observed", "fitted"]
+SOURCES: tuple[str, ...] = ("assumed", "published", "observed", "fitted")
 
 FROM_STAFFING = "from_staffing"
 
@@ -163,6 +168,7 @@ class StationParams(_Strict):
     setup_s: float | None = Field(default=None, ge=0)     # per batch
     per_6oz_s: float | None = Field(default=None, ge=0)   # per item, x oz/6
     shot_s: float | None = Field(default=None, ge=0)      # per item, x shots
+    per_item_s: float | None = Field(default=None, ge=0)  # per item, flat
     run_s: float | None = Field(default=None, ge=0)       # per batch if batch_size, else per item
     pour_s: float | None = Field(default=None, ge=0)      # per item
     batch_key: str | None = None
@@ -189,7 +195,8 @@ class StationParams(_Strict):
         if not self.cost_terms:
             raise ValueError(
                 "station declares no cost term "
-                "(expected one of base_s, setup_s, per_6oz_s, shot_s, run_s, pour_s)"
+                "(expected one of base_s, setup_s, per_6oz_s, shot_s, "
+                "per_item_s, run_s, pour_s)"
             )
         if self.max_batch_oz is not None and self.per_6oz_s is None:
             raise ValueError("max_batch_oz is meaningless without per_6oz_s")
@@ -204,6 +211,7 @@ class StationParams(_Strict):
             "setup_s": (self.setup_s, PER_BATCH, None),
             "per_6oz_s": (self.per_6oz_s, PER_ITEM, "oz"),
             "shot_s": (self.shot_s, PER_ITEM, "shots"),
+            "per_item_s": (self.per_item_s, PER_ITEM, None),
             "run_s": (self.run_s, run_per, None),
             "pour_s": (self.pour_s, PER_ITEM, None),
         }
@@ -447,6 +455,15 @@ class ProvenanceReport(BaseModel):
     def caption(self) -> str:
         """The string every figure and table has to carry."""
         return f"provenance: {round(100 * self.assumed_fraction)}% assumed"
+
+    def detail(self) -> str:
+        """The full breakdown, for a report that has room for it."""
+        parts = [
+            f"{round(100 * self.fraction(source))}% {source}"
+            for source in SOURCES
+            if self.counts.get(source)
+        ]
+        return "provenance: " + ", ".join(parts)
 
 
 class Params(_Strict):

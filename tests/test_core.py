@@ -15,7 +15,13 @@ import pytest
 from core.capacity import StationCapacityModel, task_seconds
 from core.events import EventLog, EventType
 from core.menu import make_item, make_order, service_seconds
-from core.params import ConfigError, load_params, params_from_dict, parse_hhmm
+from core.params import (
+    SOURCES,
+    ConfigError,
+    load_params,
+    params_from_dict,
+    parse_hhmm,
+)
 from core.states import LEGAL, LOST, TERMINAL, IllegalTransition, State, transition
 from core.types import Channel, Item, Line, Order, TaskKind
 
@@ -34,10 +40,12 @@ def test_every_parameter_carries_provenance(params):
     report = params.provenance_report()
     assert report.total > 0
     assert sum(report.counts.values()) == report.total
-    assert set(report.counts) <= {"assumed", "observed", "fitted"}
+    assert set(report.counts) <= set(SOURCES)
     assert 0.0 < report.assumed_fraction < 1.0
     assert report.caption().startswith("provenance: ")
-    assert params.source_of("stations.steam_wand.setup_s") == "assumed"
+    assert params.source_of("stations.steam_wand.setup_s") == "published"
+    assert params.source_of("stations.cold_bar.pour_s") == "assumed"
+    assert params.source_of("menu.latte.price_cents") == "observed"
 
 
 def test_source_of_marks_single_parameters(params):
@@ -66,7 +74,13 @@ def test_overlay_flips_provenance_without_touching_code(tmp_path, root):
     overlay = tmp_path / "observed.yaml"
     overlay.write_text(
         "stations:\n"
-        "  steam_wand: { setup_s: 7.5, per_6oz_s: 12.0, source: observed }\n"
+        "  steam_wand:\n"
+        "    setup_s: 7.5\n"
+        "    per_6oz_s: 12.0\n"
+        "    source: observed\n"
+        # base marks these two as published, and `source_of` survives a merge,
+        # so an overlay that measured them has to say so
+        "    source_of: { setup_s: observed, per_6oz_s: observed }\n"
         "arrivals:\n"
         "  capture_rate: 0.041\n"
         "  source: fitted\n"
@@ -76,7 +90,8 @@ def test_overlay_flips_provenance_without_touching_code(tmp_path, root):
     assert merged.station("steam_wand").setup_s == 7.5
     assert merged.source_of("stations.steam_wand.setup_s") == "observed"
     assert merged.source_of("arrivals.capture_rate") == "fitted"
-    assert merged.source_of("stations.group_head.shot_s") == "assumed"
+    assert merged.source_of("stations.group_head.shot_s") == "published"
+    assert merged.source_of("mix.serve.iced") == "assumed"
 
     report = merged.provenance_report()
     assert 0.0 < report.assumed_fraction < 1.0
@@ -251,10 +266,20 @@ def test_entered_at_reads_the_event_trail(params):
 
 
 def test_a_lone_hot_latte_costs_exactly_the_formula(params):
+    """Stated as the formula rather than a number, so it still means something
+    after the service times are revised."""
     wand = params.station("steam_wand")
     head = params.station("group_head")
-    _, assembly_s, _ = params.menu_item("latte").plan("hot")
-    expected = wand.setup_s + wand.per_6oz_s * (8 / 6) + head.shot_s + assembly_s
+    tasks, assembly_s, _ = params.menu_item("latte").plan("hot")
+    steam = next(task for task in tasks if task.station == "steam_wand")
+    shot = next(task for task in tasks if task.station == "group_head")
+
+    expected = (
+        wand.setup_s
+        + wand.per_6oz_s * (steam.oz / 6)
+        + head.shot_s * shot.shots
+        + assembly_s
+    )
 
     item = make_item("latte", params, order_id="o1", item_id="o1-0", milk_type="oat")
     assert item.variant == "hot"                      # the board's default here
@@ -329,14 +354,16 @@ def _lattes(params, n, milk="oat", order_id="o1"):
     return make_order(order_id, params, lines=[("latte", milk)] * n).items
 
 
-def test_batching_four_same_milk_lattes_beats_making_them_one_by_one(params):
+def test_batching_same_milk_lattes_beats_making_them_one_by_one(params):
     model = StationCapacityModel(params)
     items = _lattes(params, 4)
     solo_total = sum(model.cost(item) for item in items)
+    batches = model.group(items)
+
     assert model.batch_cost(items) < solo_total
-    # setup is paid once instead of four times
+    # setup is paid once per batch instead of once per drink
     assert solo_total - model.batch_cost(items) == pytest.approx(
-        3 * params.station("steam_wand").setup_s
+        (len(items) - len(batches)) * params.station("steam_wand").setup_s
     )
 
 
@@ -349,13 +376,21 @@ def test_batch_cost_never_exceeds_the_sum(params):
 
 
 def test_the_batch_respects_the_pitcher(params):
+    """A medium latte is 12oz of milk, so a 32oz pitcher holds two of them."""
     model = StationCapacityModel(params)
     wand = params.station("steam_wand")
-    items = _lattes(params, 5)  # 40oz against a 32oz pitcher
+    each_oz = next(
+        task.oz for task in params.menu_item("latte").plan("hot")[0]
+        if task.station == "steam_wand"
+    )
+    per_batch = int(wand.max_batch_oz // each_oz)
+    assert per_batch == 2
+
+    items = _lattes(params, 5)
     groups = model.group(items)
-    assert [len(group) for group in groups] == [4, 1]
+    assert [len(group) for group in groups] == [2, 2, 1]
     assert model.batch_cost(items) == pytest.approx(
-        2 * wand.setup_s + wand.per_6oz_s * (40 / 6)
+        len(groups) * wand.setup_s + wand.per_6oz_s * (5 * each_oz / 6)
     )
 
 
@@ -376,9 +411,14 @@ def test_items_that_miss_the_bottleneck_are_free(params):
 def test_the_panini_press_batches_by_count(params):
     model = StationCapacityModel(params, station_name="panini_press")
     press = params.station("panini_press")
-    items = make_order("o1", params, lines=[("bacon_egg_cheese_bagel", None)] * 7).items
-    assert [len(group) for group in model.group(items)] == [3, 3, 1]
-    assert model.batch_cost(items) == pytest.approx(3 * press.run_s)
+    count = 7
+    items = make_order("o1", params, lines=[("bacon_egg_cheese_bagel", None)] * count).items
+
+    groups = model.group(items)
+    assert all(len(group) <= press.batch_size for group in groups)
+    assert sum(len(group) for group in groups) == count
+    assert len(groups) == -(-count // press.batch_size)      # ceiling division
+    assert model.batch_cost(items) == pytest.approx(len(groups) * press.run_s)
 
 
 def test_register_bottleneck_degenerates_to_order_counts(root, tmp_path):
@@ -389,12 +429,14 @@ def test_register_bottleneck_degenerates_to_order_counts(root, tmp_path):
     model = StationCapacityModel(params)
     base_s = params.station("register").base_s
 
+    per_item_s = params.station("register").per_item_s
     one_order = make_order("o1", params, lines=[("latte", "oat")] * 4).items
-    assert model.batch_cost(one_order) == base_s          # one order, one interaction
-    assert sum(model.cost(item) for item in one_order) == 4 * base_s
+    # one transaction, plus the few seconds an item the trade quotes
+    assert model.batch_cost(one_order) == base_s + 4 * per_item_s
+    assert sum(model.cost(item) for item in one_order) == 4 * (base_s + per_item_s)
 
     two_orders = one_order + make_order("o2", params, lines=[("drip_coffee", None)]).items
-    assert model.batch_cost(two_orders) == 2 * base_s
+    assert model.batch_cost(two_orders) == 2 * base_s + 5 * per_item_s
 
 
 def test_capacity_seconds_follows_staffing(params, root, tmp_path):
@@ -410,8 +452,10 @@ def test_capacity_seconds_follows_staffing(params, root, tmp_path):
 
 def test_task_seconds_ignores_order_terms_by_default(params):
     register = params.station("register")
-    assert task_seconds(register) == 0.0
-    assert task_seconds(register, include_order_terms=True) == register.base_s
+    assert task_seconds(register) == register.per_item_s
+    assert task_seconds(register, include_order_terms=True) == (
+        register.base_s + register.per_item_s
+    )
 
 
 # --------------------------------------------------------------------------
@@ -568,3 +612,41 @@ def test_a_zero_dimension_costs_nothing(params, tmp_path, root):
     double = make_item("americano", merged, order_id="o", item_id="b")
     assert model.cost(single) == 18.0
     assert model.cost(double) == 36.0
+
+
+def test_a_marked_parameter_keeps_its_mark_through_a_merge(root, tmp_path):
+    """`source_of` is part of the config, so it merges like everything else.
+
+    An overlay that supersedes a marked parameter has to restate the mark, or
+    clear the block's marks with `source_of: null`. Silently inheriting
+    `published` onto a number someone actually measured would understate what
+    the project knows.
+    """
+    quiet = tmp_path / "quiet.yaml"
+    quiet.write_text("stations:\n  group_head: { shot_s: 30.0, source: observed }\n")
+    merged = load_params(root / "params" / "base.yaml", quiet)
+    assert merged.source_of("stations.group_head.shot_s") == "published"
+
+    loud = tmp_path / "loud.yaml"
+    loud.write_text(
+        "stations:\n"
+        "  group_head:\n"
+        "    shot_s: 30.0\n"
+        "    source_of: { shot_s: observed }\n"
+    )
+    restated = load_params(root / "params" / "base.yaml", loud)
+    assert restated.source_of("stations.group_head.shot_s") == "observed"
+
+    cleared = tmp_path / "cleared.yaml"
+    cleared.write_text(
+        "stations:\n"
+        "  group_head: { shot_s: 30.0, source: observed, source_of: null }\n"
+    )
+    wiped = load_params(root / "params" / "base.yaml", cleared)
+    assert wiped.source_of("stations.group_head.shot_s") == "observed"
+
+
+def test_the_report_breaks_down_every_source(params):
+    detail = params.provenance_report().detail()
+    assert detail.startswith("provenance: ")
+    assert "observed" in detail and "published" in detail and "assumed" in detail

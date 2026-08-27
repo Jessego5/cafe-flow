@@ -1,9 +1,13 @@
 # What to count, in priority order
 
 Read off the menu boards on 2026-08-27, so already `observed`: item names,
-prices, and which drinks the board offers hot or iced. Everything else in
-`params/base.yaml` is still `assumed` — the boards say what is sold, not how
-long it takes or who is working.
+prices, and which drinks the board offers hot or iced.
+
+Service times are now `published` — conventional figures from industry and
+vendor sources, cited at each parameter in `params/base.yaml`. They are a far
+better starting point than a guess, but they describe a typical cafe, not this
+one. What no published source can supply is this cafe's own demand: the mix,
+the hot/iced split, the capture rate and the staffing plan.
 
 The list below is ordered by how much the answer moves the result, not by how
 easy it is to collect.
@@ -35,10 +39,14 @@ One photograph of the espresso machine settles both.
 
 ### 4. Panini press time and capacity
 
-`stations.panini_press.run_s`, `.batch_size`. Assumed 240s for 3 sandwiches. On
-the assumed food share this station is the busiest thing in the cafe during the
-peak hour, which is either the most interesting finding in the project or an
-artefact of a guessed number. It cannot stay a guess.
+`stations.panini_press.run_s`, `.batch_size`. Now published: 4 minutes a
+sandwich, one or two at a time, which is the 10-15 sandwiches an hour a single
+14-inch grill is rated for. This station is the busiest thing in the cafe
+during the peak hour on every configuration tried.
+
+Worth confirming anyway, because it is the constraint and because the published
+figure is for a generic grill: this cafe's press may be a different size, or a
+rapid-cook oven, which would be several times faster.
 
 ### 5. Food share of orders
 

@@ -75,11 +75,20 @@ def test_the_machine_prices_shots_and_milk_separately(superauto):
                          milk_type=milk, variant=variant)
         return model.cost(item)
 
-    assert cost("espresso") == machine.shot_s
-    assert cost("americano") == 2 * machine.shot_s
-    assert cost("latte", "oat", "hot") == machine.shot_s + machine.per_6oz_s * (8 / 6)
-    assert cost("matcha_latte", "oat") == machine.per_6oz_s * (8 / 6)   # froths, no shot
-    assert cost("drip_coffee") == 0.0                                   # never touches it
+    def dimensions(drink, variant=None):
+        task = superauto.menu_item(drink).plan(variant)[0][0]
+        return task.shots or 0, task.oz or 0
+
+    for drink, variant in (("espresso", None), ("americano", None),
+                           ("latte", "hot"), ("matcha_latte", None)):
+        shots, oz = dimensions(drink, variant)
+        milk = "oat" if superauto.menu_item(drink).requires_milk else None
+        assert cost(drink, milk, variant) == pytest.approx(
+            machine.shot_s * shots + machine.per_6oz_s * oz / 6
+        )
+
+    assert dimensions("matcha_latte")[0] == 0        # froths, no shot
+    assert cost("drip_coffee") == 0.0                # never touches it
 
 
 def test_both_arms_run_and_conserve():

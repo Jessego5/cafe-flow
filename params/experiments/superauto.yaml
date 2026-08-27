@@ -20,7 +20,10 @@
 #   python -m sim.experiments --compare
 #
 # UNCONFIRMED, and what would confirm it: the model number on the front panel
-# or the sticker on the back. Cycle times below are assumed.
+# or the sticker on the back. The twin hoppers and touchscreen match the
+# Coffee Art Plus, whose published figures set the cycle below: 70-80 16oz
+# milk drinks an hour, and 32oz of milk steamed in one minute.
+#   https://www.wholelattelove.com/products/schaerer-coffee-art-plus
 
 meta:
   scenario: superauto
@@ -33,10 +36,15 @@ stations:
 
   espresso_machine:
     capacity: 1          # one machine, one drink at a time
-    shot_s: 18           # grind, tamp, extract
-    per_6oz_s: 9         # frothed milk, straight into the cup
+    # The machine brews a double as one operation, so the per-shot figure is
+    # half a double cycle rather than a shot pulled on its own. A 16oz latte is
+    # then 12.5*2 + 11.25*2 = 47.5s, or 76 an hour, inside the published 70-80.
+    # A drink with no coffee in it pays only for the milk, which is why this is
+    # not a flat per-drink cycle.
+    shot_s: 12.5         # grind, brew, all on one button
+    per_6oz_s: 11.25     # 32oz of milk in 60s, straight into the cup
     attended: false      # push the button and walk away
-    source: assumed
+    source: published
     # deliberately no batch_key: nothing to batch without a pitcher
 
 bottleneck_station: espresso_machine
@@ -51,44 +59,44 @@ menu:
     tasks: [ { station: espresso_machine, shots: 2, oz: 0 } ]
 
   cappuccino:
-    tasks: [ { station: espresso_machine, shots: 1, oz: 6 } ]
+    tasks: [ { station: espresso_machine, shots: 2, oz: 8 } ]
 
   latte:
     variants:
-      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 20 }
-      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+      hot:  { tasks: [ { station: espresso_machine, shots: 2, oz: 12 } ], assembly_s: 20 }
+      iced: { tasks: [ { station: espresso_machine, shots: 2, oz: 0 },
                        { station: cold_bar } ], assembly_s: 15 }
 
   vanilla_latte:
     variants:
-      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 25 }
-      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+      hot:  { tasks: [ { station: espresso_machine, shots: 2, oz: 12 } ], assembly_s: 25 }
+      iced: { tasks: [ { station: espresso_machine, shots: 2, oz: 0 },
                        { station: cold_bar } ], assembly_s: 20 }
 
   caramel_macchiato:
     variants:
-      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 30 }
-      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+      hot:  { tasks: [ { station: espresso_machine, shots: 2, oz: 12 } ], assembly_s: 30 }
+      iced: { tasks: [ { station: espresso_machine, shots: 2, oz: 0 },
                        { station: cold_bar } ], assembly_s: 25 }
 
   mocha:
     variants:
-      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 28 }
-      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+      hot:  { tasks: [ { station: espresso_machine, shots: 2, oz: 12 } ], assembly_s: 28 }
+      iced: { tasks: [ { station: espresso_machine, shots: 2, oz: 0 },
                        { station: cold_bar } ], assembly_s: 22 }
 
   white_chocolate_mocha:
     variants:
-      hot:  { tasks: [ { station: espresso_machine, shots: 1, oz: 8 } ], assembly_s: 28 }
-      iced: { tasks: [ { station: espresso_machine, shots: 1, oz: 0 },
+      hot:  { tasks: [ { station: espresso_machine, shots: 2, oz: 12 } ], assembly_s: 28 }
+      iced: { tasks: [ { station: espresso_machine, shots: 2, oz: 0 },
                        { station: cold_bar } ], assembly_s: 22 }
 
   # Milk-only drinks: the machine froths without pulling a shot.
   matcha_latte:
-    tasks: [ { station: espresso_machine, shots: 0, oz: 8 } ]
+    tasks: [ { station: espresso_machine, shots: 0, oz: 12 } ]
 
   chai_latte:
-    tasks: [ { station: espresso_machine, shots: 0, oz: 8 } ]
+    tasks: [ { station: espresso_machine, shots: 0, oz: 12 } ]
 
   cocoa:
-    tasks: [ { station: espresso_machine, shots: 0, oz: 8 } ]
+    tasks: [ { station: espresso_machine, shots: 0, oz: 12 } ]

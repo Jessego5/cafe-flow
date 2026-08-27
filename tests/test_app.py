@@ -26,6 +26,7 @@ from app.db import (
     seed_menu,
     session_scope,
 )
+from core.menu import make_item, service_seconds
 from core.states import State
 
 LATTE = {"drink": "latte", "milk_type": "oat"}
@@ -52,7 +53,9 @@ def test_menu_comes_from_params(client):
     assert latte["stations"] == ["steam_wand", "group_head"]     # the hot build
     assert latte["variants"] == ["hot", "iced"]
     assert latte["default_variant"] == "hot"
-    assert latte["service_s"] == 75.0
+    assert latte["service_s"] == service_seconds(
+        make_item("latte", get_params(), order_id="p", item_id="p-0", milk_type="oat")
+    )
     assert body["serve_styles"] == ["hot", "iced"]
     assert body["provenance"].startswith("provenance: ")
 
@@ -75,7 +78,14 @@ def test_placing_an_order_prices_it_and_costs_it(client):
     assert order["state"] == State.PLACED
     assert order["number"] == 1
     assert order["price_cents"] == 575 + 539
-    assert order["bottleneck_cost_s"] == 30.0      # one 8oz steam, setup included
+    wand = get_params().station("steam_wand")
+    steam_oz = next(
+        task.oz for task in get_params().menu_item("latte").plan("hot")[0]
+        if task.station == "steam_wand"
+    )
+    assert order["bottleneck_cost_s"] == pytest.approx(
+        wand.setup_s + wand.per_6oz_s * steam_oz / 6      # one steam, setup included
+    )
     assert order["payment"] == {"status": "stubbed", "amount_due_cents": 0}
     assert [item["drink"] for item in order["items"]] == ["latte", "bacon_egg_cheese_bagel"]
 
@@ -86,7 +96,7 @@ def test_an_iced_latte_costs_nothing_at_the_wand(client):
     hot = place(client, {"drink": "latte", "milk_type": "oat", "variant": "hot"})
     iced = place(client, {"drink": "latte", "milk_type": "oat", "variant": "iced"})
     assert hot["price_cents"] == iced["price_cents"]
-    assert hot["bottleneck_cost_s"] == 30.0
+    assert hot["bottleneck_cost_s"] > 0.0
     assert iced["bottleneck_cost_s"] == 0.0
 
 
@@ -313,20 +323,24 @@ def test_a_full_slot_is_refused(with_slots):
         bookable = next(
             slot for slot in client.get("/slots").json()["slots"] if slot["bookable"]
         )
+        attempts = 20
         placed, refused = 0, 0
-        for _ in range(20):
+        cost_s = None
+        for _ in range(attempts):
             response = client.post(
                 "/orders",
                 json={"lines": [LATTE], "channel": "preorder", "slot_id": bookable["slot_id"]},
             )
             if response.status_code == 201:
                 placed += 1
+                cost_s = response.json()["bottleneck_cost_s"]
             else:
                 assert response.status_code == 409
                 refused += 1
-        # 210 preorder-seconds at 30s a latte
-        assert placed == 7
-        assert refused == 13
+
+        # the window holds as many as its bottleneck-seconds allow, and no more
+        assert placed == int(bookable["remaining_s"] // cost_s)
+        assert refused == attempts - placed
 
 
 def test_capacity_check_and_decrement_are_one_transaction(tmp_path):

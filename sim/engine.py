@@ -333,13 +333,15 @@ class Cafe:
         self.orders[order.order_id] = order
         place(order, at=self.env.now, actor="customer", log=self.log)
 
-        register = self.params.station(REGISTER)
+        # The register is priced by the capacity model rather than read off one
+        # field, so the published "transaction plus a few seconds an item"
+        # shape applies here and in slot accounting alike.
         register_task = Task(
             item_id=order.items[0].item_id,
             order_id=order.order_id,
             station=REGISTER,
             kind=TaskKind.PREP,
-            duration_s=register.base_s or 0.0,
+            duration_s=StationCapacityModel(self.params, REGISTER).order_cost(order),
         )
 
         # The crew is never handed back with `yield`: a generator that yields

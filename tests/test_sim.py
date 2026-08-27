@@ -196,28 +196,40 @@ def _solo(params, drink="latte", milk="oat", variant="hot", at_s=None):
 
 
 def test_a_lone_latte_takes_exactly_the_make_time(params):
+    """Stated as the formula, so it still means something after the service
+    times are revised."""
     wand = params.station("steam_wand")
     head = params.station("group_head")
-    _, assembly_s, _ = params.menu_item("latte").plan("hot")
-    expected = wand.setup_s + wand.per_6oz_s * (8 / 6) + head.shot_s + assembly_s
+    tasks, assembly_s, _ = params.menu_item("latte").plan("hot")
+    steam = next(task for task in tasks if task.station == "steam_wand")
+    shot = next(task for task in tasks if task.station == "group_head")
+    expected = (
+        wand.setup_s
+        + wand.per_6oz_s * (steam.oz / 6)
+        + head.shot_s * shot.shots
+        + assembly_s
+    )
 
     result = _solo(params)
     order = result.orders["o0"]
     started = order.entered_at(State.IN_PROGRESS)
     ready = order.entered_at(State.READY)
     assert ready - started == pytest.approx(expected)
-    assert expected == pytest.approx(75.0)
 
 
 def test_a_lone_customer_waits_only_for_the_register_and_the_drink(params):
+    from core.capacity import StationCapacityModel
+    from core.menu import service_seconds
+
     result = _solo(params)
     order = result.orders["o0"]
     placed = order.entered_at(State.PLACED)
-    assert order.entered_at(State.ACCEPTED) - placed == pytest.approx(
-        params.station("register").base_s
-    )
+    # the register is a transaction plus a few seconds an item
+    ringing_up = StationCapacityModel(params, "register").order_cost(order)
+
+    assert order.entered_at(State.ACCEPTED) - placed == pytest.approx(ringing_up)
     assert order.entered_at(State.PICKED_UP) - placed == pytest.approx(
-        params.station("register").base_s + 75.0
+        ringing_up + service_seconds(order.items[0])
     )
 
 
@@ -318,7 +330,13 @@ def test_one_wand_serialises_two_simultaneous_lattes(params):
     # the second latte is late by exactly one steam
     ready = sorted(result.orders[o].entered_at(State.READY) for o in result.orders)
     steam = params.station("steam_wand")
-    assert ready[1] - ready[0] == pytest.approx(steam.setup_s + steam.per_6oz_s * (8 / 6))
+    steam_oz = next(
+        task.oz for task in params.menu_item("latte").plan("hot")[0]
+        if task.station == "steam_wand"
+    )
+    assert ready[1] - ready[0] == pytest.approx(
+        steam.setup_s + steam.per_6oz_s * (steam_oz / 6)
+    )
 
 
 def test_the_crew_follows_the_staffing_plan(day, params):

@@ -67,20 +67,25 @@ def test_batching_fills_the_press_to_its_capacity(params):
         _pending(params, "panini_press", "bacon_egg_cheese_bagel", index=index)
         for index in range(5)
     ]
+    limit = params.station("panini_press").batch_size
     batch = policy.next_batch("panini_press", queue, 0.0)
-    assert len(batch) == params.station("panini_press").batch_size == 3
-    assert batch == queue[:3]
+    assert len(batch) == limit
+    assert batch == queue[:limit]
 
 
 def test_batching_fills_the_pitcher_and_stops(params):
     policy = BatchPolicy(params)
+    wand = params.station("steam_wand")
     queue = [
         _pending(params, "steam_wand", "latte", "oat", "hot", index=index)
         for index in range(6)
     ]
     batch = policy.next_batch("steam_wand", queue, 0.0)
-    assert len(batch) == 4                       # 8oz each against a 32oz pitcher
-    assert sum(entry.item.tasks[0].oz for entry in batch) == 32
+    poured = sum(entry.item.tasks[0].oz for entry in batch)
+
+    assert poured <= wand.max_batch_oz
+    assert poured + batch[0].item.tasks[0].oz > wand.max_batch_oz    # one more will not fit
+    assert len(batch) < len(queue)
 
 
 def test_different_milks_are_not_grouped(params):
@@ -124,49 +129,51 @@ def test_the_overlay_selects_the_batching_policy(params, batching):
 # --------------------------------------------------------------------------
 
 
-def _three_sandwiches(params, at_s=None):
-    # 11:00: three baristas on, so all three registers clear together and all
-    # three sandwiches reach the press queue at the same moment
+def _sandwiches(params, count, at_s=None):
+    # 11:00: three baristas on, so the registers clear together and the
+    # sandwiches reach the press queue at the same moment
     at_s = 11 * 3600 if at_s is None else at_s
     return [
         Arrival(f"c{index}", f"o{index}", float(at_s), Channel.WALKUP,
                 (Line("bacon_egg_cheese_bagel", None, None),), "test")
-        for index in range(3)
+        for index in range(count)
     ]
 
 
-def test_three_sandwiches_take_three_cycles_under_fifo(params):
+def test_a_full_press_takes_one_cycle_per_sandwich_under_fifo(params):
     press = params.station("panini_press")
-    result = run(params, 0, arrivals=_three_sandwiches(params))
+    count = press.batch_size
+    result = run(params, 0, arrivals=_sandwiches(params, count))
 
     spans = [
         event.t_s for event in result.log
         if event.station == "panini_press" and event.type is EventType.STATION_END
     ]
-    assert len(spans) == 3
-    assert max(spans) - min(spans) == pytest.approx(2 * press.run_s)
+    assert len(spans) == count
+    assert max(spans) - min(spans) == pytest.approx((count - 1) * press.run_s)
 
 
-def test_three_sandwiches_take_one_cycle_when_batched(batching):
+def test_a_full_press_takes_one_cycle_when_batched(batching):
     """The fix: `batch_size: 3` now means something in the engine, not only in
     the cost model."""
     press = batching.station("panini_press")
-    result = run(batching, 0, arrivals=_three_sandwiches(batching))
+    count = press.batch_size
+    result = run(batching, 0, arrivals=_sandwiches(batching, count))
 
     ends = [
         event for event in result.log
         if event.station == "panini_press" and event.type is EventType.STATION_END
     ]
     assert len(ends) == 1
-    assert ends[0].payload["size"] == 3
+    assert ends[0].payload["size"] == count
     assert ends[0].payload["duration_s"] == press.run_s
 
     formed = [event for event in result.log if event.type is EventType.BATCH_FORMED]
     assert len(formed) == 1
-    assert sorted(formed[0].payload["orders"]) == ["o0", "o1", "o2"]
+    assert sorted(formed[0].payload["orders"]) == [f"o{index}" for index in range(count)]
     assert formed[0].payload["attended"] is False
 
-    ready = [result.orders[f"o{index}"].entered_at(State.READY) for index in range(3)]
+    ready = [result.orders[f"o{index}"].entered_at(State.READY) for index in range(count)]
     assert max(ready) - min(ready) < press.run_s      # they land together
 
 
@@ -244,20 +251,17 @@ def test_the_press_does_not_hold_itself_idle_waiting_for_a_fuller_batch(batching
     """It groups what is already waiting and starts. Holding a station idle in
     the hope that a third sandwich turns up is a different policy, and a
     riskier one: it trades a certain delay for a possible saving."""
-    at_s = params_start = batching.meta.start_s + 3600      # 08:00, two baristas
-    arrivals = [
-        Arrival(f"c{index}", f"o{index}", float(at_s), Channel.WALKUP,
-                (Line("bacon_egg_cheese_bagel", None, None),), "test")
-        for index in range(3)
-    ]
-    result = run(batching, 0, arrivals=arrivals)
+    at_s = batching.meta.start_s + 3600                     # 08:00, two baristas
+    result = run(batching, 0, arrivals=_sandwiches(batching, 3, at_s=at_s))
 
     sizes = [
         event.payload["size"] for event in result.log
         if event.station == "panini_press" and event.type is EventType.STATION_END
     ]
-    # two registers clear together and go straight in; the third follows alone
-    assert sizes == [2, 1]
+    # whatever is queued when the press frees up goes in; the rest follows
+    assert sum(sizes) == 3
+    assert len(sizes) > 1
+    assert all(size <= batching.station("panini_press").batch_size for size in sizes)
 
 
 def test_items_on_one_order_are_worked_one_after_another(batching):
