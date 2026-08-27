@@ -136,7 +136,15 @@ class Cafe:
         barista: Barista,
         station: str | None,
         label: str,
+        **payload: object,
     ) -> None:
+        """Record a span of station work.
+
+        `attended` is the part that matters downstream: a press cycle occupies
+        the press but not a person, so machine utilisation and crew utilisation
+        are different questions and the log has to answer both.
+        """
+        attended = station is None or self.params.station(station).attended
         self.log.emit(
             kind,
             self.env.now,
@@ -146,10 +154,65 @@ class Cafe:
             station=station,
             actor=barista.name,
             channel=order.channel,
-            payload={"kind": label, "duration_s": task.duration_s},
+            payload={
+                "kind": label,
+                "duration_s": task.duration_s,
+                "attended": attended,
+                **payload,
+            },
         )
 
     # ---- the service process ------------------------------------------
+
+    def make(self, order: Order, barista: Barista):
+        """Work the order's items, standing aside while machines run.
+
+        A press or a super-automatic occupies a machine, not a person: the
+        barista loads it and goes back to the floor, so the coffee for the next
+        order gets made while the panini presses.
+
+        Resources are always taken in the same order — a person, then a machine
+        — and never the other way round. Holding a machine while queueing for a
+        person deadlocks a busy cafe: the press waits for a barista who is
+        waiting for the press.
+
+        The press is released when its cycle ends rather than when someone
+        collects, so a finished sandwich does not block the next one. That is
+        optimistic by however long a tray sits waiting.
+
+        Returns whoever is holding the order at the end, which need not be
+        whoever started it.
+        """
+        for item in order.items:
+            for task in item.tasks:
+                station = (
+                    self.params.station(task.station) if task.station is not None else None
+                )
+                if station is None or station.attended:
+                    yield from barista.work(task, order, kind=str(task.kind))
+                    continue
+
+                # No try/finally around this: a generator that yields from
+                # `finally` cannot be closed, and the harness closes every
+                # unfinished order when the day is cut off. The crew is handed
+                # back before the wait, so an order abandoned mid-cycle leaves
+                # the floor correctly staffed and simply never collects.
+                starter = barista
+                self.crew.put(barista)
+                barista = None
+                with self.stations[task.station].request() as slot:
+                    yield slot
+                    self.emit_station(
+                        EventType.STATION_START, order, task, starter,
+                        task.station, "machine",
+                    )
+                    yield self.env.timeout(task.duration_s)
+                    self.emit_station(
+                        EventType.STATION_END, order, task, starter,
+                        task.station, "machine",
+                    )
+                barista = yield self.crew.get()
+        return barista
 
     def serve(self, order: Order):
         """One order, from the register to the handoff shelf."""
@@ -180,12 +243,13 @@ class Cafe:
         barista = yield self.crew.get()
         try:
             transition(order, State.IN_PROGRESS, at=self.env.now, actor=barista.name, log=self.log)
-            for item in order.items:
-                for task in item.tasks:
-                    yield from barista.work(task, order, kind=str(task.kind))
+            barista = yield from self.make(order, barista)
             transition(order, State.READY, at=self.env.now, actor=barista.name, log=self.log)
         finally:
-            self.crew.put(barista)
+            # `make` hands the crew back itself while a machine runs; it only
+            # returns holding nobody if the day was cut off mid-cycle
+            if barista is not None:
+                self.crew.put(barista)
 
         # Walk-ups are standing at the shelf; the handoff refinements that make
         # this a real delay are an M10 question.

@@ -46,7 +46,8 @@ stations:
   steam_wand:    { capacity: 1, setup_s: 10, per_6oz_s: 15,
                    batch_key: milk_type, max_batch_oz: 32 }
 
-  group_head:    { capacity: 2, shot_s: 25 }
+  # The shot pulls on its own while the barista steams the next pitcher.
+  group_head:    { capacity: 2, shot_s: 25, attended: false }
 
   # Ice, cold milk, syrups: the iced-drink build bar.
   cold_bar:      { capacity: 2, pour_s: 12 }
@@ -54,7 +55,9 @@ stations:
   # Drip, cold brew, brewed and iced tea come off urns and taps. Nearly free.
   brew_tap:      { capacity: 4, pour_s: 10 }
 
-  panini_press:  { capacity: 1, run_s: 240, batch_size: 3 }
+  # Close the lid and walk away. A pressed sandwich occupies the press, not a
+  # person — and it goes on occupying it until someone comes back for it.
+  panini_press:  { capacity: 1, run_s: 240, batch_size: 3, attended: false }
 
   food_counter:  { capacity: 2, run_s: 90 }
 

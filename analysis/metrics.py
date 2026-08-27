@@ -24,6 +24,8 @@ from core.states import State
 
 __all__ = [
     "Interval",
+    "Span",
+    "machine_utilisation",
     "load_log",
     "order_waits",
     "wait_percentiles",
@@ -237,18 +239,46 @@ def peak_throughput(
 # --------------------------------------------------------------------------
 
 
-def _spans(events: Sequence[Event]) -> list[tuple[str | None, str, float, float]]:
-    """(station, actor, start, end) for every completed piece of station work."""
-    open_at: dict[tuple, list[float]] = defaultdict(list)
-    spans: list[tuple[str | None, str, float, float]] = []
+@dataclass(frozen=True, slots=True)
+class Span:
+    """One completed piece of station work.
+
+    `attended` separates the two questions the log has to answer: a press cycle
+    occupies the press for four minutes but a person for none of it, so machine
+    utilisation and crew utilisation are not the same number.
+    """
+
+    station: str | None
+    actor: str
+    start_s: float
+    end_s: float
+    attended: bool = True
+
+    @property
+    def length_s(self) -> float:
+        return self.end_s - self.start_s
+
+
+def _spans(events: Sequence[Event]) -> list[Span]:
+    open_at: dict[tuple, list[Event]] = defaultdict(list)
+    spans: list[Span] = []
     for event in events:
         if event.type not in (EventType.STATION_START, EventType.STATION_END):
             continue
         key = (event.actor, event.station, event.item_id, event.order_id)
         if event.type is EventType.STATION_START:
-            open_at[key].append(event.t_s)
+            open_at[key].append(event)
         elif open_at[key]:
-            spans.append((event.station, event.actor, open_at[key].pop(), event.t_s))
+            started = open_at[key].pop()
+            spans.append(
+                Span(
+                    station=event.station,
+                    actor=event.actor,
+                    start_s=started.t_s,
+                    end_s=event.t_s,
+                    attended=bool(started.payload.get("attended", True)),
+                )
+            )
     return spans
 
 
@@ -258,8 +288,10 @@ def station_busy_seconds(
     """Seconds of work done at each station. Assembly work has no station and
     is reported under `None`."""
     busy: dict[str, float] = defaultdict(float)
-    for station, _actor, start, end in _spans(_events(log)):
-        busy[station] += (end - start) if window is None else window.overlap_s(start, end)
+    for span in _spans(_events(log)):
+        busy[span.station] += (
+            span.length_s if window is None else window.overlap_s(span.start_s, span.end_s)
+        )
     return dict(busy)
 
 
@@ -288,6 +320,17 @@ def station_utilisation(
     return out
 
 
+def machine_utilisation(
+    log: Iterable[Event] | EventLog,
+    params: Params,
+    *,
+    window: Interval | None = None,
+) -> dict[str, float]:
+    """Alias for `station_utilisation`, named for what it measures once
+    attended and unattended work are told apart."""
+    return station_utilisation(log, params, window=window)
+
+
 def crew_utilisation(
     log: Iterable[Event] | EventLog,
     params: Params,
@@ -296,14 +339,16 @@ def crew_utilisation(
 ) -> float:
     """Busy fraction of the whole crew.
 
-    A barista holds one piece of work at a time, so their spans never overlap
-    and this is simply their summed work over their available time.
+    Counts attended work only. A press running on its own is not a person being
+    busy, and treating it as one is what makes a shift look fuller than it is.
     """
     if window is None:
         window = Interval(float(params.meta.start_s), float(params.meta.end_s))
 
     busy = sum(
-        window.overlap_s(start, end) for _station, _actor, start, end in _spans(_events(log))
+        window.overlap_s(span.start_s, span.end_s)
+        for span in _spans(_events(log))
+        if span.attended
     )
     baristas = params.baristas_at(window.midpoint_s)
     return busy / (window.length_s * baristas)

@@ -168,7 +168,13 @@ class StationParams(_Strict):
     batch_key: str | None = None
     max_batch_oz: float | None = Field(default=None, gt=0)
     batch_size: int | None = Field(default=None, gt=0)
-    blocking: bool = False
+
+    # Does the barista have to stay? A steam wand does: someone holds the
+    # pitcher. A panini press does not: you close the lid and go make the
+    # coffee. This is the difference between a station occupying a machine and
+    # a station occupying a person, and it decides how much work a shift can
+    # actually absorb.
+    attended: bool = True
     source: Source | None = None
 
     @field_validator("capacity")

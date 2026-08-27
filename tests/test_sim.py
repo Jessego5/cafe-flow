@@ -39,22 +39,33 @@ def day(params):
     return run(params, 42)
 
 
-def intervals(log, *, by: str = "actor"):
-    """Reconstruct busy periods from the station_start/station_end pairs."""
-    open_at: dict[tuple, float] = {}
+def intervals(log, *, by: str = "actor", attended_only: bool | None = None):
+    """Reconstruct busy periods from the station_start/station_end pairs.
+
+    Grouping by actor answers "was this person busy", which counts attended
+    work only; grouping by station answers "was this machine busy", which counts
+    everything. A press cycle is the second and not the first.
+    """
+    if attended_only is None:
+        attended_only = by == "actor"
+
+    open_at: dict[tuple, tuple[float, bool]] = {}
     spans: dict[str, list[tuple[float, float]]] = defaultdict(list)
     for event in log:
         if event.type not in (EventType.STATION_START, EventType.STATION_END):
             continue
         key = (event.actor, event.station, event.item_id, event.order_id)
         if event.type is EventType.STATION_START:
-            open_at[key] = event.t_s
+            open_at[key] = (event.t_s, bool(event.payload.get("attended", True)))
         else:
             started = open_at.pop(key, None)
             if started is None:
                 continue
+            start_s, attended = started
+            if attended_only and not attended:
+                continue
             label = event.actor if by == "actor" else event.station
-            spans[label].append((started, event.t_s))
+            spans[label].append((start_s, event.t_s))
     return spans
 
 
@@ -235,6 +246,46 @@ def test_a_barista_is_never_parallel_with_themself(day):
         assert overlaps(spans) == [], f"{actor} is in two places at once"
 
 
+def test_the_coffee_gets_made_while_the_panini_presses(params):
+    """A press occupies the press, not a person. Two customers arrive together,
+    one wanting a sandwich and one a latte: the latte must not wait out the
+    press cycle."""
+    at_s = params.meta.start_s + 3600
+    arrivals = [
+        Arrival("c0", "o0", float(at_s), Channel.WALKUP,
+                (Line("bacon_egg_cheese_bagel", None, None),), "test"),
+        Arrival("c1", "o1", float(at_s), Channel.WALKUP,
+                (Line("latte", "oat", "hot"),), "test"),
+    ]
+    result = run(params, 0, arrivals=arrivals)
+
+    press = [
+        (event.t_s, event.type)
+        for event in result.log
+        if event.station == "panini_press"
+    ]
+    assert len(press) == 2
+    press_start, press_end = press[0][0], press[1][0]
+    assert press_end - press_start == params.station("panini_press").run_s
+
+    # the latte is finished before the press cycle ends
+    latte_ready = result.orders["o1"].entered_at(State.READY)
+    assert latte_ready < press_end
+
+    # and nobody was standing at the press: no attended span covers the cycle
+    for spans in intervals(result.log, by="actor").values():
+        for start, end in spans:
+            assert not (start <= press_start and end >= press_end)
+
+
+def test_a_finished_sandwich_still_blocks_the_press(params):
+    """Unattended does not mean free: the press stays seized until someone
+    comes back for it, which is exactly why collection matters."""
+    assert params.station("panini_press").attended is False
+    assert params.station("steam_wand").attended is True
+    assert params.station("register").attended is True
+
+
 def test_no_station_exceeds_its_capacity(day, params):
     for station, spans in intervals(day.log, by="station").items():
         if station is None:
@@ -272,7 +323,8 @@ def test_one_wand_serialises_two_simultaneous_lattes(params):
 
 def test_the_crew_follows_the_staffing_plan(day, params):
     """Concurrency never exceeds the plan, and the extra barista does appear
-    when the plan says so."""
+    when the plan says so. Attended work only: a running machine is not a
+    person on shift."""
     spans = [span for actor_spans in intervals(day.log).values() for span in actor_spans]
     assert max_concurrent(spans) == params.max_baristas
 

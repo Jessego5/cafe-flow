@@ -35,6 +35,7 @@ stations:
     capacity: 1          # one machine, one drink at a time
     shot_s: 18           # grind, tamp, extract
     per_6oz_s: 9         # frothed milk, straight into the cup
+    attended: false      # push the button and walk away
     source: assumed
     # deliberately no batch_key: nothing to batch without a pitcher
 
