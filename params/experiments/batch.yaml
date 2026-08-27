@@ -1,0 +1,17 @@
+# Arm D: run compatible work together.
+#
+# The plan calls this the core throughput mechanism, for four oat lattes
+# steamed in one pitcher instead of four. On the observed menu the larger
+# saving looks like the press: three sandwiches in one cycle rather than three
+# cycles, at four minutes each.
+#
+# Only work already waiting is grouped. Holding a station idle hoping a fourth
+# latte turns up is a different policy and a riskier one.
+
+meta:
+  scenario: batched
+  source: assumed
+
+policy:
+  name: batch_milk
+  source: assumed

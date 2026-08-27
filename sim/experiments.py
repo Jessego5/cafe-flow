@@ -59,6 +59,16 @@ ARMS: dict[str, Arm] = {
         ("params/experiments/superauto.yaml",),
         "one Schaerer super-automatic; no pitcher, so nothing batches",
     ),
+    "batched": Arm(
+        "batched",
+        ("params/experiments/batch.yaml",),
+        "manual bar, running compatible work together at every station that can",
+    ),
+    "superauto_batched": Arm(
+        "superauto_batched",
+        ("params/experiments/superauto.yaml", "params/experiments/batch.yaml"),
+        "super-automatic, so only the press has anything left to batch",
+    ),
 }
 
 

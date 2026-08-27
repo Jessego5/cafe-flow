@@ -211,7 +211,17 @@ class StationParams(_Strict):
 
     @property
     def batches(self) -> bool:
-        return self.batch_key is not None or self.batch_size is not None or self.base_s is not None
+        """Can work here be run several items at a time?
+
+        The register's per-order cost is not batching: it is one interaction
+        covering an order, not several orders run together.
+        """
+        return self.batch_key is not None or self.batch_size is not None
+
+    @property
+    def groups_work(self) -> bool:
+        """Should the simulator queue work here and dispatch it in batches?"""
+        return self.batches
 
 
 class TaskSpec(_Strict):

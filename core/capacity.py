@@ -173,6 +173,23 @@ class StationCapacityModel:
                 )
         return out
 
+    def compatible(self, current: Sequence[Item], candidate: Item) -> bool:
+        """Could this item join that batch?
+
+        The rule lives here rather than in a scheduling policy: whether two
+        drinks can be steamed together is a fact about the station, not a
+        choice about the order of work (ground rule 2).
+        """
+        if not self.touches(candidate):
+            return False
+        if not current:
+            return True
+        if not self.station.batches:
+            return False
+        if self.batch_value(candidate) != self.batch_value(current[0]):
+            return False
+        return self._fits(list(current), candidate)
+
     def _fits(self, current: list[Item], candidate: Item) -> bool:
         limit_n = self.station.batch_size
         if limit_n is not None and len(current) >= limit_n:

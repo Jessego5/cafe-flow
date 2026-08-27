@@ -27,6 +27,7 @@ from core.params import FROM_STAFFING, Params, load_params
 from core.states import LOST, State, place, transition
 from core.types import Channel, Order, Task, TaskKind
 from sim.arrivals import Arrival, generate_arrivals
+from sim.policies import Pending, Policy, make_policy
 
 __all__ = ["Barista", "Cafe", "RunResult", "run", "event_path"]
 
@@ -85,6 +86,8 @@ class Cafe:
     crew: simpy.Store = field(init=False)
     orders: dict[str, Order] = field(init=False, default_factory=dict)
     bench: list[Barista] = field(init=False, default_factory=list)
+    policy: Policy = field(init=False)
+    queues: dict[str, list[Pending]] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         self.stations = {
@@ -98,6 +101,16 @@ class Cafe:
         self.bench = [Barista(self, index) for index in range(self.params.max_baristas)]
         self.crew = simpy.Store(self.env, capacity=self.params.max_baristas)
         self.orders = {}
+
+        # Stations that can run several items at once get a queue and a server
+        # that decides what to run together. Everything else is worked directly
+        # by whoever is holding the order.
+        self.policy = make_policy(self.params)
+        self.grouping = [
+            name for name, station in self.params.stations.items() if station.groups_work
+        ]
+        self.queues = {name: [] for name in self.grouping}
+        self._waiting = {name: self.env.event() for name in self.grouping}
 
     # ---- staffing ------------------------------------------------------
 
@@ -125,6 +138,8 @@ class Cafe:
         for barista in self.bench:
             self.crew.put(barista)
         self.env.process(self.staffing())
+        for name in self.grouping:
+            self.env.process(self.station_server(name))
 
     # ---- events --------------------------------------------------------
 
@@ -164,6 +179,94 @@ class Cafe:
 
     # ---- the service process ------------------------------------------
 
+    def submit(self, station: str, task: Task, order: Order, item: Item) -> Pending:
+        """Hand a piece of work to a station's queue and get a receipt."""
+        entry = Pending(
+            task=task,
+            order=order,
+            item=item,
+            station=station,
+            submitted_at=self.env.now,
+            done=self.env.event(),
+        )
+        self.queues[station].append(entry)
+        waiting = self._waiting[station]
+        if not waiting.triggered:
+            waiting.succeed()
+        return entry
+
+    def station_server(self, name: str):
+        """Run one batching station for the day.
+
+        Takes a person first and the machine second, like everything else here,
+        and asks the policy what to run together. `core.capacity` prices the
+        batch, so a press cycle costs the same whether it holds one sandwich or
+        three — which is the entire point of running three.
+        """
+        station = self.params.station(name)
+        resource = self.stations[name]
+        model = StationCapacityModel(self.params, name)
+
+        while True:
+            if not self.queues[name]:
+                self._waiting[name] = self.env.event()
+                yield self._waiting[name]
+                continue
+
+            barista = None
+            if station.attended:
+                barista = yield self.crew.get()
+
+            with resource.request() as slot:
+                yield slot
+                batch = self.policy.next_batch(name, self.queues[name], self.env.now)
+                for entry in batch:
+                    self.queues[name].remove(entry)
+
+                duration = model.batch_cost([entry.item for entry in batch])
+                actor = barista.name if barista is not None else name
+                self.emit_batch(EventType.STATION_START, name, batch, actor, duration)
+                if len(batch) > 1:
+                    self.emit_batch(EventType.BATCH_FORMED, name, batch, actor, duration)
+                yield self.env.timeout(duration)
+                self.emit_batch(EventType.STATION_END, name, batch, actor, duration)
+
+            if barista is not None:
+                self.crew.put(barista)
+            for entry in batch:
+                entry.done.succeed()
+
+    def emit_batch(
+        self,
+        kind: EventType,
+        station: str,
+        batch: list[Pending],
+        actor: str,
+        duration_s: float,
+    ) -> None:
+        """One event for the whole batch, keyed on its first item so the start
+        and end pair up."""
+        head = batch[0]
+        self.log.emit(
+            kind,
+            self.env.now,
+            order_id=head.order.order_id,
+            item_id=head.item.item_id,
+            customer_id=head.order.customer_id,
+            station=station,
+            batch_id=f"{station}-{self.log.next_id()[0]}",
+            actor=actor,
+            channel=head.order.channel,
+            payload={
+                "kind": "batch",
+                "attended": self.params.station(station).attended,
+                "duration_s": duration_s,
+                "size": len(batch),
+                "items": [entry.item.item_id for entry in batch],
+                "orders": sorted({entry.order.order_id for entry in batch}),
+            },
+        )
+
     def make(self, order: Order, barista: Barista):
         """Work the order's items, standing aside while machines run.
 
@@ -188,6 +291,17 @@ class Cafe:
                 station = (
                     self.params.station(task.station) if task.station is not None else None
                 )
+                if station is not None and station.groups_work:
+                    # Queue it and stand aside: the station's server decides
+                    # what runs with what, and holding a person while waiting
+                    # for a machine is what deadlocks a busy cafe.
+                    self.crew.put(barista)
+                    barista = None
+                    entry = self.submit(task.station, task, order, item)
+                    yield entry.done
+                    barista = yield self.crew.get()
+                    continue
+
                 if station is None or station.attended:
                     yield from barista.work(task, order, kind=str(task.kind))
                     continue

@@ -43,6 +43,7 @@ question.
 | M2.5 ship the skeleton | built, not yet deployed |
 | M3 simulator engine | done |
 | M4 metrics | partial: waits, throughput, utilisation |
+| M5 policies | partial: fifo and batching, no bounded reorder yet |
 | M7 experiments | partial: named arms, no sweeps yet |
 
 ## Deploying
@@ -71,7 +72,7 @@ holds the second reading of the espresso bar, in case the Schaerer in the
 photographs is a super-automatic: no pitcher, so nothing batches, and the wand
 and group head collapse into one serialised machine.
 
-    python -m sim.experiments --arms manual_bar,superauto --seeds 20
+    python -m sim.experiments --arms manual_bar,batched,superauto --seeds 20
 
 ## Parameters
 
