@@ -116,7 +116,7 @@ def test_every_tap_is_broadcast_in_order(live_server):
     with Listener(live_server) as bar:
         time.sleep(0.1)
         order_id = httpx.post(
-            f"{live_server}/orders", json={"lines": [{"drink": "drip"}]}
+            f"{live_server}/orders", json={"lines": [{"drink": "drip_coffee"}]}
         ).json()["order_id"]
 
         for state in ("accepted", "in_progress", "ready", "picked_up"):
@@ -131,7 +131,7 @@ def test_a_reconnecting_client_can_resume_from_last_event_id(live_server):
     """Cafe wifi drops. A client that reconnects with Last-Event-ID gets what it
     missed; it still refetches whole queue state, which `/queue` provides."""
     order_id = httpx.post(
-        f"{live_server}/orders", json={"lines": [{"drink": "drip"}]}
+        f"{live_server}/orders", json={"lines": [{"drink": "drip_coffee"}]}
     ).json()["order_id"]
     httpx.post(f"{live_server}/orders/{order_id}/transition", json={"to": "accepted"})
 
@@ -149,7 +149,7 @@ def test_an_illegal_tap_broadcasts_nothing(live_server):
     with Listener(live_server) as bar:
         time.sleep(0.1)
         order_id = httpx.post(
-            f"{live_server}/orders", json={"lines": [{"drink": "drip"}]}
+            f"{live_server}/orders", json={"lines": [{"drink": "drip_coffee"}]}
         ).json()["order_id"]
         assert bar.wait_for(lambda event: event["order_id"] == order_id) is not None
 

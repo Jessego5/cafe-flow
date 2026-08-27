@@ -29,7 +29,7 @@ from app.db import (
 from core.states import State
 
 LATTE = {"drink": "latte", "milk_type": "oat"}
-DRIP = {"drink": "drip"}
+DRIP = {"drink": "drip_coffee"}
 
 
 def place(client, *lines, **kwargs) -> dict:
@@ -48,10 +48,13 @@ def test_menu_comes_from_params(client):
     names = [item["name"] for item in body["items"]]
     assert names == list(get_params().menu)
     latte = next(item for item in body["items"] if item["name"] == "latte")
-    assert latte["price_cents"] == 500
-    assert latte["stations"] == ["steam_wand", "group_head"]
+    assert latte["price_cents"] == 575
+    assert latte["stations"] == ["steam_wand", "group_head"]     # the hot build
+    assert latte["variants"] == ["hot", "iced"]
+    assert latte["default_variant"] == "hot"
     assert latte["service_s"] == 75.0
-    assert body["provenance"] == "provenance: 100% assumed"
+    assert body["serve_styles"] == ["hot", "iced"]
+    assert body["provenance"].startswith("provenance: ")
 
 
 def test_config_states_the_environment(client):
@@ -68,13 +71,30 @@ def test_config_states_the_environment(client):
 
 
 def test_placing_an_order_prices_it_and_costs_it(client):
-    order = place(client, LATTE, {"drink": "pastry"})
+    order = place(client, LATTE, {"drink": "bacon_egg_cheese_bagel"})
     assert order["state"] == State.PLACED
     assert order["number"] == 1
-    assert order["price_cents"] == 850
+    assert order["price_cents"] == 575 + 539
     assert order["bottleneck_cost_s"] == 30.0      # one 8oz steam, setup included
     assert order["payment"] == {"status": "stubbed", "amount_due_cents": 0}
-    assert [item["drink"] for item in order["items"]] == ["latte", "pastry"]
+    assert [item["drink"] for item in order["items"]] == ["latte", "bacon_egg_cheese_bagel"]
+
+
+def test_an_iced_latte_costs_nothing_at_the_wand(client):
+    """Same price, same drink, no steam. The variant reaches the capacity
+    accounting, not just the label on the cup."""
+    hot = place(client, {"drink": "latte", "milk_type": "oat", "variant": "hot"})
+    iced = place(client, {"drink": "latte", "milk_type": "oat", "variant": "iced"})
+    assert hot["price_cents"] == iced["price_cents"]
+    assert hot["bottleneck_cost_s"] == 30.0
+    assert iced["bottleneck_cost_s"] == 0.0
+
+
+def test_an_unknown_variant_is_refused(client):
+    response = client.post(
+        "/orders", json={"lines": [{"drink": "latte", "milk_type": "oat", "variant": "warm"}]}
+    )
+    assert response.status_code == 400
 
 
 def test_order_numbers_count_up_within_the_day(client):
@@ -133,7 +153,7 @@ def test_unknown_order_is_a_404(client):
     [
         ([{"drink": "flat_white"}], "not on the menu"),
         ([{"drink": "latte"}], "latte with no milk"),
-        ([{"drink": "drip", "milk_type": "oat"}], "milk on a black coffee"),
+        ([{"drink": "drip_coffee", "milk_type": "oat"}], "milk on a black coffee"),
         ([{"drink": "latte", "milk_type": "hemp"}], "unknown milk"),
     ],
 )
@@ -399,7 +419,7 @@ def test_healthz_reports_a_reachable_writable_database(client):
     assert body["event_log_readable"] is True
     assert body["event_log_writable"] is True
     assert body["events"] == 0
-    assert body["provenance"] == "provenance: 100% assumed"
+    assert body["provenance"].startswith("provenance: ")
 
 
 def test_healthz_does_not_append_to_the_event_log(client):

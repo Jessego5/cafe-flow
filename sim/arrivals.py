@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from core.params import SECONDS_PER_MINUTE, Params
-from core.types import Channel
+from core.types import Channel, Line
 
 __all__ = ["Arrival", "generate_arrivals", "class_block_size"]
 
@@ -28,7 +28,7 @@ class Arrival:
     order_id: str
     at_s: float
     channel: Channel
-    lines: tuple[tuple[str, str | None], ...]
+    lines: tuple[Line, ...]
     source: str  # which class block, or "background"
 
     @property
@@ -41,35 +41,43 @@ def class_block_size(block, capture_rate: float) -> int:
     return int(round(block.sections * block.avg_enrollment * capture_rate))
 
 
-def _draw_lines(
-    params: Params, rng: np.random.Generator
-) -> tuple[tuple[str, str | None], ...]:
-    """One basket: a drink from the mix, its milk, and maybe something to eat.
+def _pick(names: list[str], shares: dict[str, float], rng: np.random.Generator) -> str:
+    weights = np.array([shares[name] for name in names], dtype=float)
+    return names[int(rng.choice(len(names), p=weights / weights.sum()))]
 
-    The draw order is fixed because changing it would change every subsequent
-    number for the same seed.
+
+def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
+    """One basket: an item from the mix, its milk, how it is served, and maybe
+    something to eat.
+
+    Four draws, always in this order and always all four, even when the answer
+    is discarded — a conditional draw would make the seed mean different things
+    for different baskets.
     """
-    drinks = list(params.mix.drink)
-    weights = np.array([params.mix.drink[name] for name in drinks], dtype=float)
-    drink = drinks[int(rng.choice(len(drinks), p=weights / weights.sum()))]
+    drink = _pick(list(params.mix.drink), params.mix.drink, rng)
+    milk = _pick(list(params.mix.milk), params.mix.milk, rng)
+    serve = _pick(list(params.mix.serve), params.mix.serve, rng)
+    attaches = rng.random() < params.mix.attach.rate
 
-    milk = None
-    if params.menu_item(drink).requires_milk:
-        milks = list(params.mix.milk)
-        milk_weights = np.array([params.mix.milk[name] for name in milks], dtype=float)
-        milk = milks[int(rng.choice(len(milks), p=milk_weights / milk_weights.sum()))]
-
-    lines: list[tuple[str, str | None]] = [(drink, milk)]
-
-    attaches = rng.random() < params.mix.attach_rate
-    if attaches:
-        food = next(
-            (name for name, spec in params.menu.items() if not spec.requires_milk
-             and any(task.station == "oven" for task in spec.tasks)),
-            None,
+    spec = params.menu_item(drink)
+    lines = [
+        Line(
+            drink=drink,
+            milk_type=milk if spec.requires_milk else None,
+            variant=serve if spec.variants else None,
         )
-        if food is not None and food != drink:
-            lines.append((food, None))
+    ]
+
+    food = params.mix.attach.item
+    if attaches and food != drink:
+        food_spec = params.menu_item(food)
+        lines.append(
+            Line(
+                drink=food,
+                milk_type=milk if food_spec.requires_milk else None,
+                variant=serve if food_spec.variants else None,
+            )
+        )
 
     return tuple(lines)
 

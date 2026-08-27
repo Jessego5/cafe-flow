@@ -69,6 +69,7 @@ class MenuItemRow(SQLModel, table=True):
     service_s: float                       # hands-on seconds, made alone
     stations: str                          # comma separated, in order
     bottleneck_cost_s: float               # seconds at params.bottleneck_station
+    variants: str = ""                     # comma separated, empty if only one
 
 
 class OrderRow(SQLModel, table=True):
@@ -101,6 +102,7 @@ class OrderItemRow(SQLModel, table=True):
     position: int
     drink: str
     milk_type: str | None = None
+    variant: str | None = None
     price_cents: int
     cogs_cents: int
     requires_milk: bool
@@ -326,14 +328,18 @@ def seed_menu(session: Session, params: Params) -> int:
     existing = {row.name: row for row in session.exec(select(MenuItemRow)).all()}
 
     for name, spec in params.menu.items():
+        # the projection describes the item as ordered by default; the variants
+        # are priced and timed per order by `core.menu`
+        task_specs, _, price_cents = spec.plan()
         probe = Item(
             item_id=f"probe-{name}",
             order_id="probe",
             drink=name,
-            price_cents=spec.price_cents,
+            price_cents=price_cents,
             cogs_cents=spec.cogs_cents,
             requires_milk=spec.requires_milk,
             milk_type=next(iter(params.mix.milk)) if spec.requires_milk else None,
+            variant=spec.default_variant,
         )
         probe.tasks = resolve_tasks(probe, params)
 
@@ -341,12 +347,15 @@ def seed_menu(session: Session, params: Params) -> int:
                                                       requires_milk=False, assembly_s=0.0,
                                                       service_s=0.0, stations="",
                                                       bottleneck_cost_s=0.0)
-        row.price_cents = spec.price_cents
+        row.variants = ",".join(spec.variant_names)
+        row.price_cents = price_cents
         row.cogs_cents = spec.cogs_cents
         row.requires_milk = spec.requires_milk
-        row.assembly_s = spec.assembly_s
+        row.assembly_s = sum(
+            task.duration_s for task in probe.tasks if task.station is None
+        )
         row.service_s = sum(task.duration_s for task in probe.tasks)
-        row.stations = ",".join(t.station for t in spec.tasks)
+        row.stations = ",".join(task.station for task in task_specs)
         row.bottleneck_cost_s = model.cost(probe)
         session.add(row)
 
@@ -489,6 +498,7 @@ def persist_order(
                 position=position,
                 drink=item.drink,
                 milk_type=item.milk_type,
+                variant=item.variant,
                 price_cents=item.price_cents,
                 cogs_cents=item.cogs_cents,
                 requires_milk=item.requires_milk,
@@ -522,6 +532,7 @@ def hydrate(row: OrderRow, items: Sequence[OrderItemRow], params: Params) -> Ord
             cogs_cents=item_row.cogs_cents,
             requires_milk=item_row.requires_milk,
             milk_type=item_row.milk_type,
+            variant=item_row.variant,
         )
         item.tasks = resolve_tasks(item, params)
         order.items.append(item)

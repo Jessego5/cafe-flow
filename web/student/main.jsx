@@ -6,6 +6,7 @@ import '../shared/styles.css'
 
 function MenuCard({ item, milks, onAdd }) {
   const [milk, setMilk] = useState(milks[0])
+  const [variant, setVariant] = useState(item.default_variant || null)
   return (
     <div className="card">
       <div className="spread">
@@ -13,6 +14,19 @@ function MenuCard({ item, milks, onAdd }) {
         <span className="number">{money(item.price_cents)}</span>
       </div>
       <div className="muted">{item.stations.join(' → ')}</div>
+      {item.variants.length > 0 && (
+        <div className="row" style={{ marginTop: '0.6rem' }}>
+          {item.variants.map((option) => (
+            <button
+              key={option}
+              className={option === variant ? 'primary' : ''}
+              onClick={() => setVariant(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
       {item.requires_milk && (
         <div className="row" style={{ marginTop: '0.6rem' }}>
           <label className="muted" htmlFor={`milk-${item.name}`}>Milk</label>
@@ -26,7 +40,13 @@ function MenuCard({ item, milks, onAdd }) {
       <button
         className="primary wide"
         style={{ marginTop: '0.6rem' }}
-        onClick={() => onAdd({ drink: item.name, milk_type: item.requires_milk ? milk : null })}
+        onClick={() =>
+          onAdd({
+            drink: item.name,
+            milk_type: item.requires_milk ? milk : null,
+            variant: item.variants.length > 0 ? variant : null,
+          })
+        }
       >
         Add
       </button>
@@ -68,6 +88,7 @@ function Status({ orderId, onNew }) {
       <ul className="items">
         {order.items.map((item) => (
           <li key={item.item_id}>
+            {item.variant ? `${item.variant} ` : ''}
             {item.drink.replace(/_/g, ' ')}
             {item.milk_type ? ` · ${item.milk_type}` : ''}
           </li>
@@ -119,7 +140,7 @@ function App() {
   return (
     <>
       <header className="bar">
-        <h1>{config ? config.cafe.name : 'Campus Cafe'} · order ahead</h1>
+        <h1>{config ? config.cafe.name : 'Campus Cafe'} · demo</h1>
         <span className="muted">{config ? `open ${config.opens_at}–${config.closes_at}` : ''}</span>
       </header>
       <main>
@@ -151,6 +172,7 @@ function App() {
                   {cart.map((line, index) => (
                     <li key={index} className="spread">
                       <span>
+                        {line.variant ? `${line.variant} ` : ''}
                         {line.drink.replace(/_/g, ' ')}
                         {line.milk_type ? ` · ${line.milk_type}` : ''}
                       </span>

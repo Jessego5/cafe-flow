@@ -17,7 +17,7 @@ from core.events import EventLog, EventType
 from core.menu import make_item, make_order, service_seconds
 from core.params import ConfigError, load_params, params_from_dict, parse_hhmm
 from core.states import LEGAL, LOST, TERMINAL, IllegalTransition, State, transition
-from core.types import Channel, Item, Order, TaskKind
+from core.types import Channel, Item, Line, Order, TaskKind
 
 # --------------------------------------------------------------------------
 # config: loads, validates, and fails loudly by name
@@ -25,7 +25,7 @@ from core.types import Channel, Item, Order, TaskKind
 
 
 def test_base_config_loads(params):
-    assert params.meta.scenario == "base_assumed"
+    assert params.meta.scenario == "ground_truth_assumed"
     assert params.bottleneck_station in params.stations
     assert set(params.mix.drink) == set(params.menu)
 
@@ -33,9 +33,33 @@ def test_base_config_loads(params):
 def test_every_parameter_carries_provenance(params):
     report = params.provenance_report()
     assert report.total > 0
-    assert report.assumed_fraction == 1.0
-    assert report.caption() == "provenance: 100% assumed"
+    assert sum(report.counts.values()) == report.total
+    assert set(report.counts) <= {"assumed", "observed", "fitted"}
+    assert 0.0 < report.assumed_fraction < 1.0
+    assert report.caption().startswith("provenance: ")
     assert params.source_of("stations.steam_wand.setup_s") == "assumed"
+
+
+def test_source_of_marks_single_parameters(params):
+    """A price read off the board is observed; the cost of goods sitting beside
+    it in the same block is still a guess."""
+    assert params.source_of("menu.latte.price_cents") == "observed"
+    assert params.source_of("menu.latte.cogs_cents") == "assumed"
+    assert params.source_of("menu.latte.variants.hot.assembly_s") == "assumed"
+
+
+def test_source_of_must_name_a_real_parameter(corrupt):
+    message = corrupt(
+        lambda cfg: cfg["menu"]["latte"].update(source_of={"prcie_cents": "observed"})
+    )
+    assert "menu.latte.source_of.prcie_cents" in message
+
+
+def test_source_of_rejects_an_unknown_source(corrupt):
+    message = corrupt(
+        lambda cfg: cfg["menu"]["latte"].update(source_of={"price_cents": "eyeballed"})
+    )
+    assert "menu.latte.source_of.price_cents" in message
 
 
 def test_overlay_flips_provenance_without_touching_code(tmp_path, root):
@@ -78,11 +102,11 @@ def test_mix_that_does_not_sum_is_named(corrupt):
 
 def test_menu_pointing_at_an_unknown_station_is_named(corrupt):
     message = corrupt(
-        lambda cfg: cfg["menu"]["latte"]["tasks"].__setitem__(
+        lambda cfg: cfg["menu"]["latte"]["variants"]["hot"]["tasks"].__setitem__(
             0, {"station": "steamer", "oz": 8}
         )
     )
-    assert "menu.latte.tasks[0]" in message
+    assert "menu.latte.variants.hot.tasks[0]" in message
     assert "steamer" in message
 
 
@@ -102,8 +126,8 @@ def test_negative_duration_is_rejected(corrupt):
 
 
 def test_task_missing_a_required_dimension_is_named(corrupt):
-    message = corrupt(lambda cfg: cfg["menu"]["latte"]["tasks"][0].pop("oz"))
-    assert "menu.latte.tasks[0]" in message
+    message = corrupt(lambda cfg: cfg["menu"]["latte"]["variants"]["hot"]["tasks"][0].pop("oz"))
+    assert "menu.latte.variants.hot.tasks[0]" in message
     assert "oz" in message
 
 
@@ -226,14 +250,46 @@ def test_entered_at_reads_the_event_trail(params):
 # --------------------------------------------------------------------------
 
 
-def test_a_lone_latte_costs_exactly_the_formula(params):
+def test_a_lone_hot_latte_costs_exactly_the_formula(params):
     wand = params.station("steam_wand")
     head = params.station("group_head")
-    spec = params.menu_item("latte")
-    expected = wand.setup_s + wand.per_6oz_s * (8 / 6) + head.shot_s + spec.assembly_s
+    _, assembly_s, _ = params.menu_item("latte").plan("hot")
+    expected = wand.setup_s + wand.per_6oz_s * (8 / 6) + head.shot_s + assembly_s
 
     item = make_item("latte", params, order_id="o1", item_id="o1-0", milk_type="oat")
+    assert item.variant == "hot"                      # the board's default here
     assert service_seconds(item) == pytest.approx(expected)
+
+
+def test_an_iced_latte_never_touches_the_steam_wand(params):
+    """The board offers most milk drinks hot or iced, and the iced build skips
+    the wand. This is what decides how much of the menu milk batching can
+    touch at all."""
+    model = StationCapacityModel(params)
+    hot = make_item("latte", params, order_id="o", item_id="h", milk_type="oat", variant="hot")
+    iced = make_item("latte", params, order_id="o", item_id="i", milk_type="oat", variant="iced")
+
+    assert [task.station for task in hot.tasks] == ["steam_wand", "group_head", None]
+    assert [task.station for task in iced.tasks] == ["group_head", "cold_bar", None]
+    assert model.cost(hot) > 0
+    assert model.cost(iced) == 0.0
+    assert hot.price_cents == iced.price_cents      # the board charges one price
+
+
+def test_iced_drinks_do_not_batch_because_there_is_nothing_to_batch(params):
+    model = StationCapacityModel(params)
+    iced = make_order("o1", params, lines=[Line("latte", "oat", "iced")] * 4).items
+    assert model.batch_cost(iced) == 0.0
+    assert model.group(iced) == []
+
+
+def test_an_unknown_variant_is_refused(params):
+    with pytest.raises(ConfigError, match="lukewarm"):
+        make_item("latte", params, order_id="o", item_id="i", milk_type="oat",
+                  variant="lukewarm")
+    with pytest.raises(ConfigError):
+        # drip coffee is poured one way only
+        make_item("drip_coffee", params, order_id="o", item_id="i", variant="hot")
 
 
 def test_station_plan_shape(params):
@@ -249,7 +305,7 @@ def test_milk_rules_are_enforced(params):
     with pytest.raises(ConfigError):
         make_item("latte", params, order_id="o", item_id="i")            # milk missing
     with pytest.raises(ConfigError):
-        make_item("drip", params, order_id="o", item_id="i", milk_type="oat")
+        make_item("drip_coffee", params, order_id="o", item_id="i", milk_type="oat")
     with pytest.raises(ConfigError):
         make_item("latte", params, order_id="o", item_id="i", milk_type="hemp")
     with pytest.raises(ConfigError):
@@ -257,9 +313,9 @@ def test_milk_rules_are_enforced(params):
 
 
 def test_order_totals(params):
-    order = make_order("o1", params, lines=[("latte", "oat"), ("pastry", None)])
-    assert order.price_cents == 500 + 350
-    assert order.margin_cents == (500 - 130) + (350 - 110)
+    order = make_order("o1", params, lines=[("latte", "oat"), ("bacon_egg_cheese_bagel", None)])
+    assert order.price_cents == 575 + 539
+    assert order.margin_cents == (575 - 130) + (539 - 180)
     assert [item.item_id for item in order.items] == ["o1-0", "o1-1"]
     assert len(order.milk_items) == 1
 
@@ -312,17 +368,17 @@ def test_different_milks_do_not_batch(params):
 
 def test_items_that_miss_the_bottleneck_are_free(params):
     model = StationCapacityModel(params)
-    drip = make_item("drip", params, order_id="o1", item_id="o1-0")
+    drip = make_item("drip_coffee", params, order_id="o1", item_id="o1-0")
     assert model.cost(drip) == 0.0
     assert model.group([drip]) == []
 
 
-def test_oven_batches_by_count(params):
-    model = StationCapacityModel(params, station_name="oven")
-    oven = params.station("oven")
-    items = make_order("o1", params, lines=[("pastry", None)] * 7).items
-    assert [len(group) for group in model.group(items)] == [6, 1]
-    assert model.batch_cost(items) == pytest.approx(2 * oven.run_s)
+def test_the_panini_press_batches_by_count(params):
+    model = StationCapacityModel(params, station_name="panini_press")
+    press = params.station("panini_press")
+    items = make_order("o1", params, lines=[("bacon_egg_cheese_bagel", None)] * 7).items
+    assert [len(group) for group in model.group(items)] == [3, 3, 1]
+    assert model.batch_cost(items) == pytest.approx(3 * press.run_s)
 
 
 def test_register_bottleneck_degenerates_to_order_counts(root, tmp_path):
@@ -337,7 +393,7 @@ def test_register_bottleneck_degenerates_to_order_counts(root, tmp_path):
     assert model.batch_cost(one_order) == base_s          # one order, one interaction
     assert sum(model.cost(item) for item in one_order) == 4 * base_s
 
-    two_orders = one_order + make_order("o2", params, lines=[("drip", None)]).items
+    two_orders = one_order + make_order("o2", params, lines=[("drip_coffee", None)]).items
     assert model.batch_cost(two_orders) == 2 * base_s
 
 
@@ -365,7 +421,7 @@ def test_task_seconds_ignores_order_terms_by_default(params):
 
 def test_event_ids_are_deterministic_not_random(params):
     def run() -> EventLog:
-        log = EventLog("base_assumed", 42, is_simulated=True)
+        log = EventLog("ground_truth_assumed", 42, is_simulated=True)
         order = make_order("o1", params, lines=[("latte", "oat")], is_simulated=True)
         for state in (State.ACCEPTED, State.IN_PROGRESS, State.READY):
             transition(order, state, at=100.0, actor="barista", log=log)
@@ -375,16 +431,16 @@ def test_event_ids_are_deterministic_not_random(params):
     first, second = run(), run()
     assert first.digest() == second.digest()
     assert [event.event_id for event in first] == [
-        "base_assumed:42:0000000",
-        "base_assumed:42:0000001",
-        "base_assumed:42:0000002",
-        "base_assumed:42:0000003",
+        "ground_truth_assumed:42:0000000",
+        "ground_truth_assumed:42:0000001",
+        "ground_truth_assumed:42:0000002",
+        "ground_truth_assumed:42:0000003",
     ]
-    assert EventLog("base_assumed", 43).digest() != first.digest()
+    assert EventLog("ground_truth_assumed", 43).digest() != first.digest()
 
 
 def test_log_roundtrips_through_jsonl(tmp_path, params):
-    log = EventLog("base_assumed", 42, is_simulated=True)
+    log = EventLog("ground_truth_assumed", 42, is_simulated=True)
     order = make_order("o1", params, lines=[("latte", "oat")], is_simulated=True)
     transition(order, State.ACCEPTED, at=100.0, log=log, note="hand test")
     path = log.write_jsonl(tmp_path / "events.jsonl")
@@ -461,8 +517,8 @@ def test_placement_is_an_event_with_no_from_state(params):
 
 def test_a_live_log_does_not_unflag_a_simulated_order(params):
     log = EventLog("live", None, is_simulated=False)
-    real = make_order("o1", params, lines=[("drip", None)])
-    fake = make_order("o2", params, lines=[("drip", None)], is_simulated=True)
+    real = make_order("o1", params, lines=[("drip_coffee", None)])
+    fake = make_order("o2", params, lines=[("drip_coffee", None)], is_simulated=True)
     transition(real, State.ACCEPTED, at=1.0, log=log)
     transition(fake, State.ACCEPTED, at=1.0, log=log)
     assert [event.is_simulated for event in log] == [False, True]

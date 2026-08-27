@@ -15,7 +15,7 @@ from typing import Iterable
 from core.events import Event
 from core.states import State
 
-__all__ = ["Channel", "TaskKind", "Task", "Item", "Order", "Batch", "Customer"]
+__all__ = ["Channel", "TaskKind", "Line", "Task", "Item", "Order", "Batch", "Customer"]
 
 
 class Channel(StrEnum):
@@ -26,6 +26,23 @@ class Channel(StrEnum):
 class TaskKind(StrEnum):
     PREP = "prep"          # occupies a station
     ASSEMBLY = "assembly"  # occupies the barista only
+
+
+@dataclass(frozen=True, slots=True)
+class Line:
+    """One thing a customer asks for, before it becomes work.
+
+    `variant` is the board's "Hot or Iced". It is not a garnish: the iced build
+    skips the steam wand, so it changes what the drink costs at the bottleneck.
+    """
+
+    drink: str
+    milk_type: str | None = None
+    variant: str | None = None
+
+    @classmethod
+    def of(cls, value: "Line | tuple") -> "Line":
+        return value if isinstance(value, cls) else cls(*value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +69,7 @@ class Task:
 
 @dataclass(slots=True)
 class Item:
-    """One drink or pastry on an order."""
+    """One drink or food item on an order."""
 
     item_id: str
     order_id: str
@@ -61,6 +78,7 @@ class Item:
     cogs_cents: int
     requires_milk: bool
     milk_type: str | None = None
+    variant: str | None = None
     tasks: list[Task] = field(default_factory=list)
 
     @property

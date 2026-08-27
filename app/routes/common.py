@@ -41,6 +41,7 @@ def order_payload(
                 "item_id": item.item_id,
                 "drink": item.drink,
                 "milk_type": item.milk_type,
+                "variant": item.variant,
                 "price_cents": item.price_cents,
             }
             for item in sorted(items, key=lambda i: i.position)

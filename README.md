@@ -41,7 +41,8 @@ question.
 | M1 shared core | done |
 | M2 app skeleton | done |
 | M2.5 ship the skeleton | built, not yet deployed |
-| M3 simulator engine | not started |
+| M3 simulator engine | done |
+| M4 metrics | not started |
 
 ## Deploying
 
@@ -53,14 +54,24 @@ The runbook, the environment table and the SSE gotchas are in
     docker run -p 8080:8080 -v cafe_data:/data cafe-flow
     docker run --rm --entrypoint /usr/local/bin/verify-restore.sh cafe-flow
 
+## Scope
+
+The cafe is Ground Truth, a Wisconsin Union cafe pouring Peet's Coffee, and it
+already has order-ahead: Transact Mobile Ordering, deployed and advertised at
+the door. So this project does not build a competing student ordering app. The
+student view is a demo; the deliverable is the simulator, the observations, and
+a barista-side queue that batches and reorders work the existing system does
+not. `customers.preorder_adoption` is an observable here, not a sweep.
+
 ## Parameters
 
-Every duration, rate, capacity and mix fraction lives in `params/base.yaml`, and
-each one carries provenance (`assumed`, `observed`, `fitted`). Overlays merge
-left to right:
+Item names, prices and the board's hot/iced offer are `observed`. Every
+duration, capacity, mix fraction and staffing level is still `assumed`; see
+[observations/README.md](observations/README.md) for what to count and in what
+order. Overlays merge left to right:
 
     from core.params import load_params
     params = load_params("params/base.yaml", "params/observed.yaml")
-    params.provenance_report().caption()   # 'provenance: 100% assumed'
+    params.provenance_report().caption()   # 'provenance: 81% assumed'
 
 Calibration at M8 writes `params/observed.yaml` and changes no Python.

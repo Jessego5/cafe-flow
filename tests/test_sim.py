@@ -22,7 +22,7 @@ from core.params import SECONDS_PER_MINUTE, load_params
 from core.states import LEGAL, State
 from sim.arrivals import Arrival, class_block_size, generate_arrivals
 from sim.engine import event_path, run
-from core.types import Channel
+from core.types import Channel, Line
 
 SEEDS = [0, 1, 7, 42]
 BIN_S = 300           # 5 minute bins for the arrival histogram
@@ -148,7 +148,7 @@ def test_the_log_is_flagged_simulated_throughout(day):
     assert all(event.is_simulated for event in day.log)
     assert all(order.is_simulated for order in day.orders.values())
     assert {event.seed for event in day.log} == {42}
-    assert {event.scenario for event in day.log} == {"base_assumed"}
+    assert {event.scenario for event in day.log} == {"ground_truth_assumed"}
 
 
 def test_the_log_writes_the_shared_schema(day, tmp_path):
@@ -157,7 +157,7 @@ def test_the_log_writes_the_shared_schema(day, tmp_path):
     from core.events import EVENT_COLUMNS
 
     path = day.log.write_parquet(event_path(day.scenario, day.seed, tmp_path))
-    assert path.name == "events_base_assumed_42.parquet"
+    assert path.name == "events_ground_truth_assumed_42.parquet"
 
     frame = pd.read_parquet(path)
     assert list(frame.columns) == list(EVENT_COLUMNS)
@@ -170,7 +170,7 @@ def test_the_log_writes_the_shared_schema(day, tmp_path):
 # --------------------------------------------------------------------------
 
 
-def _solo(params, drink="latte", milk="oat", at_s=None):
+def _solo(params, drink="latte", milk="oat", variant="hot", at_s=None):
     """One customer, alone in an empty cafe."""
     at_s = params.meta.start_s + 3600 if at_s is None else at_s
     arrival = Arrival(
@@ -178,7 +178,7 @@ def _solo(params, drink="latte", milk="oat", at_s=None):
         order_id="o0",
         at_s=float(at_s),
         channel=Channel.WALKUP,
-        lines=((drink, milk),),
+        lines=(Line(drink, milk, variant),),
         source="test",
     )
     return run(params, 0, arrivals=[arrival])
@@ -187,8 +187,8 @@ def _solo(params, drink="latte", milk="oat", at_s=None):
 def test_a_lone_latte_takes_exactly_the_make_time(params):
     wand = params.station("steam_wand")
     head = params.station("group_head")
-    spec = params.menu_item("latte")
-    expected = wand.setup_s + wand.per_6oz_s * (8 / 6) + head.shot_s + spec.assembly_s
+    _, assembly_s, _ = params.menu_item("latte").plan("hot")
+    expected = wand.setup_s + wand.per_6oz_s * (8 / 6) + head.shot_s + assembly_s
 
     result = _solo(params)
     order = result.orders["o0"]
@@ -213,7 +213,7 @@ def test_a_lone_customer_waits_only_for_the_register_and_the_drink(params):
 def test_the_register_is_worked_by_a_barista(params):
     """The register competes for barista time even when it is not the
     bottleneck, so it appears in the log as station work like anything else."""
-    result = _solo(params, drink="drip", milk=None)
+    result = _solo(params, drink="drip_coffee", milk=None, variant=None)
     stations = [
         event.station for event in result.log if event.type is EventType.STATION_START
     ]
@@ -251,7 +251,10 @@ def test_one_wand_serialises_two_simultaneous_lattes(params):
     """
     at_s = params.meta.start_s + 3600
     arrivals = [
-        Arrival(f"c{index}", f"o{index}", float(at_s), Channel.WALKUP, (("latte", "oat"),), "test")
+        Arrival(
+            f"c{index}", f"o{index}", float(at_s), Channel.WALKUP,
+            (Line("latte", "oat", "hot"),), "test",
+        )
         for index in range(2)
     ]
     result = run(params, 0, arrivals=arrivals)
@@ -348,8 +351,37 @@ def test_nobody_arrives_outside_opening_hours(params):
 
 def test_baskets_respect_the_menu(params, day):
     for arrival in day.arrivals:
-        for drink, milk in arrival.lines:
-            spec = params.menu_item(drink)
-            assert (milk is not None) == spec.requires_milk
-            if milk is not None:
-                assert milk in params.mix.milk
+        for line in arrival.lines:
+            spec = params.menu_item(line.drink)
+            assert (line.milk_type is not None) == spec.requires_milk
+            if line.milk_type is not None:
+                assert line.milk_type in params.mix.milk
+            assert (line.variant is not None) == bool(spec.variants)
+            if line.variant is not None:
+                assert line.variant in params.mix.serve
+
+
+def test_the_hot_iced_split_follows_the_mix(params):
+    """The single most important thing to count during observation: it decides
+    how much of the menu milk batching can reach."""
+    from collections import Counter
+
+    served: Counter = Counter()
+    for seed in range(8):        # one day is far too small a sample to assert on
+        for arrival in generate_arrivals(params, np.random.default_rng(seed)):
+            served.update(line.variant for line in arrival.lines if line.variant)
+
+    total = sum(served.values())
+    assert total > 300
+    assert set(served) == set(params.mix.serve)
+    assert abs(served["iced"] / total - params.mix.serve["iced"]) < 0.08
+
+
+def test_only_hot_milk_drinks_reach_the_wand(params, day):
+    from core.capacity import StationCapacityModel
+
+    model = StationCapacityModel(params, station_name="steam_wand")
+    for order in day.orders.values():
+        for item in order.items:
+            if item.variant == "iced":
+                assert model.cost(item) == 0.0

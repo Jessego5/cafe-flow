@@ -1,35 +1,65 @@
-# Campus Cafe Order-Ahead — base parameter file.
+# Ground Truth (a Wisconsin Union cafe), pouring Peet's Coffee.
 #
-# Ground rule 1: no magic numbers outside this file.
-# Ground rule 3: every parameter carries provenance. `source` on a mapping
-#   applies to that mapping and everything beneath it unless overridden.
-#   At M8, params/observed.yaml overlays this file and flips the touched
-#   subtrees to `source: observed` (or `fitted`).
+# Provenance (ground rule 3). `source` on a mapping applies to everything
+# beneath it; `source_of` overrides individual keys in that same mapping.
+#
+#   observed  read off the menu boards photographed 2026-08-27
+#   assumed   placeholder, to be replaced at M8
+#
+# Item names, prices and the hot/iced offer are observed. Every duration,
+# capacity, mix fraction and staffing level below is still assumed: the boards
+# say what is sold, not how long it takes or who is working.
 
 meta:
-  scenario: base_assumed
+  scenario: ground_truth_assumed
   seed: 42
   sim_start: "07:00"
   sim_end: "15:00"
   source: assumed
 
 cafe:
-  name: Campus Cafe
-  timezone: America/Chicago     # class blocks and slot boundaries are local
+  name: Ground Truth
+  timezone: America/Chicago
   source: assumed
 
+# ---------------------------------------------------------------------------
+# stations
+#
+# Observed from the photographs: espresso bar, batch-brew urns and taps, a
+# panini press, and a food counter for salads and soups. There is no blender
+# (no blended drinks anywhere on the board) and no oven.
+#
+# NOT observed, and the three that matter most: how many steam wands and group
+# heads the machine has, and how many POS terminals there are. All three are
+# top of the M8 list.
+# ---------------------------------------------------------------------------
 stations:
   source: assumed
-  register:    { capacity: from_staffing, base_s: 35 }
-  steam_wand:  { capacity: 1, setup_s: 10, per_6oz_s: 15,
-                 batch_key: milk_type, max_batch_oz: 32 }
-  group_head:  { capacity: 2, shot_s: 25 }
-  blender:     { capacity: 1, run_s: 90, blocking: true }
-  cold_tap:    { capacity: 99, pour_s: 8 }
-  oven:        { capacity: 1, run_s: 180, batch_size: 6 }
 
-# Which station gates slot capacity. Set from the M8 findings.
-# If this turns out to be `register`, swap the name — no code changes.
+  # A 30-item board with customisations. `from_staffing` assumes whoever takes
+  # the order also makes drinks; if the cafe runs a dedicated cashier this
+  # becomes a fixed capacity and the register stops competing for barista time.
+  register:      { capacity: from_staffing, base_s: 40 }
+
+  # Hot milk only. Iced drinks never touch it, which is why the hot/iced split
+  # decides how much milk batching is worth at all.
+  steam_wand:    { capacity: 1, setup_s: 10, per_6oz_s: 15,
+                   batch_key: milk_type, max_batch_oz: 32 }
+
+  group_head:    { capacity: 2, shot_s: 25 }
+
+  # Ice, cold milk, syrups: the iced-drink build bar.
+  cold_bar:      { capacity: 2, pour_s: 12 }
+
+  # Drip, cold brew, brewed and iced tea come off urns and taps. Nearly free.
+  brew_tap:      { capacity: 4, pour_s: 10 }
+
+  panini_press:  { capacity: 1, run_s: 240, batch_size: 3 }
+
+  food_counter:  { capacity: 2, run_s: 90 }
+
+# Which station gates capacity. Assumed, and genuinely open now: with a large
+# iced share the wand may not be it. Set from measured occupancy at M8.
 bottleneck_station: steam_wand
 
 staffing:
@@ -37,32 +67,325 @@ staffing:
   - { from: "10:00", to: "13:00", baristas: 3, source: assumed }
   - { from: "13:00", to: "15:00", baristas: 2, source: assumed }
 
+# ---------------------------------------------------------------------------
+# menu
+#
+# Prices and names are off the board. Station plans and times are assumed.
+# `variants` carry the board's "Hot or Iced": the iced build skips the steam
+# wand entirely.
+# ---------------------------------------------------------------------------
 menu:
   source: assumed
+
+  drip_coffee:
+    price_cents: 385
+    cogs_cents: 40
+    requires_milk: false
+    tasks: [ { station: brew_tap } ]
+    assembly_s: 5
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  espresso:
+    price_cents: 295
+    cogs_cents: 35
+    requires_milk: false
+    tasks: [ { station: group_head, shots: 1 } ]
+    assembly_s: 5
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  americano:
+    price_cents: 505
+    cogs_cents: 45
+    requires_milk: false
+    tasks: [ { station: group_head, shots: 2 } ]
+    assembly_s: 10
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  cappuccino:                      # hot only; the board offers no iced cap
+    price_cents: 575
+    cogs_cents: 120
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 6 }, { station: group_head, shots: 1 } ]
+    assembly_s: 18
+    source_of: { price_cents: observed, requires_milk: observed }
+
   latte:
-    price_cents: 500
+    price_cents: 575
     cogs_cents: 130
     requires_milk: true
-    tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ]
-    assembly_s: 20
-  drip:       { price_cents: 250, cogs_cents: 40,  requires_milk: false,
-                tasks: [ { station: cold_tap } ], assembly_s: 5 }
-  cold_brew:  { price_cents: 450, cogs_cents: 90,  requires_milk: false,
-                tasks: [ { station: cold_tap } ], assembly_s: 8 }
-  cappuccino: { price_cents: 475, cogs_cents: 120, requires_milk: true,
-                tasks: [ { station: steam_wand, oz: 6 },
-                         { station: group_head, shots: 1 } ], assembly_s: 18 }
-  blended:    { price_cents: 600, cogs_cents: 170, requires_milk: true,
-                tasks: [ { station: blender } ], assembly_s: 15 }
-  pastry:     { price_cents: 350, cogs_cents: 110, requires_milk: false,
-                tasks: [ { station: oven } ], assembly_s: 5 }
+    default_variant: hot
+    variants:
+      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+              assembly_s: 20 }
+      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+              assembly_s: 15 }
+    source_of: { price_cents: observed, requires_milk: observed }
 
+  vanilla_latte:
+    price_cents: 635
+    cogs_cents: 145
+    requires_milk: true
+    default_variant: hot
+    variants:
+      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+              assembly_s: 25 }
+      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+              assembly_s: 20 }
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  caramel_macchiato:
+    price_cents: 635
+    cogs_cents: 150
+    requires_milk: true
+    default_variant: iced
+    variants:
+      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+              assembly_s: 30 }
+      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+              assembly_s: 25 }
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  mocha:
+    price_cents: 630
+    cogs_cents: 155
+    requires_milk: true
+    default_variant: hot
+    variants:
+      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+              assembly_s: 28 }
+      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+              assembly_s: 22 }
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  white_chocolate_mocha:
+    price_cents: 680
+    cogs_cents: 165
+    requires_milk: true
+    default_variant: hot
+    variants:
+      hot:  { tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 1 } ],
+              assembly_s: 28 }
+      iced: { tasks: [ { station: group_head, shots: 1 }, { station: cold_bar } ],
+              assembly_s: 22 }
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  cold_brew:
+    price_cents: 525
+    cogs_cents: 90
+    requires_milk: false
+    tasks: [ { station: brew_tap } ]
+    assembly_s: 8
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  cold_brew_oat_latte:             # named on the board; iced by definition
+    price_cents: 615
+    cogs_cents: 125
+    requires_milk: true
+    tasks: [ { station: brew_tap }, { station: cold_bar } ]
+    assembly_s: 12
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  black_tie:                       # cold brew, condensed milk, chicory, half & half
+    price_cents: 625
+    cogs_cents: 130
+    requires_milk: true
+    tasks: [ { station: brew_tap }, { station: cold_bar } ]
+    assembly_s: 20
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  brewed_tea:
+    price_cents: 355
+    cogs_cents: 35
+    requires_milk: false
+    tasks: [ { station: brew_tap } ]
+    assembly_s: 5
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  iced_tea:
+    price_cents: 415
+    cogs_cents: 40
+    requires_milk: false
+    tasks: [ { station: brew_tap } ]
+    assembly_s: 8
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  matcha_latte:                    # board does not offer it iced
+    price_cents: 600
+    cogs_cents: 150
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 8 } ]
+    assembly_s: 30
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  chai_latte:
+    price_cents: 600
+    cogs_cents: 145
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 8 } ]
+    assembly_s: 25
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  sparkling_grapefruit_cold_brew:
+    price_cents: 605
+    cogs_cents: 140
+    requires_milk: false
+    tasks: [ { station: brew_tap }, { station: cold_bar } ]
+    assembly_s: 15
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  sparkling_passion_fruit_black_tea:
+    price_cents: 605
+    cogs_cents: 140
+    requires_milk: false
+    tasks: [ { station: cold_bar } ]
+    assembly_s: 15
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  sparkling_lemonade:
+    price_cents: 405
+    cogs_cents: 85
+    requires_milk: false
+    tasks: [ { station: cold_bar } ]
+    assembly_s: 10
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  cocoa:
+    price_cents: 470
+    cogs_cents: 110
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 8 } ]
+    assembly_s: 20
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  bacon_egg_cheese_bagel:
+    price_cents: 539
+    cogs_cents: 180
+    requires_milk: false
+    tasks: [ { station: panini_press } ]
+    assembly_s: 30
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  sausage_egg_cheese:
+    price_cents: 499
+    cogs_cents: 165
+    requires_milk: false
+    tasks: [ { station: panini_press } ]
+    assembly_s: 30
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  vegan_sausage_egg_cheese:
+    price_cents: 639
+    cogs_cents: 215
+    requires_milk: false
+    tasks: [ { station: panini_press } ]
+    assembly_s: 30
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  italian_herb_chicken:
+    price_cents: 1175
+    cogs_cents: 390
+    requires_milk: false
+    tasks: [ { station: panini_press } ]
+    assembly_s: 45
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  mona_lisa:
+    price_cents: 1025
+    cogs_cents: 330
+    requires_milk: false
+    tasks: [ { station: panini_press } ]
+    assembly_s: 45
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  monterey_turkey:
+    price_cents: 1025
+    cogs_cents: 340
+    requires_milk: false
+    tasks: [ { station: panini_press } ]
+    assembly_s: 45
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  caesar_salad:                    # price sat at the edge of the photograph
+    price_cents: 1100
+    cogs_cents: 350
+    requires_milk: false
+    tasks: [ { station: food_counter } ]
+    assembly_s: 20
+    source_of: { requires_milk: observed }
+
+  build_your_own_salad:
+    price_cents: 1175
+    cogs_cents: 370
+    requires_milk: false
+    tasks: [ { station: food_counter } ]
+    assembly_s: 60
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  broccoli_cheese_soup:            # cup price; the bowl price was cropped
+    price_cents: 399
+    cogs_cents: 120
+    requires_milk: false
+    tasks: [ { station: food_counter } ]
+    assembly_s: 20
+    source_of: { price_cents: observed, requires_milk: observed }
+
+  chicken_dumpling_soup:
+    price_cents: 399
+    cogs_cents: 120
+    requires_milk: false
+    tasks: [ { station: food_counter } ]
+    assembly_s: 20
+    source_of: { price_cents: observed, requires_milk: observed }
+
+# ---------------------------------------------------------------------------
+# mix
+#
+# All assumed. `serve` is the hot/iced split, and it is the single most
+# important thing to count during observation: it decides how large a share of
+# the menu milk batching can touch at all.
+# ---------------------------------------------------------------------------
 mix:
-  drink: { latte: 0.38, drip: 0.18, cold_brew: 0.16,
-           cappuccino: 0.12, blended: 0.08, pastry: 0.08 }
-  milk:  { whole: 0.32, oat: 0.38, skim: 0.14, almond: 0.16 }
-  attach_rate: 0.15
   source: assumed
+  drink:
+    latte: 0.130
+    vanilla_latte: 0.050
+    caramel_macchiato: 0.040
+    mocha: 0.035
+    white_chocolate_mocha: 0.020
+    cappuccino: 0.030
+    americano: 0.040
+    espresso: 0.010
+    drip_coffee: 0.095
+    cold_brew: 0.065
+    cold_brew_oat_latte: 0.040
+    black_tie: 0.015
+    brewed_tea: 0.025
+    matcha_latte: 0.030
+    chai_latte: 0.025
+    iced_tea: 0.040
+    sparkling_grapefruit_cold_brew: 0.012
+    sparkling_passion_fruit_black_tea: 0.008
+    sparkling_lemonade: 0.015
+    cocoa: 0.010
+    bacon_egg_cheese_bagel: 0.055
+    sausage_egg_cheese: 0.040
+    vegan_sausage_egg_cheese: 0.020
+    italian_herb_chicken: 0.030
+    mona_lisa: 0.025
+    monterey_turkey: 0.030
+    caesar_salad: 0.020
+    build_your_own_salad: 0.020
+    broccoli_cheese_soup: 0.015
+    chicken_dumpling_soup: 0.010
+
+  # The board prices no alternative milk, and calories are quoted against 2%,
+  # so 2% is the default and oat is a named menu item in its own right.
+  milk: { two_percent: 0.30, oat: 0.32, whole: 0.12, nonfat: 0.08,
+          almond: 0.10, soy: 0.08 }
+
+  serve: { hot: 0.45, iced: 0.55 }
+
+  attach: { item: bacon_egg_cheese_bagel, rate: 0.12 }
 
 arrivals:
   class_blocks:
@@ -80,19 +403,21 @@ arrivals:
 customers:
   time_budget_min:    { dist: lognormal, median: 9.0, sigma: 0.5 }
   balk_tolerance_min: { dist: lognormal, median: 7.0, sigma: 0.45 }
+  # Transact mobile ordering is already deployed here, so this is an
+  # observable at the pickup shelf rather than a hypothetical.
   preorder_adoption: 0.0
   no_show_rate: 0.03
   source: assumed
 
 policy:
-  name: fifo                   # fifo | batch_milk | bounded_reorder
+  name: fifo
   lookahead_s: 180
   reorder_window_s: 180
   starvation_guard_s: 300
   source: assumed
 
 slots:
-  enabled: false               # turned on at M10 if findings support it
+  enabled: false
   width_min: 5
   walkup_reserve_fraction: 0.30
   min_lead_time_min: 10

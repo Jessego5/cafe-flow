@@ -97,6 +97,14 @@ class _Strict(BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_provenance_overrides(cls, data: Any) -> Any:
+        """`source_of` is provenance metadata, not a parameter."""
+        if isinstance(data, Mapping) and "source_of" in data:
+            return {key: value for key, value in data.items() if key != "source_of"}
+        return data
+
 
 class MetaParams(_Strict):
     scenario: str
@@ -199,28 +207,97 @@ class TaskSpec(_Strict):
     shots: int | None = Field(default=None, gt=0)
 
 
+class VariantParams(_Strict):
+    """One way of building an item, e.g. the board's "Hot or Iced".
+
+    Not cosmetic: an iced latte never touches the steam wand, so the variant
+    changes which stations the drink needs and therefore what it costs at the
+    bottleneck.
+    """
+
+    tasks: list[TaskSpec] = Field(min_length=1)
+    assembly_s: float | None = Field(default=None, ge=0)
+    price_cents: int | None = Field(default=None, gt=0)
+    source: Source | None = None
+
+
 class MenuItemParams(_Strict):
     price_cents: int = Field(gt=0)
     cogs_cents: int = Field(ge=0)
     requires_milk: bool
-    tasks: list[TaskSpec] = Field(min_length=1)
-    assembly_s: float = Field(ge=0)
+    tasks: list[TaskSpec] = Field(default_factory=list)
+    assembly_s: float = Field(default=0.0, ge=0)
+    variants: dict[str, VariantParams] = Field(default_factory=dict)
+    default_variant: str | None = None
     source: Source | None = None
 
     @model_validator(mode="after")
-    def _margin_is_positive(self) -> "MenuItemParams":
-        if self.cogs_cents >= self.price_cents:
+    def _coherent(self) -> "MenuItemParams":
+        if bool(self.tasks) == bool(self.variants):
+            raise ValueError("give either `tasks` or `variants`, not both and not neither")
+        if self.variants:
+            if self.default_variant is None:
+                raise ValueError(f"variants {sorted(self.variants)} need a default_variant")
+            if self.default_variant not in self.variants:
+                raise ValueError(
+                    f"default_variant {self.default_variant!r} is not one of "
+                    f"{sorted(self.variants)}"
+                )
+        elif self.default_variant is not None:
+            raise ValueError("default_variant without variants")
+
+        prices = [self.price_cents] + [
+            variant.price_cents for variant in self.variants.values()
+            if variant.price_cents is not None
+        ]
+        if self.cogs_cents >= min(prices):
             raise ValueError("cogs_cents must be below price_cents")
         return self
+
+    @property
+    def variant_names(self) -> tuple[str, ...]:
+        return tuple(self.variants)
+
+    def plan(self, variant: str | None = None) -> tuple[list[TaskSpec], float, int]:
+        """Station plan, assembly time and price for one way of building it."""
+        if not self.variants:
+            if variant is not None:
+                raise ConfigError(f"this item has no variants, got {variant!r}")
+            return self.tasks, self.assembly_s, self.price_cents
+
+        name = self.default_variant if variant is None else variant
+        chosen = self.variants.get(name)
+        if chosen is None:
+            raise ConfigError(f"unknown variant {name!r} (have {sorted(self.variants)})")
+        return (
+            chosen.tasks,
+            self.assembly_s if chosen.assembly_s is None else chosen.assembly_s,
+            self.price_cents if chosen.price_cents is None else chosen.price_cents,
+        )
+
+    def all_task_specs(self) -> list[tuple[str, list[TaskSpec]]]:
+        """Every station plan this item can take, labelled, for validation."""
+        if not self.variants:
+            return [("tasks", self.tasks)]
+        return [(f"variants.{name}.tasks", v.tasks) for name, v in self.variants.items()]
+
+
+class AttachParams(_Strict):
+    """The thing people add to a drink order."""
+
+    item: str
+    rate: float = Field(ge=0, le=1)
+    source: Source | None = None
 
 
 class MixParams(_Strict):
     drink: dict[str, float]
     milk: dict[str, float]
-    attach_rate: float = Field(ge=0, le=1)
+    serve: dict[str, float]          # the board's hot/iced split
+    attach: AttachParams
     source: Source | None = None
 
-    @field_validator("drink", "milk")
+    @field_validator("drink", "milk", "serve")
     @classmethod
     def _is_a_distribution(cls, value: dict[str, float], info) -> dict[str, float]:
         if not value:
@@ -364,7 +441,7 @@ class Params(_Strict):
         """`source` sits beside the named entries in these blocks; it is
         provenance metadata, not a station or a menu item."""
         if isinstance(value, Mapping):
-            return {k: v for k, v in value.items() if k != "source"}
+            return {k: v for k, v in value.items() if k not in ("source", "source_of")}
         return value
 
     @model_validator(mode="after")
@@ -378,20 +455,32 @@ class Params(_Strict):
             )
 
         for name, item in self.menu.items():
-            for index, task in enumerate(item.tasks):
-                where = f"menu.{name}.tasks[{index}]"
-                station = self.stations.get(task.station)
-                if station is None:
-                    problems.append(f"{where}.station: unknown station {task.station!r}")
-                    continue
-                if station.per_6oz_s is not None and task.oz is None:
-                    problems.append(f"{where}: station {task.station!r} needs `oz`")
-                if station.shot_s is not None and task.shots is None:
-                    problems.append(f"{where}: station {task.station!r} needs `shots`")
-                if task.oz is not None and station.per_6oz_s is None:
-                    problems.append(f"{where}: station {task.station!r} does not use `oz`")
-                if task.shots is not None and station.shot_s is None:
-                    problems.append(f"{where}: station {task.station!r} does not use `shots`")
+            for label, specs in item.all_task_specs():
+                for index, task in enumerate(specs):
+                    where = f"menu.{name}.{label}[{index}]"
+                    station = self.stations.get(task.station)
+                    if station is None:
+                        problems.append(f"{where}.station: unknown station {task.station!r}")
+                        continue
+                    if station.per_6oz_s is not None and task.oz is None:
+                        problems.append(f"{where}: station {task.station!r} needs `oz`")
+                    if station.shot_s is not None and task.shots is None:
+                        problems.append(f"{where}: station {task.station!r} needs `shots`")
+                    if task.oz is not None and station.per_6oz_s is None:
+                        problems.append(f"{where}: station {task.station!r} does not use `oz`")
+                    if task.shots is not None and station.shot_s is None:
+                        problems.append(f"{where}: station {task.station!r} does not use `shots`")
+
+        # Every item that can be built more than one way must offer the same
+        # choices, because `mix.serve` draws that choice for all of them.
+        for name, item in self.menu.items():
+            if item.variants and set(item.variant_names) != set(self.mix.serve):
+                problems.append(
+                    f"menu.{name}.variants: {sorted(item.variant_names)} does not match "
+                    f"mix.serve {sorted(self.mix.serve)}"
+                )
+        if self.mix.attach.item not in self.menu:
+            problems.append(f"mix.attach.item: {self.mix.attach.item!r} is not on the menu")
 
         mix_only = set(self.mix.drink) - set(self.menu)
         menu_only = set(self.menu) - set(self.mix.drink)
@@ -490,10 +579,27 @@ def _walk_provenance(
             raise ConfigError(
                 f"{'.'.join(path + ['source'])}: {source!r} is not one of {SOURCES}"
             )
+
+        # `source_of` marks individual keys differently from their block: a menu
+        # price read off the board is observed while its cost of goods, sitting
+        # beside it, is still a guess.
+        overrides = node.get("source_of") or {}
+        if not isinstance(overrides, Mapping):
+            raise ConfigError(f"{'.'.join(path + ['source_of'])}: must be a mapping")
+        for key, value in overrides.items():
+            if value not in SOURCES:
+                raise ConfigError(
+                    f"{'.'.join(path + ['source_of', str(key)])}: {value!r} is not one of {SOURCES}"
+                )
+            if key not in node:
+                raise ConfigError(
+                    f"{'.'.join(path + ['source_of', str(key)])}: there is no such parameter here"
+                )
+
         for key, value in node.items():
-            if key == "source":
+            if key in ("source", "source_of"):
                 continue
-            _walk_provenance(value, path + [str(key)], source, out)
+            _walk_provenance(value, path + [str(key)], overrides.get(key, source), out)
     elif isinstance(node, Sequence) and not isinstance(node, (str, bytes)):
         for index, value in enumerate(node):
             _walk_provenance(value, path + [str(index)], inherited, out)

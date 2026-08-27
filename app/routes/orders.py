@@ -30,7 +30,7 @@ from app.db import (
 from app.routes.common import event_payload, order_payload
 from app.stream import broadcaster
 from core.capacity import StationCapacityModel
-from core.menu import make_order
+from core.menu import Line, make_order
 from core.params import ConfigError, SECONDS_PER_MINUTE
 from core.states import IllegalTransition, State, place, transition
 from core.types import Channel
@@ -43,6 +43,7 @@ NUMBER_RETRIES = 5  # daily order numbers are unique per day; retry a lost race
 class LineIn(BaseModel):
     drink: str
     milk_type: str | None = None
+    variant: str | None = None      # the board's hot or iced
 
 
 class OrderIn(BaseModel):
@@ -93,7 +94,9 @@ async def create_order(
                 order = make_order(
                     order_id,
                     params,
-                    lines=[(line.drink, line.milk_type) for line in body.lines],
+                    lines=[
+                        Line(line.drink, line.milk_type, line.variant) for line in body.lines
+                    ],
                     channel=body.channel,
                     placed_at_s=now_s,
                     customer_id=body.customer_id,
@@ -150,6 +153,7 @@ async def create_order(
                 "item_id": item.item_id,
                 "drink": item.drink,
                 "milk_type": item.milk_type,
+                "variant": item.variant,
                 "price_cents": item.price_cents,
             }
             for item in order.items
@@ -175,6 +179,7 @@ async def get_order(order_id: str) -> dict:
             "item_id": item.item_id,
             "drink": item.drink,
             "milk_type": item.milk_type,
+            "variant": item.variant,
             "price_cents": item.price_cents,
         }
         for item in order.items

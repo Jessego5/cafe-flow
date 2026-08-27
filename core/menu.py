@@ -11,9 +11,10 @@ from typing import Iterable, Sequence
 
 from core.capacity import task_seconds
 from core.params import ConfigError, Params
-from core.types import Channel, Item, Order, Task, TaskKind
+from core.types import Channel, Item, Line, Order, Task, TaskKind
 
 __all__ = [
+    "Line",
     "resolve_tasks",
     "make_item",
     "make_order",
@@ -30,9 +31,10 @@ def resolve_tasks(item: Item, params: Params) -> list[Task]:
     discounts are applied later by `core.capacity`.
     """
     spec = params.menu_item(item.drink)
+    task_specs, assembly_s, _ = spec.plan(item.variant)
     tasks: list[Task] = []
 
-    for task_spec in spec.tasks:
+    for task_spec in task_specs:
         station = params.station(task_spec.station)
         batch_value = None
         if station.batch_key is not None:
@@ -51,14 +53,14 @@ def resolve_tasks(item: Item, params: Params) -> list[Task]:
             )
         )
 
-    if spec.assembly_s > 0:
+    if assembly_s > 0:
         tasks.append(
             Task(
                 item_id=item.item_id,
                 order_id=item.order_id,
                 station=None,
                 kind=TaskKind.ASSEMBLY,
-                duration_s=spec.assembly_s,
+                duration_s=assembly_s,
             )
         )
     return tasks
@@ -71,9 +73,18 @@ def make_item(
     order_id: str,
     item_id: str,
     milk_type: str | None = None,
+    variant: str | None = None,
 ) -> Item:
     """Build an item with its price, margin and station plan attached."""
     spec = params.menu_item(drink)
+
+    if variant is not None and variant not in spec.variants:
+        raise ConfigError(
+            f"{drink} has no {variant!r} variant"
+            + (f" (have {sorted(spec.variants)})" if spec.variants else "")
+        )
+    if spec.variants and variant is None:
+        variant = spec.default_variant
 
     if spec.requires_milk and milk_type is None:
         raise ConfigError(f"{drink} requires a milk type")
@@ -88,10 +99,11 @@ def make_item(
         item_id=item_id,
         order_id=order_id,
         drink=drink,
-        price_cents=spec.price_cents,
+        price_cents=spec.plan(variant)[2],
         cogs_cents=spec.cogs_cents,
         requires_milk=spec.requires_milk,
         milk_type=milk_type,
+        variant=variant,
     )
     item.tasks = resolve_tasks(item, params)
     return item
@@ -101,7 +113,7 @@ def make_order(
     order_id: str,
     params: Params,
     *,
-    lines: Sequence[tuple[str, str | None]],
+    lines: Sequence[Line | tuple],
     channel: Channel = Channel.WALKUP,
     placed_at_s: float = 0.0,
     customer_id: str | None = None,
@@ -124,13 +136,14 @@ def make_order(
     )
     order.items = [
         make_item(
-            drink,
+            line.drink,
             params,
             order_id=order_id,
             item_id=f"{order_id}-{index}",
-            milk_type=milk,
+            milk_type=line.milk_type,
+            variant=line.variant,
         )
-        for index, (drink, milk) in enumerate(lines)
+        for index, line in enumerate(Line.of(raw) for raw in lines)
     ]
     return order
 
@@ -144,5 +157,9 @@ def order_service_seconds(order: Order) -> float:
     return sum(service_seconds(item) for item in order.items)
 
 
-def price_cents(lines: Iterable[tuple[str, str | None]], params: Params) -> int:
-    return sum(params.menu_item(drink).price_cents for drink, _ in lines)
+def price_cents(lines: Iterable[Line | tuple], params: Params) -> int:
+    total = 0
+    for raw in lines:
+        line = Line.of(raw)
+        total += params.menu_item(line.drink).plan(line.variant)[2]
+    return total

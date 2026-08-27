@@ -20,14 +20,16 @@ async def get_menu() -> dict:
     items = []
     for name, spec in params.menu.items():
         row = rows.get(name)
+        task_specs, _, price_cents = spec.plan()
         items.append(
             {
                 "name": name,
-                "price_cents": spec.price_cents,
+                "price_cents": price_cents,
                 "requires_milk": spec.requires_milk,
-                "assembly_s": spec.assembly_s,
+                "variants": list(spec.variant_names),
+                "default_variant": spec.default_variant,
                 "service_s": row.service_s if row else None,
-                "stations": [task.station for task in spec.tasks],
+                "stations": [task.station for task in task_specs],
                 "bottleneck_cost_s": row.bottleneck_cost_s if row else None,
             }
         )
@@ -35,6 +37,7 @@ async def get_menu() -> dict:
     return {
         "items": items,
         "milks": sorted(params.mix.milk),
+        "serve_styles": list(params.mix.serve),
         "bottleneck_station": params.bottleneck_station,
         # every surface states how much of what it shows is still guessed
         "provenance": params.provenance_report().caption(),

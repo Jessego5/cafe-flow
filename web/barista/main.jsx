@@ -29,6 +29,7 @@ function Card({ order, since, onMove, busy }) {
       <ul className="items">
         {order.items.map((item) => (
           <li key={item.item_id}>
+            {item.variant && <strong className="variant">{item.variant} </strong>}
             {item.drink.replace(/_/g, ' ')}
             {item.milk_type ? <strong> · {item.milk_type}</strong> : ''}
           </li>
