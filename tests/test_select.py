@@ -151,3 +151,47 @@ def test_every_objective_is_a_metric_the_runs_actually_produce():
 def test_an_unknown_objective_is_refused():
     with pytest.raises(SystemExit, match="unknown objective"):
         select_policy([BASE], objective="vibes", seeds=1)
+
+
+# --------------------------------------------------------------------------
+# every configuration that ships
+# --------------------------------------------------------------------------
+
+EXAMPLES = [
+    "params/base.yaml",
+    "params/examples/espresso_bar.yaml",
+    "params/examples/maven_roasters.yaml",
+]
+
+
+@pytest.mark.parametrize("config", EXAMPLES)
+def test_every_example_configuration_runs_and_can_be_selected_for(config):
+    """Three operations built three different ways — a menu board, a hand
+    written sketch, and a transaction log — and the same machinery answers for
+    all of them."""
+    params = load_params(config)
+    selection = select_policy([config], objective="margin", seeds=2)
+    assert selection.chosen in POLICIES
+    assert selection.incumbent == params.policy.name
+    assert len(selection.candidates) == len(POLICIES)
+
+
+def test_the_configurations_really_are_different_operations():
+    loaded = [load_params(config) for config in EXAMPLES]
+    assert len({params.cafe.name for params in loaded}) == len(EXAMPLES)
+    assert len({tuple(sorted(params.menu)) for params in loaded}) == len(EXAMPLES)
+    assert len({tuple(sorted(params.stations)) for params in loaded}) == len(EXAMPLES)
+
+    models = {params.arrivals.model for params in loaded}
+    assert models == {"class_blocks", "profile"}
+
+
+def test_a_synthetic_configuration_says_it_is_synthetic():
+    """A generated dataset is realistic in shape and is not a record of
+    anything that happened. Marking it observed would be the one lie the
+    provenance system exists to prevent."""
+    maven = load_params("params/examples/maven_roasters.yaml")
+    counts = maven.provenance_report().counts
+    assert counts.get("synthetic", 0) > 0
+    assert counts.get("observed", 0) == 0
+    assert maven.source_of("arrivals.profile.rate_per_hour.0") == "synthetic"

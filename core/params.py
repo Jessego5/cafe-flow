@@ -42,12 +42,14 @@ __all__ = [
 ]
 
 #: Where a parameter came from.
-#:   assumed   a guess, to be replaced
-#:   published a conventional figure from an industry or vendor source
-#:   observed  measured at this cafe
-#:   fitted    tuned to match observations
-Source = Literal["assumed", "published", "observed", "fitted"]
-SOURCES: tuple[str, ...] = ("assumed", "published", "observed", "fitted")
+#:   assumed    a guess, to be replaced
+#:   synthetic  from a generated dataset: realistic in shape, but not a record
+#:              of anything that happened anywhere
+#:   published  a conventional figure from an industry or vendor source
+#:   observed   measured at this cafe
+#:   fitted     tuned to match observations
+Source = Literal["assumed", "synthetic", "published", "observed", "fitted"]
+SOURCES: tuple[str, ...] = ("assumed", "synthetic", "published", "observed", "fitted")
 
 FROM_STAFFING = "from_staffing"
 
@@ -390,13 +392,46 @@ class ClassBlock(_Strict):
         return parse_hhmm(self.ends_at, field="arrivals.class_blocks.ends_at")
 
 
+class ProfileParams(_Strict):
+    """Demand as a measured curve rather than a story about class timetables.
+
+    A point-of-sale export gives the rate hour by hour and says nothing about
+    why. For a cafe whose demand is not driven by a bell that is the better
+    model, and it is the one a real transaction log can actually supply.
+    """
+
+    bin_minutes: float = Field(gt=0)
+    rate_per_hour: list[float] = Field(min_length=1)
+    source: Source | None = None
+
+    @field_validator("rate_per_hour")
+    @classmethod
+    def _non_negative(cls, value: list[float]) -> list[float]:
+        if any(rate < 0 for rate in value):
+            raise ValueError("an arrival rate cannot be negative")
+        return value
+
+
 class ArrivalsParams(_Strict):
-    class_blocks: list[ClassBlock] = Field(min_length=1)
+    #: `class_blocks` builds demand from a timetable; `profile` takes it from a
+    #: measured curve. A campus cafe is the first; a shop on a commuter street
+    #: is the second, and only a log can tell you which you have.
+    model: Literal["class_blocks", "profile"] = "class_blocks"
+    class_blocks: list[ClassBlock] = Field(default_factory=list)
+    profile: ProfileParams | None = None
     capture_rate: float = Field(gt=0, le=1)
-    offset_min: float
-    sigma_min: float = Field(gt=0)
+    offset_min: float = 0.0
+    sigma_min: float = Field(default=1.0, gt=0)
     background_per_hour: float = Field(ge=0)
     source: Source | None = None
+
+    @model_validator(mode="after")
+    def _has_what_its_model_needs(self) -> "ArrivalsParams":
+        if self.model == "class_blocks" and not self.class_blocks:
+            raise ValueError("arrivals.model is class_blocks but none are given")
+        if self.model == "profile" and self.profile is None:
+            raise ValueError("arrivals.model is profile but no profile is given")
+        return self
 
 
 class LogNormalDist(_Strict):

@@ -103,5 +103,8 @@ def preorder_lead_s(params: Params) -> float:
     ends = sorted(block.ends_at_s for block in params.arrivals.class_blocks)
     gaps = [later - earlier for earlier, later in zip(ends, ends[1:])]
     if not gaps:
+        # no timetable to take it from, so an hour: long enough to be ordering
+        # ahead rather than queueing, short enough that the drink is still worth
+        # collecting
         return 60.0 * SECONDS_PER_MINUTE
     return float(mean(gaps))

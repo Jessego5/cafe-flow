@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 from core.events import EventType
-from core.params import SECONDS_PER_MINUTE, load_params
+from core.params import SECONDS_PER_MINUTE, ConfigError, load_params
 from core.states import LEGAL, State
 from sim.arrivals import Arrival, class_block_size, generate_arrivals
 from sim.engine import event_path, run
@@ -455,3 +455,82 @@ def test_only_hot_milk_drinks_reach_the_wand(params, day):
         for item in order.items:
             if item.variant == "iced":
                 assert model.cost(item) == 0.0
+
+
+# --------------------------------------------------------------------------
+# demand as a measured curve rather than a timetable
+# --------------------------------------------------------------------------
+
+
+def _profile_params(root, tmp_path, rate_per_hour, capture=1.0, bin_minutes=60):
+    overlay = tmp_path / "profile.yaml"
+    overlay.write_text(
+        "meta:\n  sim_start: \"08:00\"\n"
+        f"  sim_end: \"{8 + len(rate_per_hour):02d}:00\"\n"
+        "staffing:\n"
+        f"  - {{ from: \"08:00\", to: \"{8 + len(rate_per_hour):02d}:00\", "
+        "baristas: 3, source: assumed }\n"
+        "arrivals:\n"
+        "  model: profile\n"
+        "  class_blocks: null\n"
+        f"  capture_rate: {capture}\n"
+        "  background_per_hour: 0\n"
+        "  profile:\n"
+        f"    bin_minutes: {bin_minutes}\n"
+        f"    rate_per_hour: {list(rate_per_hour)}\n"
+    )
+    return load_params(root / "params" / "base.yaml", overlay)
+
+
+def test_a_measured_curve_reproduces_its_own_rate(root, tmp_path):
+    """A shop on a commuter street has no bell to model. The curve is the
+    model, and what comes out has to match what went in."""
+    params = _profile_params(root, tmp_path, [30.0, 30.0, 30.0])
+    counts = [
+        len(generate_arrivals(params, np.random.default_rng(seed))) for seed in range(12)
+    ]
+    assert 3 * 30 * 0.75 < mean_of(counts) < 3 * 30 * 1.25
+
+
+def mean_of(values):
+    return sum(values) / len(values)
+
+
+def test_the_curve_puts_the_rush_where_the_rush_was(root, tmp_path):
+    params = _profile_params(root, tmp_path, [60.0, 5.0, 5.0])
+    arrivals = generate_arrivals(params, np.random.default_rng(3))
+    first_hour = [a for a in arrivals if a.at_s < 9 * 3600]
+    assert len(first_hour) > 3 * (len(arrivals) - len(first_hour))
+
+
+def test_capture_rate_still_scales_a_measured_curve(root, tmp_path):
+    """The same knob calibrates either arrivals model, which is what lets a
+    measured shape and a fitted volume live together."""
+    full = _profile_params(root, tmp_path, [40.0, 40.0], capture=1.0)
+    half = _profile_params(root, tmp_path, [40.0, 40.0], capture=0.5)
+    many = lambda p: mean_of(
+        [len(generate_arrivals(p, np.random.default_rng(s))) for s in range(12)]
+    )
+    assert many(half) < many(full)
+    assert 0.35 < many(half) / many(full) < 0.65
+
+
+def test_a_profile_model_without_a_profile_is_refused(root, tmp_path):
+    overlay = tmp_path / "broken.yaml"
+    overlay.write_text("arrivals:\n  model: profile\n")
+    with pytest.raises(ConfigError, match="no profile"):
+        load_params(root / "params" / "base.yaml", overlay)
+
+
+def test_a_timetable_model_without_a_timetable_is_refused(root, tmp_path):
+    overlay = tmp_path / "broken.yaml"
+    overlay.write_text("arrivals:\n  class_blocks: null\n")
+    with pytest.raises(ConfigError, match="class_blocks"):
+        load_params(root / "params" / "base.yaml", overlay)
+
+
+def test_a_day_drawn_from_a_curve_is_still_deterministic(root, tmp_path):
+    params = _profile_params(root, tmp_path, [25.0, 40.0, 15.0])
+    first, second = run(params, 4), run(params, 4)
+    assert first.log.digest() == second.log.digest()
+    assert first.conserved()

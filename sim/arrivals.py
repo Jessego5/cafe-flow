@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from core.params import SECONDS_PER_MINUTE, Params
+from core.params import SECONDS_PER_MINUTE, Params, format_hhmm
 from core.types import Channel, Line
 from sim.balking import draw_channel, preorder_lead_s, sample_minutes
 
@@ -96,16 +96,9 @@ def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
     return tuple(lines)
 
 
-def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]:
-    """The whole day's demand, sorted by arrival time.
-
-    Class blocks give the bursts; a Poisson background gives the trough. Anyone
-    who would arrive outside opening hours is dropped rather than clipped to the
-    edge, which would put a false spike on the boundary.
-    """
-    opens, closes = float(params.meta.start_s), float(params.meta.end_s)
+def _from_class_blocks(params: Params, rng: np.random.Generator) -> list[tuple[float, str]]:
+    """Demand as a timetable: a block lets out, some fraction come here."""
     times: list[tuple[float, str]] = []
-
     for index, block in enumerate(params.arrivals.class_blocks):
         count = class_block_size(block, params.arrivals.capture_rate)
         if count <= 0:
@@ -114,6 +107,51 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
         spread = params.arrivals.sigma_min * SECONDS_PER_MINUTE
         label = f"block{index}@{block.ends_at}"
         times.extend((float(t), label) for t in rng.normal(centre, spread, count))
+    return times
+
+
+def _from_profile(params: Params, rng: np.random.Generator) -> list[tuple[float, str]]:
+    """Demand as a measured curve.
+
+    A non-homogeneous Poisson process: each bin's count is drawn from its own
+    rate and placed uniformly inside it. `capture_rate` still scales the whole
+    curve, so the same knob calibrates either model — which is what lets a
+    measured shape and a fitted volume live together.
+    """
+    profile = params.arrivals.profile
+    opens, closes = float(params.meta.start_s), float(params.meta.end_s)
+    width_s = profile.bin_minutes * SECONDS_PER_MINUTE
+    scale = params.arrivals.capture_rate
+
+    times: list[tuple[float, str]] = []
+    for index, rate in enumerate(profile.rate_per_hour):
+        start = opens + index * width_s
+        end = min(start + width_s, closes)
+        if start >= closes or end <= start or rate <= 0:
+            continue
+        expected = rate * scale * (end - start) / SECONDS_PER_HOUR
+        count = int(rng.poisson(expected))
+        if count:
+            label = f"profile@{format_hhmm(start)}"
+            times.extend((float(t), label) for t in rng.uniform(start, end, count))
+    return times
+
+
+def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]:
+    """The whole day's demand, sorted by arrival time.
+
+    Two ways of getting there, chosen by `arrivals.model`: a timetable of class
+    blocks, or a curve measured from a transaction log. Either way a Poisson
+    background fills the trough, and anyone who would arrive outside opening
+    hours is dropped rather than clipped to the edge, which would put a false
+    spike on the boundary.
+    """
+    opens, closes = float(params.meta.start_s), float(params.meta.end_s)
+
+    if params.arrivals.model == "profile":
+        times = _from_profile(params, rng)
+    else:
+        times = _from_class_blocks(params, rng)
 
     hours = (closes - opens) / SECONDS_PER_HOUR
     background = int(rng.poisson(params.arrivals.background_per_hour * hours))

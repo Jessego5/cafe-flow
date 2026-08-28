@@ -70,6 +70,29 @@ student view is a demo; the deliverable is the simulator, the observations, and
 a barista-side queue that batches and reorders work the existing system does
 not. `customers.preorder_adoption` is an observable here, not a sweep.
 
+## Feeding it a till's history
+
+A point-of-sale export replaces two of the largest guesses in any configuration
+— the shape of the day and the mix of the order book — with something counted:
+
+    python -m analysis.demand "Coffee Shop Sales.xlsx" --location "Hell's Kitchen" \
+      --drop Housewares Clothing "Organic Beans" --out demand.yaml
+
+Column names are arguments, so the same code reads a Maven Analytics teaching
+set, a Transact export or a Square CSV. `arrivals.model: profile` then draws
+the day from that measured curve instead of a class timetable.
+
+`params/examples/maven_roasters.yaml` is built this way, from 46,844
+transactions over 181 days. It is marked `synthetic`, not `observed`: Maven
+Roasters is a fictitious business and the data is realistic in shape rather
+than a record of anything that happened. A log from a real till would earn the
+stronger word.
+
+**What no sales log can supply**, however many rows it has: service times, which
+station did the work, staffing, and — the important one — balking. A list of
+people who bought something is structurally blind to everyone who looked at the
+queue and left. That still has to be counted by a person.
+
 ## Choosing the scheduler for whatever cafe it is fed
 
 `params/base.yaml` describes one cafe. Point the tool at another — a different
@@ -79,9 +102,14 @@ menu, different stations, different demand — and it works out which scheduler
     python -m sim.select --objective margin --seeds 40
     python -m sim.select --params params/examples/espresso_bar.yaml --objective margin
 
-The answers differ, which is the point. On the observed Ground Truth menu
-batching wins clearly; on the example espresso bar, where the group head is the
-constraint and it cannot batch, nothing beats plain FIFO.
+The answers differ, which is the point. Three operations, built three different
+ways — a photographed menu board, a hand-written sketch, and a transaction log:
+
+| configuration | built from | verdict |
+|---|---|---|
+| Ground Truth | menu boards + published times | batching wins, given enough seeded days |
+| Example espresso bar | hand written | FIFO; the group head is the constraint and cannot batch |
+| Maven Roasters | 46,844 transactions | every policy identical to the cent: the shop is never busy enough for scheduling to matter |
 
 Two rules keep it honest. A challenger must clear the incumbent's confidence
 interval rather than merely beat its mean, because two policies whose intervals

@@ -1,0 +1,279 @@
+# Maven Roasters, Hell's Kitchen - built from a transaction log.
+#
+# 46,844 orders over 181 days, from the Maven Analytics "Coffee Shop Sales"
+# dataset. The shape of the day, the opening hours, the item mix and the prices
+# are read out of that file rather than invented.
+#
+# IT IS A FICTITIOUS BUSINESS. Maven generates these for teaching, so the data
+# is realistic in shape and is not a record of anything that happened anywhere.
+# That is why it is marked synthetic rather than observed: a log from a real
+# till would earn the stronger word; this does not.
+#
+# What no sales log can supply, however many rows it has: service times, which
+# station does the work, staffing, and - the important one - balking. A list of
+# people who bought something is structurally blind to everyone who looked at
+# the queue and left.
+#
+# The station plans below are a judgement about how a bar works, not a fact in
+# the data, and are marked assumed accordingly.
+#
+#   python -m analysis.demand "Coffee Shop Sales.xlsx" --location "Hell's Kitchen"
+#   https://mavenanalytics.io/data-playground/coffee-shop-sales
+
+meta:
+  sim_start: 06:30
+  sim_end: '21:00'
+  source: assumed
+  scenario: maven_roasters
+  seed: 42
+cafe:
+  name: Maven Roasters (Hell's Kitchen)
+  timezone: America/New_York
+  source: assumed
+stations:
+  source: assumed
+  register:
+    capacity: from_staffing
+    base_s: 40
+    per_item_s: 3
+    source_of:
+      base_s: published
+      per_item_s: published
+  steam_wand:
+    capacity: 1
+    setup_s: 12
+    per_6oz_s: 13
+    changeover_s: 10
+    batch_key: milk_type
+    max_batch_oz: 32
+    source_of:
+      setup_s: published
+      per_6oz_s: published
+  group_head:
+    capacity: 2
+    shot_s: 27
+    attended: false
+    source_of:
+      shot_s: published
+  brew_tap:
+    capacity: 4
+    pour_s: 10
+  counter:
+    capacity: 2
+    run_s: 25
+bottleneck_station: steam_wand
+staffing:
+- from: 06:30
+  to: '11:00'
+  baristas: 3
+  source: assumed
+- from: '11:00'
+  to: '21:00'
+  baristas: 2
+  source: assumed
+menu:
+  source: assumed
+  barista_espresso:
+    price_cents: 375
+    cogs_cents: 112
+    requires_milk: true
+    tasks:
+    - station: steam_wand
+      oz: 10
+    - station: group_head
+      shots: 2
+    assembly_s: 20
+    source_of:
+      price_cents: synthetic
+  brewed_chai_tea:
+    price_cents: 255
+    cogs_cents: 76
+    requires_milk: false
+    tasks: &id001
+    - station: brew_tap
+    assembly_s: 8
+    source_of:
+      price_cents: synthetic
+  gourmet_brewed_coffee:
+    price_cents: 300
+    cogs_cents: 90
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 5
+    source_of:
+      price_cents: synthetic
+  hot_chocolate:
+    price_cents: 450
+    cogs_cents: 135
+    requires_milk: true
+    tasks:
+    - station: steam_wand
+      oz: 12
+    assembly_s: 20
+    source_of:
+      price_cents: synthetic
+  brewed_black_tea:
+    price_cents: 250
+    cogs_cents: 75
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 8
+    source_of:
+      price_cents: synthetic
+  brewed_herbal_tea:
+    price_cents: 250
+    cogs_cents: 75
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 8
+    source_of:
+      price_cents: synthetic
+  organic_brewed_coffee:
+    price_cents: 300
+    cogs_cents: 90
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 5
+    source_of:
+      price_cents: synthetic
+  drip_coffee:
+    price_cents: 250
+    cogs_cents: 75
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 5
+    source_of:
+      price_cents: synthetic
+  premium_brewed_coffee:
+    price_cents: 310
+    cogs_cents: 93
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 5
+    source_of:
+      price_cents: synthetic
+  scone:
+    price_cents: 325
+    cogs_cents: 97
+    requires_milk: false
+    tasks: &id002
+    - station: counter
+    assembly_s: 20
+    source_of:
+      price_cents: synthetic
+  brewed_green_tea:
+    price_cents: 250
+    cogs_cents: 75
+    requires_milk: false
+    tasks: *id001
+    assembly_s: 8
+    source_of:
+      price_cents: synthetic
+  pastry:
+    price_cents: 375
+    cogs_cents: 112
+    requires_milk: false
+    tasks: *id002
+    assembly_s: 20
+    source_of:
+      price_cents: synthetic
+  biscotti:
+    price_cents: 350
+    cogs_cents: 105
+    requires_milk: false
+    tasks: *id002
+    assembly_s: 15
+    source_of:
+      price_cents: synthetic
+mix:
+  source: synthetic
+  source_of:
+    milk: assumed
+    serve: assumed
+    attach: assumed
+  drink:
+    barista_espresso: 0.136198
+    brewed_chai_tea: 0.131555
+    gourmet_brewed_coffee: 0.127303
+    hot_chocolate: 0.085229
+    brewed_black_tea: 0.085109
+    brewed_herbal_tea: 0.083471
+    organic_brewed_coffee: 0.067889
+    drip_coffee: 0.065244
+    premium_brewed_coffee: 0.057461
+    scone: 0.052893
+    brewed_green_tea: 0.045169
+    pastry: 0.03456
+    biscotti: 0.027919
+  milk:
+    whole: 0.45
+    oat: 0.4
+    skim: 0.15
+  serve:
+    hot: 1.0
+  attach:
+    item: scone
+    rate: 0.0
+arrivals:
+  model: profile
+  profile:
+    bin_minutes: 30.0
+    rate_per_hour:
+    - 17.204
+    - 16.796
+    - 17.746
+    - 34.475
+    - 35.105
+    - 34.188
+    - 33.956
+    - 33.315
+    - 35.138
+    - 23.348
+    - 13.624
+    - 12.497
+    - 12.983
+    - 13.359
+    - 14.11
+    - 15.227
+    - 13.359
+    - 11.591
+    - 14.519
+    - 13.492
+    - 14.552
+    - 15.16
+    - 14.276
+    - 13.746
+    - 13.757
+    - 12.166
+    - 12.818
+    - 2.155
+    - 2.95
+  capture_rate: 1.0
+  background_per_hour: 0.0
+  source: synthetic
+  source_of:
+    capture_rate: fitted
+customers:
+  time_budget_min:
+    dist: lognormal
+    median: 9.0
+    sigma: 0.5
+  balk_tolerance_min:
+    dist: lognormal
+    median: 7.0
+    sigma: 0.45
+  preorder_adoption: 0.0
+  no_show_rate: 0.03
+  source: assumed
+policy:
+  name: fifo
+  lookahead_s: 180
+  reorder_window_s: 180
+  starvation_guard_s: 300
+  source: assumed
+slots:
+  enabled: false
+  width_min: 5
+  walkup_reserve_fraction: 0.3
+  min_lead_time_min: 10
+  source: assumed
