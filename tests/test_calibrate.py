@@ -16,6 +16,13 @@ from core.params import ConfigError, load_params
 
 BASE = "params/base.yaml"
 
+
+def runner(params, seed):
+    """`analysis/` never imports a runtime, so the caller supplies one."""
+    from sim.engine import run
+
+    return run(params, seed).log
+
 RUSH = """Ground Truth, 2026-08-27
 watched: 15 min
 orders: 23
@@ -131,13 +138,13 @@ def test_the_overlay_is_a_config_file_like_any_other(seen, params, tmp_path):
 
 def test_the_fit_reproduces_the_volume_that_was_counted(seen, params):
     overlay = to_overlay(seen, params)
-    capture, produced = fit_capture_rate(seen, [BASE], overlay, seeds=[0, 1])
+    capture, produced = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
 
     assert 0 < capture <= 1
     assert produced == pytest.approx(seen.orders_per_hour, rel=0.15)
 
     calibrated = load_params(BASE, overlay={**overlay, "arrivals": {"capture_rate": capture}})
-    report = validate(seen, calibrated, seeds=[0, 1])
+    report = validate(seen, calibrated, runner, seeds=[0, 1])
     assert report.passes
     assert abs(report.volume_error) <= 0.1
 
@@ -147,17 +154,17 @@ def test_a_volume_the_class_blocks_cannot_supply_is_refused(params):
     rather than the knob being mis-set."""
     impossible = read_summary("Ground Truth, 2026-08-27\nwatched: 5 min\norders: 400\n")
     with pytest.raises(ConfigError, match="class_blocks"):
-        fit_capture_rate(impossible, [BASE], {}, seeds=[0])
+        fit_capture_rate(impossible, [BASE], {}, runner, seeds=[0])
 
 
 def test_the_balk_gap_is_reported_because_nothing_was_fitted_to_it(seen, params):
     """Volume agreeing proves little — it is what the knob was turned to match.
     Balking is the honest test."""
     overlay = to_overlay(seen, params)
-    capture, _ = fit_capture_rate(seen, [BASE], overlay, seeds=[0, 1])
+    capture, _ = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
     calibrated = load_params(BASE, overlay={**overlay, "arrivals": {"capture_rate": capture}})
 
-    report = validate(seen, calibrated, seeds=[0, 1])
+    report = validate(seen, calibrated, runner, seeds=[0, 1])
     assert report.balk_ratio is not None
     assert report.observed_balks_per_hour == pytest.approx(12.0)
 
@@ -173,3 +180,23 @@ def test_calibration_moves_the_provenance(seen, params):
     after = calibrated.provenance_report()
     assert after.assumed_fraction < before.assumed_fraction
     assert after.counts["observed"] > before.counts["observed"]
+
+
+def test_calibration_needs_no_simulator_to_be_tested(seen, params):
+    """The arithmetic is separable from the thing that runs a day: a stub
+    runner is enough to exercise the fit."""
+    from core.events import EventLog, EventType
+    from core.states import State
+
+    def flat(params, seed):
+        """A cafe where volume rises exactly with the capture rate."""
+        log = EventLog("stub", seed)
+        count = int(params.arrivals.capture_rate * 600)
+        for index in range(count):
+            log.emit(EventType.STATE_CHANGE, 36000.0 + index, order_id=f"o{index}",
+                     to_state=State.PLACED, channel="walkup")
+        return log
+
+    capture, produced = fit_capture_rate(seen, [BASE], {}, flat, seeds=[0])
+    assert 0 < capture < 1
+    assert produced == pytest.approx(seen.orders_per_hour, rel=0.2)

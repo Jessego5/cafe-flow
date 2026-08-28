@@ -218,10 +218,27 @@ def test_state_counts_include_what_never_finished():
 
 
 def test_analysis_imports_neither_runtime(request):
+    """Ground rule: a metric is computed from the log and nothing else.
+
+    `calibrate.py` is the one module that has to *drive* a runtime rather than
+    read its output, and it takes that as an injected argument — so the only
+    import of `sim` in `analysis/` sits inside a function, never at module
+    scope where it would make the package depend on a simulator.
+    """
     forbidden = {"app", "sim", "fastapi", "sqlmodel", "simpy"}
     offences: list[str] = []
     for path in sorted((request.config.rootpath / "analysis").glob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text())):
+        tree = ast.parse(path.read_text())
+        module_level = {
+            id(node)
+            for statement in tree.body
+            for node in ast.walk(statement)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            and isinstance(statement, (ast.Import, ast.ImportFrom))
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)) and id(node) not in module_level:
+                continue  # inside a function: a composition point, not a dependency
             if isinstance(node, ast.Import):
                 names = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
@@ -229,11 +246,26 @@ def test_analysis_imports_neither_runtime(request):
             else:
                 continue
             offences += [
-                f"{path.name}:{node.lineno} imports {name}"
+                f"{path.name}:{node.lineno} imports {name} at module scope"
                 for name in names
                 if name.split(".")[0] in forbidden
             ]
     assert offences == []
+
+
+def test_metrics_and_figures_do_not_touch_a_runtime_at_all(request):
+    """The stricter half of the rule, for the modules that only ever read."""
+    forbidden = {"app", "sim", "fastapi", "sqlmodel", "simpy"}
+    for name in ("metrics.py", "figures.py"):
+        source = (request.config.rootpath / "analysis" / name).read_text()
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            assert not any(n.split(".")[0] in forbidden for n in names), f"{name}:{node.lineno}"
 
 
 # --------------------------------------------------------------------------

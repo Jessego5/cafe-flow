@@ -6,6 +6,12 @@ five numbers. So this reads the summary the counter hands you and does the two
 things that matter: writes down what was counted, and searches for the one
 parameter that cannot be counted directly.
 
+`analysis/` may not depend on either runtime, so the thing that runs a day is
+passed in. That keeps the arithmetic here testable without a simulator, and it
+means a calibration could just as well be driven from a real day's log. Only
+`main()`, which is a composition point rather than a calculation, reaches for
+`sim`.
+
 **The gate matters more than the fit.** If the calibrated model cannot
 reproduce what was seen, the model is wrong, and the answer is to fix the model
 rather than tune the fit. Fitting `capture_rate` to match a volume is
@@ -20,11 +26,17 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from statistics import mean
+from typing import Callable
 
 import yaml
 
-from analysis.metrics import balk_count_and_lost_margin, busiest_window, state_counts
-from core.params import SECONDS_PER_MINUTE, ConfigError, Params, load_params, overlay_for
+from analysis.metrics import balk_count_and_lost_margin, busiest_window
+from core.events import EventLog
+from core.params import ConfigError, Params, load_params
+
+#: Runs one day and hands back its log. Injected so `analysis/` stays free of
+#: both runtimes (ground rule 2).
+Runner = Callable[[Params, int], EventLog]
 
 __all__ = ["Observation", "read_summary", "to_overlay", "fit_capture_rate", "validate"]
 
@@ -185,19 +197,17 @@ def to_overlay(seen: Observation, params: Params) -> dict:
     return overlay
 
 
-def _peak_orders_per_hour(params: Params, seeds: list[int]) -> float:
+def _peak_orders_per_hour(params: Params, seeds: list[int], runner: Runner) -> float:
     """What the model thinks the busiest hour looks like."""
-    from sim.engine import run
-
     rates: list[float] = []
     for seed in seeds:
-        result = run(params, seed)
-        window = busiest_window(result.log)
+        log = runner(params, seed)
+        window = busiest_window(log)
         if window is None:
             rates.append(0.0)
             continue
         placed = [
-            event for event in result.log
+            event for event in log
             if event.to_state == "placed" and window.holds(event.t_s)
         ]
         rates.append(len(placed) * 3600.0 / window.length_s)
@@ -208,6 +218,7 @@ def fit_capture_rate(
     seen: Observation,
     base: list[str],
     overlay: dict,
+    runner: Runner,
     *,
     seeds: list[int] | None = None,
 ) -> tuple[float, float]:
@@ -226,7 +237,7 @@ def fit_capture_rate(
         merged = dict(overlay)
         merged.setdefault("arrivals", {})["capture_rate"] = capture
         merged["arrivals"].setdefault("source_of", {})["capture_rate"] = "fitted"
-        return _peak_orders_per_hour(load_params(*base, overlay=merged), seeds)
+        return _peak_orders_per_hour(load_params(*base, overlay=merged), seeds, runner)
 
     low, high = 0.001, 1.0
     if rate_at(high) < target:
@@ -315,17 +326,20 @@ class Validation:
         return "\n".join(lines)
 
 
-def validate(seen: Observation, params: Params, seeds: list[int] | None = None) -> Validation:
-    from sim.engine import run
-
+def validate(
+    seen: Observation,
+    params: Params,
+    runner: Runner,
+    seeds: list[int] | None = None,
+) -> Validation:
     seeds = seeds or [0, 1, 2, 3]
-    modelled = _peak_orders_per_hour(params, seeds)
+    modelled = _peak_orders_per_hour(params, seeds, runner)
 
     balks: list[float] = []
     for seed in seeds:
-        result = run(params, seed)
-        window = busiest_window(result.log)
-        losses = balk_count_and_lost_margin(result.log, window=window)
+        log = runner(params, seed)
+        window = busiest_window(log)
+        losses = balk_count_and_lost_margin(log, window=window)
         if window is not None:
             balks.append(losses["balked"] * 3600.0 / window.length_s)
 
@@ -340,6 +354,12 @@ def validate(seen: Observation, params: Params, seeds: list[int] | None = None) 
 
 
 def main() -> None:
+    # The one place this module composes with a runtime.
+    from sim.engine import run as run_day
+
+    def runner(params: Params, seed: int) -> EventLog:
+        return run_day(params, seed).log
+
     parser = argparse.ArgumentParser(
         description="Turn a counted rush into params/observed.yaml."
     )
@@ -358,13 +378,13 @@ def main() -> None:
 
     overlay = to_overlay(seen, base)
     seeds = list(range(args.seeds))
-    capture, produced = fit_capture_rate(seen, args.params, overlay, seeds=seeds)
+    capture, produced = fit_capture_rate(seen, args.params, overlay, runner, seeds=seeds)
     overlay.setdefault("arrivals", {})["capture_rate"] = capture
     overlay["arrivals"].setdefault("source_of", {})["capture_rate"] = "fitted"
     print(f"fitted capture_rate {capture} -> {produced:.0f}/h at peak")
 
     calibrated = load_params(*args.params, overlay=overlay)
-    report = validate(seen, calibrated, seeds)
+    report = validate(seen, calibrated, runner, seeds)
     print(report.render())
 
     target = Path(args.out)
