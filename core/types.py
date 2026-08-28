@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Iterable
-
 from core.events import Event
 from core.states import State
 
@@ -184,7 +182,3 @@ class Customer:
 
     def would_balk(self, estimated_wait_s: float) -> bool:
         return estimated_wait_s > self.balk_tolerance_s
-
-
-def total_margin_cents(items: Iterable[Item]) -> int:
-    return sum(item.margin_cents for item in items)

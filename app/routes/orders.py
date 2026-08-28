@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
 from app.config import day_seconds, get_params, service_date, settings
 from app.db import (
     DbEventLog,
-    OrderRow,
     events_for,
     load_order,
     next_order_number,

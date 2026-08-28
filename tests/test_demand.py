@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 
 from analysis.demand import Columns, build_demand_model, to_params_fragment
-from core.params import load_params
 
 pd = pytest.importorskip("pandas")
 

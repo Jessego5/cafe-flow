@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Sequence
 
 __all__ = ["Columns", "DemandModel", "read_transactions", "build_demand_model"]
 

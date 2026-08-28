@@ -318,8 +318,8 @@ class Validation:
             lines += [
                 "",
                 f"  Balking is {ratio:.1f}x off, which is the number worth arguing with.",
-                f"  Volume is what capture_rate was fitted to, so it agreeing proves",
-                f"  little. Nothing was fitted to balks. Modelling customers as too",
+                "  Volume is what capture_rate was fitted to, so it agreeing proves",
+                "  little. Nothing was fitted to balks. Modelling customers as too",
                 f"  {direction} means customers.balk_tolerance_min is wrong, and it is the",
                 "  softest assumption left in the file.",
             ]

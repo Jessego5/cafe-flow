@@ -10,16 +10,15 @@ state machine, and bottleneck cost from the capacity model.
 
 from __future__ import annotations
 
-import json
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Sequence
 
 from sqlalchemy import Column, UniqueConstraint, event as sa_event, text, update
 from sqlalchemy.engine import Engine
 from sqlmodel import JSON, Field, Session, SQLModel, create_engine, select
 
-from app.config import at_local_time, day_seconds, now_utc, service_date, settings
+from app.config import at_local_time, now_utc, settings
 from core.capacity import StationCapacityModel
 from core.events import Event, EventLog, EventType
 from core.menu import resolve_tasks

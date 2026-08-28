@@ -13,7 +13,6 @@ from collections import Counter
 import pytest
 import simpy
 
-from core.capacity import StationCapacityModel
 from core.events import EventType
 from core.menu import make_item, make_order
 from core.params import ConfigError, load_params
@@ -224,7 +223,6 @@ def test_a_batch_never_exceeds_what_the_station_allows(batching):
         if event.station == "panini_press":
             assert event.payload["size"] <= press_limit
         if event.station == "steam_wand":
-            model = StationCapacityModel(batching, "steam_wand")
             assert event.payload["duration_s"] <= (
                 batching.station("steam_wand").setup_s
                 + batching.station("steam_wand").per_6oz_s * wand_limit / 6
@@ -457,8 +455,6 @@ def test_reordering_has_no_scope_on_this_cafes_demand(reordering):
     assert sum(wand.values()) > 50
     assert wand.get(1, 0) / sum(wand.values()) > 0.85
 
-    press = params_station_keys = {
-        n: c for (station, n), c in depths.items() if station == "panini_press"
-    }
+    press = {n: c for (station, n), c in depths.items() if station == "panini_press"}
     assert press, "the press should be dispatching work"
     assert reordering.station("panini_press").batch_key is None

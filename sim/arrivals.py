@@ -8,7 +8,7 @@ same seed reproduces the same day exactly (ground rule 5).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 

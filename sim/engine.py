@@ -23,9 +23,9 @@ import simpy
 from core.capacity import StationCapacityModel
 from core.events import EventLog, EventType
 from core.menu import make_order
-from core.params import FROM_STAFFING, Params, load_params
+from core.params import Params, load_params
 from core.states import LOST, State, place, promise, transition
-from core.types import Channel, Order, Task, TaskKind
+from core.types import Channel, Item, Order, Task, TaskKind
 from sim.arrivals import Arrival, generate_arrivals
 from sim.balking import (
     estimate_wait_s,

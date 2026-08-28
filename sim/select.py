@@ -31,9 +31,9 @@ from typing import Sequence
 
 import yaml
 
-from core.params import Params, load_params
+from core.params import load_params
 from core.policies import POLICIES
-from sim.experiments import ARMS, Arm, ArmResult, run_arm
+from sim.experiments import Arm, ArmResult, run_arm
 
 __all__ = [
     "Objective",
@@ -226,20 +226,6 @@ def decide(
     )
     confident = leader.policy != incumbent and separated
     return (leader.policy if confident else incumbent), confident
-
-
-def _arm_for(policy: str, base_arms: Sequence[str]) -> Arm:
-    """The arm that runs a policy, reusing a named one where it exists.
-
-    A named arm may carry more than a policy — adoption, a different bar — so
-    reusing it keeps the comparison on the configuration someone actually
-    described rather than a synthesised one.
-    """
-    for name in base_arms:
-        arm = ARMS[name]
-        if arm.name.endswith(policy) or policy in arm.name:
-            return arm
-    return Arm(policy, (), f"policy {policy}")
 
 
 def select_policy(

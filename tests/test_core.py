@@ -8,7 +8,6 @@ base.yaml raises a validation error naming the bad field.
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 import pytest
 
@@ -23,7 +22,7 @@ from core.params import (
     parse_hhmm,
 )
 from core.states import LEGAL, LOST, TERMINAL, IllegalTransition, State, transition
-from core.types import Channel, Item, Line, Order, TaskKind
+from core.types import Channel, Line, Order, TaskKind
 
 # --------------------------------------------------------------------------
 # config: loads, validates, and fails loudly by name

@@ -153,10 +153,6 @@ def service_seconds(item: Item) -> float:
     return sum(task.duration_s for task in item.tasks)
 
 
-def order_service_seconds(order: Order) -> float:
-    return sum(service_seconds(item) for item in order.items)
-
-
 def price_cents(lines: Iterable[Line | tuple], params: Params) -> int:
     total = 0
     for raw in lines:

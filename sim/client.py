@@ -26,7 +26,6 @@ import socket
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
 
 import httpx
 
@@ -39,7 +38,7 @@ from core.capacity import StationCapacityModel
 from core.events import EventLog, EventType
 from core.params import Params, load_params
 from core.states import State
-from core.types import Channel, Line
+from core.types import Channel
 from sim.engine import RunResult, run
 
 __all__ = ["Replay", "DriftReport", "drift_check", "check_slot_concurrency", "serve"]
