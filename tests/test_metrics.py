@@ -234,3 +234,106 @@ def test_analysis_imports_neither_runtime(request):
                 if name.split(".")[0] in forbidden
             ]
     assert offences == []
+
+
+# --------------------------------------------------------------------------
+# promises, batching and fairness
+# --------------------------------------------------------------------------
+
+
+def _promise(log, order_id, at, promised_at_s):
+    log.emit(EventType.PROMISE_SET, at, order_id=order_id,
+             payload={"promised_at_s": promised_at_s})
+
+
+def _run(log, station, start, end, size, order_id="o", item_id="i"):
+    for kind, t in ((EventType.STATION_START, start), (EventType.STATION_END, end)):
+        log.emit(kind, t, station=station, actor="barista-0", order_id=order_id,
+                 item_id=item_id, payload={"size": size, "kind": "batch", "attended": False})
+
+
+def test_a_promise_is_read_from_the_log_not_the_config():
+    from analysis.metrics import promises
+
+    log = EventLog("hand", 1)
+    _order(log, "a", placed=0.0, ready=500.0)
+    _promise(log, "a", at=1.0, promised_at_s=600.0)
+    assert promises(log) == {"a": 600.0}
+
+
+def test_promise_error_is_signed_and_counts_the_misses():
+    from analysis.metrics import promise_error
+
+    log = EventLog("hand", 1)
+    _order(log, "early", placed=0.0, ready=400.0)
+    _promise(log, "early", at=1.0, promised_at_s=600.0)     # 200s early
+    _order(log, "late", placed=0.0, ready=900.0)
+    _promise(log, "late", at=1.0, promised_at_s=600.0)      # 300s late
+
+    stats = promise_error(log, percentiles=(50,))
+    assert stats["promised"] == 2
+    assert stats["late"] == 1
+    assert stats["late_fraction"] == 0.5
+    assert stats["p50"] == pytest.approx(50.0)              # midpoint of -200 and +300
+
+
+def test_a_preorder_lead_time_is_not_counted_as_waiting():
+    """Someone who ordered ahead for eleven and collected at eleven waited no
+    time at all."""
+    from analysis.metrics import experienced_waits
+
+    log = EventLog("hand", 1)
+    _order(log, "ahead", placed=0.0, ready=3600.0, channel="preorder")
+    _promise(log, "ahead", at=1.0, promised_at_s=3600.0)
+    _order(log, "queued", placed=3000.0, ready=3600.0, channel="walkup")
+
+    waits = experienced_waits(log)
+    assert waits["ahead"] == 0.0
+    assert waits["queued"] == 600.0
+
+
+def test_batch_rate_counts_what_was_made_in_company():
+    from analysis.metrics import batch_rate
+
+    log = EventLog("hand", 1)
+    _run(log, "panini_press", 0.0, 240.0, size=2, item_id="i1")
+    _run(log, "panini_press", 240.0, 480.0, size=1, item_id="i2")
+    _run(log, "steam_wand", 0.0, 40.0, size=1, item_id="i3")
+
+    rate = batch_rate(log)
+    assert rate["items"] == 4
+    assert rate["in_a_batch"] == 2
+    assert rate["rate"] == 0.5
+    assert rate["runs_saved"] == 1                    # three runs would have been four
+
+    press = rate["by_station"]["panini_press"]
+    assert press["items"] == 3 and press["runs"] == 2
+    assert press["rate"] == pytest.approx(2 / 3)
+    assert rate["by_station"]["steam_wand"]["rate"] == 0.0
+
+
+def test_fairness_gap_compares_what_each_channel_experienced():
+    from analysis.metrics import fairness_gap
+
+    log = EventLog("hand", 1)
+    for index in range(3):
+        _order(log, f"w{index}", placed=0.0, ready=600.0, channel="walkup")
+    for index in range(3):
+        _order(log, f"p{index}", placed=0.0, ready=600.0, channel="preorder")
+        _promise(log, f"p{index}", at=1.0, promised_at_s=600.0)
+
+    gap = fairness_gap(log)
+    assert gap["walkup_s"] == 600.0
+    assert gap["preorder_s"] == 0.0
+    assert gap["gap_s"] == 600.0
+
+
+def test_fairness_gap_is_none_when_only_one_channel_showed_up():
+    from analysis.metrics import fairness_gap
+
+    log = EventLog("hand", 1)
+    _order(log, "a", placed=0.0, ready=100.0, channel="walkup")
+    gap = fairness_gap(log)
+    assert gap["walkup_s"] == 100.0
+    assert gap["preorder_s"] is None
+    assert gap["gap_s"] is None

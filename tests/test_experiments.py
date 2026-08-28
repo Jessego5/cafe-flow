@@ -135,3 +135,82 @@ def test_the_summary_carries_a_confidence_interval():
     assert value > 0
     assert half_width > 0
     assert result.summary("nonexistent") != result.summary("wait_p90_s")
+
+
+# --------------------------------------------------------------------------
+# M7: sweeps
+# --------------------------------------------------------------------------
+
+
+def test_a_swept_value_goes_through_the_normal_merge():
+    from core.params import load_params, overlay_for
+
+    swept = load_params("params/base.yaml", overlay=overlay_for("customers.preorder_adoption", 0.4))
+    assert swept.customers.preorder_adoption == 0.4
+
+
+def test_a_swept_value_is_marked_as_an_assumption():
+    """A sweep must not launder a guess into a citation: the published press
+    time stops being published the moment something else is put in its place."""
+    from core.params import load_params, overlay_for
+
+    base = load_params("params/base.yaml")
+    assert base.source_of("stations.panini_press.run_s") == "published"
+
+    swept = load_params("params/base.yaml", overlay=overlay_for("stations.panini_press.run_s", 150))
+    assert swept.station("panini_press").run_s == 150
+    assert swept.source_of("stations.panini_press.run_s") == "assumed"
+    # everything it did not touch keeps its own provenance
+    assert swept.source_of("stations.group_head.shot_s") == "published"
+
+
+def test_sweeping_a_parameter_that_does_not_exist_fails_by_name():
+    from core.params import ConfigError, load_params, overlay_for
+
+    with pytest.raises(ConfigError, match="press_run_s"):
+        load_params("params/base.yaml", overlay=overlay_for("stations.panini_press.press_run_s", 1))
+
+
+def test_a_sweep_runs_every_arm_at_every_value():
+    from sim.experiments import sweep
+
+    points = sweep(["manual_bar", "batched"], "customers.preorder_adoption", [0.0, 0.5], [0, 1])
+    assert len(points) == 4
+    assert {(p.arm, p.value) for p in points} == {
+        ("manual_bar", 0.0), ("manual_bar", 0.5), ("batched", 0.0), ("batched", 0.5)
+    }
+    for point in points:
+        assert len(point.result.rows) == 2
+        assert point.result.params.customers.preorder_adoption == point.value
+
+
+def test_more_people_ordering_ahead_means_fewer_lost(tmp_path):
+    """The mechanism the plan cares about, swept rather than asserted at a
+    single point."""
+    from sim.experiments import sweep
+
+    points = sweep(["batched"], "customers.preorder_adoption", [0.0, 0.3, 0.6], list(range(6)))
+    lost = [point.summary("lost_fraction")[0] for point in points]
+    assert lost == sorted(lost, reverse=True), lost
+    assert lost[0] - lost[-1] > 0.05
+
+
+def test_figures_carry_their_provenance(tmp_path):
+    from analysis.figures import arm_figures, sweep_figure, utilisation_figure
+    from sim.experiments import compare, sweep
+
+    results = compare(["manual_bar", "batched"], [0, 1])
+    written = arm_figures(results, tmp_path)
+    assert len(written) == 2
+    for path in written:
+        assert path.exists() and path.stat().st_size > 5_000
+
+    points = sweep(["batched"], "customers.preorder_adoption", [0.0, 0.4], [0, 1])
+    figure = sweep_figure(points, tmp_path)
+    assert figure.exists() and figure.stat().st_size > 5_000
+
+    load = utilisation_figure(
+        {"panini_press": 0.72, "steam_wand": 0.11, None: 0.4},
+        "provenance: 79% assumed", tmp_path,
+    )
+    assert load.exists() and load.stat().st_size > 5_000

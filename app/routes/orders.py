@@ -32,7 +32,7 @@ from app.stream import broadcaster
 from core.capacity import StationCapacityModel
 from core.menu import Line, make_order
 from core.params import ConfigError, SECONDS_PER_MINUTE
-from core.states import IllegalTransition, State, place, transition
+from core.states import IllegalTransition, State, place, promise, transition
 from core.types import Channel
 
 router = APIRouter(tags=["orders"])
@@ -106,6 +106,7 @@ async def create_order(
                 raise HTTPException(400, str(exc)) from None
 
             cost_s = StationCapacityModel(params).order_cost(order)
+            promised_at_s: float | None = None
 
             if body.slot_id is not None:
                 slot = session.get(SlotRow, body.slot_id)
@@ -120,11 +121,8 @@ async def create_order(
                 if not reserve_slot_capacity(session, slot.slot_id, cost_s):
                     raise HTTPException(409, f"slot {slot.slot_id} is full")
                 order.slot_id = slot.slot_id
-                order.promised_at_s = slot.ends_at_s
+                promised_at_s = slot.ends_at_s
 
-            row = persist_order(
-                session, order, params, number=number, on=on, bottleneck_cost_s=cost_s
-            )
             log = DbEventLog(
                 session, scenario=str(settings.env), is_simulated=is_simulated,
                 policy=params.policy.name,
@@ -135,8 +133,17 @@ async def create_order(
                 actor="customer",
                 log=log,
                 price_cents=order.price_cents,
+                margin_cents=order.margin_cents,
                 bottleneck_cost_s=cost_s,
                 items=[item.drink for item in order.items],
+            )
+            if promised_at_s is not None:
+                promise(order, at=now_s, promised_at_s=promised_at_s, log=log,
+                        slot_id=order.slot_id)
+
+            # after the promise, so the row records the time that was quoted
+            row = persist_order(
+                session, order, params, number=number, on=on, bottleneck_cost_s=cost_s
             )
 
             try:

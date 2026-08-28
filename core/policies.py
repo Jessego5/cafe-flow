@@ -21,7 +21,16 @@ from core.capacity import StationCapacityModel
 from core.params import ConfigError, Params
 from core.types import Item
 
-__all__ = ["Queued", "Policy", "FIFOPolicy", "BatchPolicy", "POLICIES", "make_policy"]
+__all__ = [
+    "Queued",
+    "Policy",
+    "FIFOPolicy",
+    "BatchPolicy",
+    "BoundedReorderPolicy",
+    "POLICIES",
+    "make_policy",
+    "plan_batches",
+]
 
 
 @runtime_checkable
@@ -45,6 +54,11 @@ class Policy(Protocol):
     ) -> list[Queued]:
         """Pick the work to run next. Never empty when `pending` is not."""
 
+    def reset(self) -> None:
+        """Forget anything carried between runs. Policies that remember what
+        they last made need this so laying out a plan twice gives the same
+        plan twice."""
+
 
 class FIFOPolicy:
     """One at a time, in the order it arrived. The baseline."""
@@ -53,6 +67,9 @@ class FIFOPolicy:
 
     def __init__(self, params: Params) -> None:
         self.params = params
+
+    def reset(self) -> None:
+        return None
 
     def next_batch(
         self, station: str, pending: Sequence[Queued], now: float
@@ -83,10 +100,26 @@ class BatchPolicy:
         )
         self._models: dict[str, StationCapacityModel] = {}
 
+    def reset(self) -> None:
+        return None
+
     def _model(self, station: str) -> StationCapacityModel:
         if station not in self._models:
             self._models[station] = StationCapacityModel(self.params, station)
         return self._models[station]
+
+    def _grow(self, station: str, head: Queued, pending: Sequence[Queued]) -> list[Queued]:
+        """Everything compatible with `head` that is already waiting."""
+        model = self._model(station)
+        batch = [head]
+        for candidate in pending:
+            if candidate is head:
+                continue
+            if candidate.submitted_at - head.submitted_at > self.lookahead_s:
+                continue
+            if model.compatible([entry.item for entry in batch], candidate.item):
+                batch.append(candidate)
+        return batch
 
     def next_batch(
         self, station: str, pending: Sequence[Queued], now: float
@@ -103,11 +136,74 @@ class BatchPolicy:
         return batch
 
 
+class BoundedReorderPolicy(BatchPolicy):
+    """Batch, and prefer work that avoids a changeover — but only within a
+    bounded window, and never at the cost of leaving someone stranded.
+
+    Switching the wand from oat to whole means purging and wiping; running the
+    oat drinks together avoids that. Left alone, a policy that always chases
+    the cheapest changeover starves whoever ordered the unpopular thing, so two
+    limits apply. It will only look `reorder_window_s` into the queue, and
+    anything that has waited past `starvation_guard_s` goes next regardless of
+    what it costs.
+
+    That guard is the whole reason this is safe to run on a real bar: nobody's
+    order can be passed over indefinitely because it was inconvenient.
+    """
+
+    name = "bounded_reorder"
+
+    def __init__(
+        self,
+        params: Params,
+        lookahead_s: float | None = None,
+        window_s: float | None = None,
+        guard_s: float | None = None,
+    ) -> None:
+        super().__init__(params, lookahead_s)
+        self.window_s = params.policy.reorder_window_s if window_s is None else window_s
+        self.guard_s = params.policy.starvation_guard_s if guard_s is None else guard_s
+        self._last_key: dict[str, str | None] = {}
+
+    def reset(self) -> None:
+        self._last_key = {}
+
+    def next_batch(
+        self, station: str, pending: Sequence[Queued], now: float
+    ) -> list[Queued]:
+        model = self._model(station)
+        head = self._choose_head(station, pending, now, model)
+        batch = self._grow(station, head, pending)
+        self._last_key[station] = model.batch_value(batch[0].item)
+        return batch
+
+    def _choose_head(self, station, pending, now, model) -> Queued:
+        # Anyone past the guard goes next, whatever it costs to switch to them.
+        for entry in pending:
+            if now - entry.submitted_at >= self.guard_s:
+                return entry
+
+        wanted = self._last_key.get(station)
+        if wanted is None:
+            return pending[0]
+
+        # Otherwise look a bounded way down the queue for work that needs no
+        # changeover. Anything past the window is not a candidate at all.
+        earliest = pending[0].submitted_at
+        for entry in pending:
+            if entry.submitted_at - earliest > self.window_s:
+                break
+            if model.batch_value(entry.item) == wanted:
+                return entry
+        return pending[0]
+
+
 #: Config name -> policy. A name with no implementation must fail at load
 #: rather than quietly fall back to FIFO and report someone else's numbers.
 POLICIES: dict[str, type] = {
     FIFOPolicy.name: FIFOPolicy,
     BatchPolicy.name: BatchPolicy,
+    BoundedReorderPolicy.name: BoundedReorderPolicy,
 }
 
 
@@ -131,6 +227,7 @@ def plan_batches(
     while it works. A bar display wants the whole plan, so the barista can see
     what is coming as well as what to do now.
     """
+    getattr(policy, "reset", lambda: None)()
     remaining = list(pending)
     plan: list[list[Queued]] = []
     while remaining:

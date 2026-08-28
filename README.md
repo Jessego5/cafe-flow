@@ -42,11 +42,11 @@ question.
 | M2 app skeleton | done |
 | M2.5 ship the skeleton | built, not yet deployed |
 | M3 simulator engine | done |
-| M4 metrics | partial: waits, throughput, utilisation, lost margin |
-| M5 policies | partial: fifo and batching, no bounded reorder yet |
+| M4 metrics | done |
+| M5 policies | done |
 | M10 findings back into the app | partial: the bar runs the measured policy |
 | M6 balking and channel choice | done |
-| M7 experiments | partial: named arms, no sweeps yet |
+| M7 experiments | partial: arms, sweeps and figures; no calibrated run yet |
 
 ## Deploying
 
@@ -86,7 +86,13 @@ holds the second reading of the espresso bar, in case the Schaerer in the
 photographs is a super-automatic: no pitcher, so nothing batches, and the wand
 and group head collapse into one serialised machine.
 
-    python -m sim.experiments --arms manual_bar,batched,adoption,adoption_batched --seeds 20
+    python -m sim.experiments --arms manual_bar,batched,adoption_batched --seeds 20 --figures
+    python -m sim.experiments --sweep customers.preorder_adoption --values 0,0.3,0.6 --seeds 20
+
+A sweep is not looking for an optimum — almost every input is still assumed, so
+an optimum would be an artefact of a guess. It answers which assumptions the
+conclusion depends on: an arm that wins across the whole plausible range of a
+parameter does not need that parameter measured carefully.
 
 ## Parameters
 

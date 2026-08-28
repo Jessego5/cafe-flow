@@ -37,6 +37,11 @@ __all__ = [
     "state_counts",
     "busiest_window",
     "balk_count_and_lost_margin",
+    "promises",
+    "experienced_waits",
+    "promise_error",
+    "batch_rate",
+    "fairness_gap",
 ]
 
 SECONDS_PER_HOUR = 3600.0
@@ -420,4 +425,153 @@ def balk_count_and_lost_margin(
         "lost_margin_cents": total_lost_cents,
         "offered_margin_cents": offered_cents,
         "captured_margin_cents": offered_cents - total_lost_cents,
+    }
+
+
+def promises(log: Iterable[Event] | EventLog) -> dict[str, float]:
+    """The ready-by time quoted for each order, as it was quoted at the time."""
+    return {
+        event.order_id: float(event.payload["promised_at_s"])
+        for event in _events(log)
+        if event.type is EventType.PROMISE_SET
+        and event.order_id is not None
+        and "promised_at_s" in event.payload
+    }
+
+
+def experienced_waits(
+    log: Iterable[Event] | EventLog, *, to: State = State.READY
+) -> dict[str, float]:
+    """How long each customer actually stood there.
+
+    Not the same as placed-to-ready. Someone who ordered ahead for eleven
+    o'clock and collected at eleven waited no time at all, and counting their
+    lead time as waiting would make ordering ahead look like the worst thing
+    the cafe offers. Their clock starts at the time they were promised.
+    """
+    events = _events(log)
+    placed = _reached(events, State.PLACED)
+    arrived = _reached(events, to)
+    quoted = promises(events)
+
+    waits: dict[str, float] = {}
+    for order_id, ready_at in arrived.items():
+        reference = quoted.get(order_id, placed.get(order_id))
+        if reference is None:
+            continue
+        waits[order_id] = max(0.0, ready_at - reference)
+    return waits
+
+
+def promise_error(
+    log: Iterable[Event] | EventLog,
+    *,
+    percentiles: Sequence[int] = DEFAULT_PERCENTILES,
+    window: Interval | None = None,
+) -> dict:
+    """Ready-at minus promised-at, signed, in seconds.
+
+    Negative is early. `late_fraction` is the number that matters to a
+    customer: a promise kept on average but missed a third of the time is not
+    a promise anyone will rely on twice.
+    """
+    events = _within(_events(log), window)
+    quoted = promises(events)
+    ready = _reached(events, State.READY)
+
+    errors = [ready[order_id] - at for order_id, at in quoted.items() if order_id in ready]
+    stats = _percentiles(errors, percentiles)
+    stats["late"] = sum(1 for error in errors if error > 0)
+    stats["late_fraction"] = stats["late"] / len(errors) if errors else 0.0
+    stats["promised"] = len(quoted)
+    return stats
+
+
+def batch_rate(
+    log: Iterable[Event] | EventLog, *, window: Interval | None = None
+) -> dict:
+    """How much of the batchable work was actually made in company.
+
+    Reads the size recorded on each station run, so a station that ran one item
+    when it could have held two counts against the rate. Per station, because
+    the aggregate hides the thing worth knowing: on this menu the press batches
+    and the wand barely does.
+    """
+    events = _within(_events(log), window)
+
+    items: dict[str, int] = defaultdict(int)
+    grouped: dict[str, int] = defaultdict(int)
+    runs: dict[str, int] = defaultdict(int)
+
+    for event in events:
+        if event.type is not EventType.STATION_START or event.station is None:
+            continue
+        size = int(event.payload.get("size", 0) or 0)
+        if not size:
+            continue
+        items[event.station] += size
+        runs[event.station] += 1
+        if size > 1:
+            grouped[event.station] += size
+
+    by_station = {
+        station: {
+            "items": count,
+            "runs": runs[station],
+            "in_a_batch": grouped[station],
+            "rate": grouped[station] / count if count else 0.0,
+            "items_per_run": count / runs[station] if runs[station] else 0.0,
+            "runs_saved": count - runs[station],
+        }
+        for station, count in items.items()
+    }
+
+    total_items = sum(items.values())
+    total_grouped = sum(grouped.values())
+    return {
+        "by_station": by_station,
+        "items": total_items,
+        "in_a_batch": total_grouped,
+        "rate": total_grouped / total_items if total_items else 0.0,
+        "runs_saved": total_items - sum(runs.values()),
+    }
+
+
+def fairness_gap(
+    log: Iterable[Event] | EventLog,
+    *,
+    percentile: int = 95,
+    window: Interval | None = None,
+) -> dict:
+    """How much worse the queue is for the people standing in it.
+
+    Measured on what each customer actually experienced, so the pre-order lead
+    time does not count against them. A large positive gap means ordering ahead
+    is buying its adopters a materially better cafe than everyone else gets,
+    which is a policy question rather than a bug — but one nobody can weigh
+    without the number.
+    """
+    events = _events(log)
+    placed = _reached(events, State.PLACED)
+    channels = _channels(events)
+    waits = experienced_waits(events)
+
+    grouped: dict[str, list[float]] = defaultdict(list)
+    for order_id, wait in waits.items():
+        if window is not None and not window.holds(placed.get(order_id, -1)):
+            continue
+        grouped[channels.get(order_id, "unknown")].append(wait)
+
+    stats = {
+        channel: _percentiles(values, (percentile,))
+        for channel, values in grouped.items()
+    }
+    walkup = stats.get("walkup", {}).get(f"p{percentile}")
+    preorder = stats.get("preorder", {}).get(f"p{percentile}")
+    return {
+        "percentile": percentile,
+        "by_channel": stats,
+        "walkup_s": walkup,
+        "preorder_s": preorder,
+        "gap_s": None if walkup is None or preorder is None else walkup - preorder,
     }

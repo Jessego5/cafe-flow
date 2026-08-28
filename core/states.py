@@ -18,7 +18,15 @@ if TYPE_CHECKING:  # avoids a cycle: core.types imports State from here
     from core.events import EventLog
     from core.types import Order
 
-__all__ = ["State", "LEGAL", "TERMINAL", "IllegalTransition", "place", "transition"]
+__all__ = [
+    "State",
+    "LEGAL",
+    "TERMINAL",
+    "IllegalTransition",
+    "place",
+    "promise",
+    "transition",
+]
 
 
 class State(StrEnum):
@@ -106,6 +114,41 @@ def place(
         channel=order.channel,
         is_simulated=order.is_simulated,
         payload=payload,
+    )
+    if log is not None:
+        event = log.append(event)
+    order.history.append(event)
+    return event
+
+
+def promise(
+    order: "Order",
+    at: float,
+    promised_at_s: float,
+    actor: str = "system",
+    *,
+    log: "EventLog | None" = None,
+    **payload: Any,
+) -> Event:
+    """Quote a time the order will be ready by.
+
+    Not a state change — the order is where it was — but it has to be an event,
+    because how far a promise missed can only be measured against what was
+    actually promised at the time, and that cannot be reconstructed later from
+    a config file that has since changed.
+    """
+    order.promised_at_s = promised_at_s
+    event = Event(
+        seq=PENDING_SEQ,
+        event_id="",
+        t_s=at,
+        type=EventType.PROMISE_SET,
+        order_id=order.order_id,
+        customer_id=order.customer_id,
+        actor=actor,
+        channel=order.channel,
+        is_simulated=order.is_simulated,
+        payload={"promised_at_s": promised_at_s, **payload},
     )
     if log is not None:
         event = log.append(event)

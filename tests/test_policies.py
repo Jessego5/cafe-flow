@@ -21,7 +21,7 @@ from core.states import State
 from core.types import Channel, Line
 from sim.arrivals import Arrival
 from sim.engine import run
-from sim.policies import BatchPolicy, FIFOPolicy, Pending, make_policy
+from sim.policies import POLICIES, BatchPolicy, FIFOPolicy, Pending, make_policy
 
 BASE = "params/base.yaml"
 BATCH = "params/experiments/batch.yaml"
@@ -111,12 +111,21 @@ def test_work_outside_the_lookahead_waits(params):
     assert len(batch) == 2
 
 
-def test_a_policy_that_is_not_built_fails_at_load(tmp_path):
-    overlay = tmp_path / "reorder.yaml"
-    overlay.write_text("policy:\n  name: bounded_reorder\n")
-    params = load_params(BASE, overlay)
+def test_every_policy_the_config_allows_is_built():
+    """A name the config accepts but nothing implements would quietly fall back
+    to FIFO and report someone else's numbers."""
+    from core.params import PolicyParams
+    from typing import get_args
+
+    allowed = set(get_args(PolicyParams.model_fields["name"].annotation))
+    assert allowed == set(POLICIES), allowed ^ set(POLICIES)
+
+
+def test_an_unknown_policy_fails_loudly(params):
+    broken = params.model_copy(deep=True)
+    object.__setattr__(broken.policy, "name", "cheapest_first")
     with pytest.raises(ConfigError, match="not implemented"):
-        make_policy(params)
+        make_policy(broken)
 
 
 def test_the_overlay_selects_the_batching_policy(params, batching):
@@ -338,3 +347,118 @@ def test_every_event_names_the_scheduler_in_force(params, batching):
     """A week of logs spanning two policies is uninterpretable without it."""
     assert {event.policy for event in run(params, 0).log} == {"fifo"}
     assert {event.policy for event in run(batching, 0).log} == {"batch_milk"}
+
+
+# --------------------------------------------------------------------------
+# M5 arm E: bounded reorder
+# --------------------------------------------------------------------------
+
+REORDER = "params/experiments/reorder.yaml"
+
+
+@pytest.fixture(scope="module")
+def reordering():
+    return load_params(BASE, REORDER)
+
+
+def test_a_changeover_needs_something_to_change_between(tmp_path):
+    overlay = tmp_path / "bad.yaml"
+    overlay.write_text("stations:\n  brew_tap: { changeover_s: 10 }\n")
+    with pytest.raises(ConfigError, match="changeover_s"):
+        load_params(BASE, overlay)
+
+
+def test_reordering_prefers_work_that_needs_no_changeover(reordering):
+    from core.policies import BoundedReorderPolicy
+
+    policy = BoundedReorderPolicy(reordering)
+    queue = [
+        _pending(reordering, "steam_wand", "latte", "whole", "hot", at=0.0, index=0),
+        _pending(reordering, "steam_wand", "latte", "oat", "hot", at=1.0, index=1),
+    ]
+
+    # nothing run yet, so no changeover to avoid: strict order
+    assert policy.next_batch("steam_wand", queue, 2.0)[0].item.milk_type == "whole"
+    # having just run whole, it now reaches past the oat drink for another whole
+    queue.append(_pending(reordering, "steam_wand", "latte", "whole", "hot", at=2.0, index=2))
+    assert policy.next_batch("steam_wand", queue[1:], 3.0)[0].item.milk_type == "whole"
+
+
+def test_nobody_is_passed_over_past_the_guard(reordering):
+    """The guard is what makes reordering safe to run on a real bar."""
+    from core.policies import BoundedReorderPolicy
+
+    policy = BoundedReorderPolicy(reordering)
+    guard = reordering.policy.starvation_guard_s
+    policy._last_key["steam_wand"] = "oat"
+
+    stranded = _pending(reordering, "steam_wand", "latte", "whole", "hot", at=0.0, index=0)
+    convenient = _pending(reordering, "steam_wand", "latte", "oat", "hot", at=10.0, index=1)
+    queue = [stranded, convenient]
+
+    # before the guard, the convenient one goes first
+    assert policy.next_batch("steam_wand", queue, 20.0)[0] is convenient
+    # past it, the stranded one jumps regardless of what it costs
+    policy._last_key["steam_wand"] = "oat"
+    assert policy.next_batch("steam_wand", queue, guard + 1.0)[0] is stranded
+
+
+def test_reordering_never_delays_an_order_past_the_guard(params, reordering):
+    """The plan's acceptance criterion, measured against FIFO on the same day."""
+    guard = reordering.policy.starvation_guard_s
+    for seed in (0, 1, 2):
+        fifo = {
+            order_id: order.entered_at(State.READY)
+            for order_id, order in run(params, seed).orders.items()
+        }
+        reordered = {
+            order_id: order.entered_at(State.READY)
+            for order_id, order in run(reordering, seed).orders.items()
+        }
+        delayed = [
+            reordered[order_id] - fifo[order_id]
+            for order_id in fifo
+            if fifo.get(order_id) is not None and reordered.get(order_id) is not None
+        ]
+        assert delayed
+        assert max(delayed) <= guard, max(delayed)
+
+
+def test_reordering_has_no_scope_on_this_cafes_demand(reordering):
+    """Recorded because it is the answer, not because it is a happy one.
+
+    A reordering policy can only act on a station with a queue to permute. The
+    wand is idle almost every time it is asked for work, so there is nothing to
+    reorder; the station that does back up has no changeover to avoid. If
+    demand ever rises enough for that to stop being true, this fails and the
+    arm becomes worth running.
+    """
+    from collections import Counter
+
+    from core.policies import BoundedReorderPolicy
+    from sim import engine as engine_module
+
+    depths: Counter = Counter()
+
+    class Watched(BoundedReorderPolicy):
+        def next_batch(self, station, pending, now):
+            depths[(station, len(pending))] += 1
+            return super().next_batch(station, pending, now)
+
+    original = engine_module.make_policy
+    engine_module.make_policy = lambda p: Watched(p)
+    try:
+        for seed in range(4):
+            run(reordering, seed)
+    finally:
+        engine_module.make_policy = original
+
+    wand = {n: c for (station, n), c in depths.items() if station == "steam_wand"}
+    assert sum(wand.values()) > 50
+    assert wand.get(1, 0) / sum(wand.values()) > 0.85
+
+    press = params_station_keys = {
+        n: c for (station, n), c in depths.items() if station == "panini_press"
+    }
+    assert press, "the press should be dispatching work"
+    assert reordering.station("panini_press").batch_key is None

@@ -14,6 +14,7 @@ import simpy
 from core.policies import (
     POLICIES,
     BatchPolicy,
+    BoundedReorderPolicy,
     FIFOPolicy,
     Policy,
     Queued,
@@ -28,6 +29,7 @@ __all__ = [
     "Queued",
     "FIFOPolicy",
     "BatchPolicy",
+    "BoundedReorderPolicy",
     "POLICIES",
     "make_policy",
     "plan_batches",

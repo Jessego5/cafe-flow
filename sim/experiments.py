@@ -15,6 +15,7 @@ import argparse
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Sequence
 from statistics import mean, stdev
 
 from analysis.metrics import (
@@ -26,10 +27,10 @@ from analysis.metrics import (
     station_utilisation,
     wait_percentiles,
 )
-from core.params import Params, load_params
+from core.params import Params, load_params, overlay_for
 from sim.engine import run
 
-__all__ = ["Arm", "ARMS", "run_arm", "compare"]
+__all__ = ["Arm", "ARMS", "SweepPoint", "run_arm", "compare", "sweep", "render_sweep"]
 
 BASE = "params/base.yaml"
 CONFIDENCE_95 = 1.96
@@ -43,8 +44,8 @@ class Arm:
     overlays: tuple[str, ...] = ()
     note: str = ""
 
-    def params(self, base: str = BASE) -> Params:
-        return load_params(base, *self.overlays)
+    def params(self, base: str = BASE, overlay: dict | None = None) -> Params:
+        return load_params(base, *self.overlays, overlay=overlay)
 
 
 #: The two readings of the espresso bar. Both are assumed until the machine is
@@ -69,6 +70,11 @@ ARMS: dict[str, Arm] = {
         "adoption_batched",
         ("params/experiments/adoption.yaml", "params/experiments/batch.yaml"),
         "both: ordering ahead and running compatible work together",
+    ),
+    "reordered": Arm(
+        "reordered",
+        ("params/experiments/reorder.yaml",),
+        "batching plus a bounded reorder that avoids changeovers, guarded",
     ),
     "batched": Arm(
         "batched",
@@ -103,9 +109,11 @@ class ArmResult:
         return (mean(values), half)
 
 
-def run_arm(arm: Arm, seeds: list[int], *, base: str = BASE) -> ArmResult:
+def run_arm(
+    arm: Arm, seeds: list[int], *, base: str = BASE, overlay: dict | None = None
+) -> ArmResult:
     """Run one arm across seeds, measuring the rush the log itself identifies."""
-    params = arm.params(base)
+    params = arm.params(base, overlay)
     result = ArmResult(arm=arm, params=params)
 
     for seed in seeds:
@@ -154,6 +162,97 @@ def compare(names: list[str], seeds: list[int], *, base: str = BASE) -> list[Arm
     return [run_arm(ARMS[name], seeds, base=base) for name in names]
 
 
+@dataclass
+class SweepPoint:
+    """One arm at one value of the swept parameter."""
+
+    arm: str
+    path: str
+    value: float
+    result: ArmResult
+
+    def summary(self, key: str) -> tuple[float, float]:
+        return self.result.summary(key)
+
+
+def sweep(
+    names: list[str],
+    path: str,
+    values: Sequence[float],
+    seeds: list[int],
+    *,
+    base: str = BASE,
+) -> list[SweepPoint]:
+    """Run every arm at every value of one parameter.
+
+    The point of a sweep here is not to find an optimum. Almost every input is
+    still assumed, so an optimum would be an artefact of a guess. What a sweep
+    answers is which assumptions the conclusion actually depends on: if an arm
+    wins across the whole plausible range of a parameter, that parameter does
+    not need measuring carefully, and if the arms cross somewhere inside the
+    range, the crossing point is the thing to go and check.
+    """
+    points: list[SweepPoint] = []
+    for name in names:
+        for value in values:
+            points.append(
+                SweepPoint(
+                    arm=name,
+                    path=path,
+                    value=value,
+                    result=run_arm(
+                        ARMS[name], seeds, base=base, overlay=overlay_for(path, value)
+                    ),
+                )
+            )
+    return points
+
+
+def _units(key: str) -> tuple[float, str, int]:
+    """How to show a metric: minutes, dollars, percent, or as it comes."""
+    if key.endswith("_cents"):
+        return (100.0, "$", 0)
+    if key.endswith("_fraction"):
+        return (0.01, "%", 0)
+    if key.endswith("_s"):
+        return (60.0, "min", 1)
+    return (1.0, "", 1)
+
+
+def render_sweep(points: list[SweepPoint], keys: Sequence[str]) -> str:
+    """One row per value, one column per arm, for each metric asked for."""
+    if not points:
+        return "nothing swept"
+
+    path = points[0].path
+    arms = list(dict.fromkeys(point.arm for point in points))
+    values = list(dict.fromkeys(point.value for point in points))
+    lookup = {(point.arm, point.value): point for point in points}
+
+    lines: list[str] = []
+    for key in keys:
+        scale, unit, places = _units(key)
+        lines.append("")
+        lines.append(f"{key}{f' ({unit})' if unit else ''} by {path}")
+        header = f"{path.split('.')[-1]:>22}" + "".join(f"{arm:>20}" for arm in arms)
+        lines.append(header)
+        lines.append("-" * len(header))
+        for value in values:
+            row = f"{value:>22.4g}"
+            for arm in arms:
+                point = lookup.get((arm, value))
+                if point is None:
+                    row += f"{'-':>20}"
+                    continue
+                mean_value, half = point.summary(key)
+                row += (
+                    f"{mean_value / scale:>13.{places}f}"
+                    f"±{half / scale:<6.{places}f}"
+                )
+            lines.append(row)
+    return "\n".join(lines)
+
+
 def render(results: list[ArmResult]) -> str:
     lines: list[str] = []
     for result in results:
@@ -198,6 +297,17 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, default=20)
     parser.add_argument("--base", default=BASE)
     parser.add_argument("--out", default="out")
+    parser.add_argument(
+        "--sweep", default=None,
+        help="dotted parameter path, e.g. customers.preorder_adoption",
+    )
+    parser.add_argument(
+        "--values", default=None,
+        help="comma separated values for --sweep",
+    )
+    parser.add_argument(
+        "--figures", action="store_true", help="write figures to --out",
+    )
     args = parser.parse_args()
 
     names = [name.strip() for name in args.arms.split(",") if name.strip()]
@@ -205,8 +315,49 @@ def main() -> None:
     if unknown:
         raise SystemExit(f"unknown arm(s) {unknown}; have {sorted(ARMS)}")
 
-    results = compare(names, list(range(args.seeds)), base=args.base)
+    seeds = list(range(args.seeds))
+
+    if args.sweep:
+        if not args.values:
+            raise SystemExit("--sweep needs --values")
+        values = [float(v) for v in args.values.split(",") if v.strip()]
+        points = sweep(names, args.sweep, values, seeds, base=args.base)
+        print(
+            render_sweep(
+                points,
+                ["wait_p90_walkup_s", "lost_fraction", "captured_margin_cents"],
+            )
+        )
+        print()
+        print(points[0].result.params.provenance_report().detail())
+
+        target = Path(args.out) / "sweep.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(
+                [
+                    {"arm": p.arm, "path": p.path, "value": p.value, "rows": p.result.rows}
+                    for p in points
+                ],
+                indent=2,
+            )
+        )
+        print(f"wrote {target}")
+
+        if args.figures:
+            from analysis.figures import sweep_figure
+
+            print(f"wrote {sweep_figure(points, args.out)}")
+        return
+
+    results = compare(names, seeds, base=args.base)
     print(render(results))
+
+    if args.figures:
+        from analysis.figures import arm_figures
+
+        for path in arm_figures(results, args.out):
+            print(f"wrote {path}")
 
     target = Path(args.out) / "compare.json"
     target.parent.mkdir(parents=True, exist_ok=True)

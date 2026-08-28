@@ -1,0 +1,20 @@
+# Arm E: batch, and prefer work that avoids a changeover.
+#
+# Switching the wand between milks means purging and wiping. Running the oat
+# drinks together avoids it — but a policy that always chases the cheapest
+# changeover strands whoever ordered the unpopular thing, so it only looks a
+# bounded way down the queue and anything past the guard goes next regardless.
+#
+# The guard is what makes this safe to run on a real bar. Without it the policy
+# is a way to lose a customer quietly.
+
+meta:
+  scenario: reordered
+  source: assumed
+
+policy:
+  name: bounded_reorder
+  lookahead_s: 180
+  reorder_window_s: 180
+  starvation_guard_s: 300
+  source: assumed

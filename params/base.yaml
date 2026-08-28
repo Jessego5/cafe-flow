@@ -62,7 +62,9 @@ stations:
   # decides how much milk batching is worth at all.
   # 12oz of milk in 12 + 13*2 = 38s, inside the 30-45s a barista is quoted for
   # a pitcher. A 32oz pitcher therefore holds two medium drinks, not four.
-  steam_wand:    { capacity: 1, setup_s: 12, per_6oz_s: 13,
+  # changeover_s is purging and wiping between milks. Small, and the only
+  # thing a reordering policy has to work with — worth a stopwatch.
+  steam_wand:    { capacity: 1, setup_s: 12, per_6oz_s: 13, changeover_s: 10,
                    batch_key: milk_type, max_batch_oz: 32,
                    source_of: { setup_s: published, per_6oz_s: published } }
 

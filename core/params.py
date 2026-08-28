@@ -34,6 +34,7 @@ __all__ = [
     "ProvenanceReport",
     "Source",
     "load_params",
+    "overlay_for",
     "params_from_dict",
     "parse_hhmm",
     "format_hhmm",
@@ -194,6 +195,12 @@ class StationParams(_Strict):
     max_batch_oz: float | None = Field(default=None, gt=0)
     batch_size: int | None = Field(default=None, gt=0)
 
+    # What it costs to switch this station from one batch key to another:
+    # purging and wiping a wand between milks, rinsing a milk line. Paid on the
+    # run that changes, so it depends on the order work is done in and not on
+    # any one batch. That is the whole thing a reordering policy can act on.
+    changeover_s: float | None = Field(default=None, ge=0)
+
     # Does the barista have to stay? A steam wand does: someone holds the
     # pitcher. A panini press does not: you close the lid and go make the
     # coffee. This is the difference between a station occupying a machine and
@@ -219,6 +226,8 @@ class StationParams(_Strict):
             )
         if self.max_batch_oz is not None and self.per_6oz_s is None:
             raise ValueError("max_batch_oz is meaningless without per_6oz_s")
+        if self.changeover_s is not None and self.batch_key is None:
+            raise ValueError("changeover_s needs a batch_key to change between")
         return self
 
     @property
@@ -707,10 +716,40 @@ def params_from_dict(raw: Mapping[str, Any]) -> Params:
     return params
 
 
-def load_params(*paths: str | Path) -> Params:
+def overlay_for(path: str, value: Any) -> dict[str, Any]:
+    """Turn `customers.preorder_adoption` and a number into a config overlay.
+
+    A swept value goes through the same merge everything else does, so it is
+    validated, cross-checked and given provenance exactly like one written in a
+    file.
+    """
+    parts = [part for part in path.split(".") if part]
+    if not parts:
+        raise ConfigError("cannot sweep an empty parameter path")
+
+    overlay: dict[str, Any] = {}
+    node = overlay
+    for part in parts[:-1]:
+        node[part] = {}
+        node = node[part]
+
+    # A swept value is a hypothesis, whatever the parameter used to be. Leaving
+    # it marked `published` would let a sweep quietly launder a guess into a
+    # citation.
+    node[parts[-1]] = value
+    node["source_of"] = {parts[-1]: "assumed"}
+    return overlay
+
+
+def load_params(
+    *paths: str | Path, overlay: Mapping[str, Any] | None = None
+) -> Params:
     """Load base config plus overlays, left to right. Later files win.
 
         load_params("params/base.yaml", "params/observed.yaml")
+
+    `overlay` applies after every file, for values built in memory such as a
+    sweep point.
     """
     if not paths:
         raise ConfigError("load_params needs at least one file")
@@ -729,6 +768,9 @@ def load_params(*paths: str | Path) -> Params:
         if not isinstance(loaded, Mapping):
             raise ConfigError(f"{p}: top level must be a mapping")
         merged = deep_merge(merged, loaded)
+
+    if overlay:
+        merged = deep_merge(merged, overlay)
 
     try:
         return params_from_dict(merged)

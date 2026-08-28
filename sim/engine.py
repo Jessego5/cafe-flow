@@ -24,7 +24,7 @@ from core.capacity import StationCapacityModel
 from core.events import EventLog, EventType
 from core.menu import make_order
 from core.params import FROM_STAFFING, Params, load_params
-from core.states import LOST, State, place, transition
+from core.states import LOST, State, place, promise, transition
 from core.types import Channel, Order, Task, TaskKind
 from sim.arrivals import Arrival, generate_arrivals
 from sim.balking import (
@@ -213,6 +213,7 @@ class Cafe:
         station = self.params.station(name)
         resource = self.stations[name]
         model = StationCapacityModel(self.params, name)
+        last_key: str | None = None
 
         while True:
             if not self.queues[name]:
@@ -230,9 +231,25 @@ class Cafe:
                 for entry in batch:
                     self.queues[name].remove(entry)
 
-                duration = model.batch_cost([entry.item for entry in batch])
+                items = [entry.item for entry in batch]
+                duration = model.batch_cost(items)
+
+                # Switching the station between batch keys costs something, and
+                # it is paid by whoever runs the batch that changes it. This is
+                # sequence-dependent, so it lives here and not in the capacity
+                # model, which prices a batch on its own.
+                key = model.batch_value(items[0])
+                changeover_s = 0.0
+                if station.changeover_s and last_key is not None and key != last_key:
+                    changeover_s = station.changeover_s
+                    duration += changeover_s
+                last_key = key
+
                 actor = barista.name if barista is not None else name
-                self.emit_batch(EventType.STATION_START, name, batch, actor, duration)
+                self.emit_batch(
+                    EventType.STATION_START, name, batch, actor, duration,
+                    changeover_s=changeover_s,
+                )
                 if len(batch) > 1:
                     self.emit_batch(EventType.BATCH_FORMED, name, batch, actor, duration)
                 yield self.env.timeout(duration)
@@ -250,6 +267,7 @@ class Cafe:
         batch: list[Pending],
         actor: str,
         duration_s: float,
+        **extra: object,
     ) -> None:
         """One event for the whole batch, keyed on its first item so the start
         and end pair up."""
@@ -271,6 +289,7 @@ class Cafe:
                 "size": len(batch),
                 "items": [entry.item.item_id for entry in batch],
                 "orders": sorted({entry.order.order_id for entry in batch}),
+                **extra,
             },
         )
 
@@ -432,7 +451,6 @@ class Cafe:
             customer_id=arrival.customer_id,
             is_simulated=True,
         )
-        order.promised_at_s = arrival.wanted_at_s
         self.orders[order.order_id] = order
         place(
             order, at=self.env.now, actor="customer", log=self.log,
@@ -440,6 +458,9 @@ class Cafe:
             margin_cents=order.margin_cents,
             items=[item.drink for item in order.items],
         )
+
+        if arrival.preordered and arrival.wanted_at_s is not None:
+            promise(order, at=self.env.now, promised_at_s=arrival.wanted_at_s, log=self.log)
 
         if self.balks(arrival, order):
             return
