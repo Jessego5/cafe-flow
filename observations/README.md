@@ -1,5 +1,9 @@
 # What to count, in priority order
 
+> Use the counter: four taps and a stopwatch, fifteen minutes at the 10:50
+> peak. Paste what it gives you into `observations/rush.txt` and run
+> `python -m analysis.calibrate observations/rush.txt`.
+
 Read off the menu boards on 2026-08-27, so already `observed`: item names,
 prices, and which drinks the board offers hot or iced.
 

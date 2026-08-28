@@ -47,6 +47,7 @@ question.
 | M10 findings back into the app | partial: the bar runs the measured policy |
 | M6 balking and channel choice | done |
 | M7 experiments | partial: arms, sweeps and figures; no calibrated run yet |
+| M8 calibration | built; waiting on a counted rush |
 | M9 HTTP replay and drift check | done |
 
 ## Deploying
@@ -99,6 +100,23 @@ that deliberately breaks the app to prove the check would notice.
 
 `--speed 60` compresses a morning into a minute against the live UIs, which is
 the only way to show someone a rush on the bar display without waiting for one.
+
+## Turning a counted rush into parameters
+
+One person watching one rush produces five numbers, not a time series. Paste
+what the counter gives you into a file and:
+
+    python -m analysis.calibrate observations/rush.txt
+
+It writes `params/observed.yaml`, searches for the one parameter that cannot be
+counted directly (`arrivals.capture_rate`), and says whether the calibrated
+model reproduces what was seen. It exits non-zero if it does not: the answer to
+a model that cannot reproduce the observation is to fix the model, not to tune
+the fit.
+
+Volume agreeing proves little, because it is what `capture_rate` was fitted to.
+Balking is the honest test — nothing is fitted to it — so the report calls out
+how far the model's patience is from what was counted.
 
 ## Comparing arms
 
