@@ -1,0 +1,15 @@
+# Slots on, over a day long enough that the concurrency check can run at any
+# hour. The check is about a database transaction, not about opening times.
+
+meta:
+  scenario: slots_check
+  sim_start: "00:00"
+  sim_end: "23:00"
+  source: assumed
+
+staffing:
+  - { from: "00:00", to: "23:00", baristas: 3, source: assumed }
+
+slots:
+  enabled: true
+  source: assumed

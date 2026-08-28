@@ -91,5 +91,8 @@ def test_litestream_replicates_the_order_log(deploy):
 def test_ci_gates_the_deploy_on_green(request):
     workflow = (request.config.rootpath / ".github" / "workflows" / "ci.yml").read_text()
     assert "needs: [test, web, image, drift]" in workflow
-    assert "sim/client.py" in workflow       # the M9 drift check, wired ahead of M9
     assert "pytest -q" in workflow
+
+    # the two checks that only mean anything against a running app
+    assert "python -m sim.client --drift-check" in workflow
+    assert "python -m sim.client --concurrency" in workflow

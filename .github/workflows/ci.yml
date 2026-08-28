@@ -67,13 +67,15 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements-dev.txt
-      - name: compare app metrics against the in-process run
+      - name: replay a simulated day at the app and compare the two logs
+        # Unpaced and structural: prices, bottleneck costs, item lists, state
+        # paths and counts do not depend on how fast the replay ran, so this is
+        # seconds rather than the eight minutes a paced day would take.
+        run: python -m sim.client --drift-check
+      - name: a slot cannot be overbooked under concurrency
         run: |
-          if [ -f sim/client.py ]; then
-            python -m sim.client --drift-check
-          else
-            echo "::notice::sim/client.py is not built yet (M9); nothing to compare"
-          fi
+          CAFE_PARAMS="params/base.yaml:params/experiments/slots_check.yaml" \
+            python -m sim.client --concurrency
 
   deploy:
     name: deploy

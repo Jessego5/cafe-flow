@@ -1,0 +1,14 @@
+# Slots on, for the concurrency check and for M10 if the findings support them.
+#
+# The capacity check and the decrement have to be one transaction. Split into a
+# read and a write they interleave, and a slot with room for ten takes thirty
+# bookings — which nobody notices until the shelf is full of drinks nobody can
+# make.
+
+meta:
+  scenario: slots_on
+  source: assumed
+
+slots:
+  enabled: true
+  source: assumed

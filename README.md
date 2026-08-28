@@ -47,6 +47,7 @@ question.
 | M10 findings back into the app | partial: the bar runs the measured policy |
 | M6 balking and channel choice | done |
 | M7 experiments | partial: arms, sweeps and figures; no calibrated run yet |
+| M9 HTTP replay and drift check | done |
 
 ## Deploying
 
@@ -78,6 +79,26 @@ without it.
 
 `GET /queue` returns the resulting suggestions and what each is worth in
 bottleneck-seconds. They are advisory: the barista decides.
+
+## The app and the core cannot drift apart
+
+Both runtimes share `core/`, so in principle neither can grow its own idea of
+what a latte costs or which state moves are legal. `sim/client.py` makes that a
+fact: it replays a simulated day at the running app over real HTTP and compares
+the app's own event log, through the same `analysis/metrics.py`, against the
+in-process run.
+
+    python -m sim.client                    # structural, about two seconds
+    python -m sim.client --speed 400 --compare-waits
+    CAFE_PARAMS="params/base.yaml:params/experiments/slots_check.yaml" \
+      python -m sim.client --concurrency
+
+CI runs the first and the third on every merge, before deploying. If they
+disagree it is a bug in `app/`, not a tolerance to widen — and there is a test
+that deliberately breaks the app to prove the check would notice.
+
+`--speed 60` compresses a morning into a minute against the live UIs, which is
+the only way to show someone a rush on the bar display without waiting for one.
 
 ## Comparing arms
 
