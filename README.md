@@ -49,6 +49,7 @@ question.
 | M7 experiments | partial: arms, sweeps and figures; no calibrated run yet |
 | M8 calibration | built; waiting on a counted rush |
 | M9 HTTP replay and drift check | done |
+| Policy selection | done: chooses a scheduler for any configuration |
 
 ## Deploying
 
@@ -68,6 +69,32 @@ the door. So this project does not build a competing student ordering app. The
 student view is a demo; the deliverable is the simulator, the observations, and
 a barista-side queue that batches and reorders work the existing system does
 not. `customers.preorder_adoption` is an observable here, not a sweep.
+
+## Choosing the scheduler for whatever cafe it is fed
+
+`params/base.yaml` describes one cafe. Point the tool at another — a different
+menu, different stations, different demand — and it works out which scheduler
+*that* operation should run:
+
+    python -m sim.select --objective margin --seeds 40
+    python -m sim.select --params params/examples/espresso_bar.yaml --objective margin
+
+The answers differ, which is the point. On the observed Ground Truth menu
+batching wins clearly; on the example espresso bar, where the group head is the
+constraint and it cannot batch, nothing beats plain FIFO.
+
+Two rules keep it honest. A challenger must clear the incumbent's confidence
+interval rather than merely beat its mean, because two policies whose intervals
+overlap have not been told apart. And a tie goes to the simpler policy: a
+scheduler that is harder to explain to a barista, adopted for a difference the
+evidence cannot see, is a bad trade at any confidence.
+
+It also refuses to apply a selection against a configuration that is still
+mostly assumed. A model nobody has checked against the floor will name a winner
+regardless, confidently, and be wrong.
+
+`--apply` writes `params/selected.yaml`, which is an ordinary overlay. The app
+reads it the way it reads everything else and never imports the simulator.
 
 ## One scheduler, two runtimes
 

@@ -1,0 +1,106 @@
+# A different operation entirely, to show the tool is not one cafe's answer.
+#
+# A small espresso bar: no food, no cold brew, one wand, one group head, and
+# twice the drink volume in a shorter day. Everything the machinery needs comes
+# from this file — feed it and it works out which scheduler this bar should run,
+# and it need not be the one Ground Truth should.
+#
+# Entirely assumed. It exists to exercise the tool, not to describe anywhere.
+
+meta:
+  scenario: espresso_bar
+  seed: 42
+  sim_start: "07:00"
+  sim_end: "13:00"
+  source: assumed
+
+cafe:
+  name: Example Espresso Bar
+  timezone: America/Chicago
+  source: assumed
+
+stations:
+  source: assumed
+  register:   { capacity: from_staffing, base_s: 25, per_item_s: 3 }
+  steam_wand: { capacity: 1, setup_s: 12, per_6oz_s: 13, changeover_s: 10,
+                batch_key: milk_type, max_batch_oz: 32 }
+  group_head: { capacity: 1, shot_s: 27, attended: false }
+  brew_tap:   { capacity: 2, pour_s: 10 }
+
+bottleneck_station: steam_wand
+
+staffing:
+  - { from: "07:00", to: "13:00", baristas: 2, source: assumed }
+
+menu:
+  source: assumed
+  espresso:
+    price_cents: 300
+    cogs_cents: 35
+    requires_milk: false
+    tasks: [ { station: group_head, shots: 1 } ]
+    assembly_s: 5
+  filter:
+    price_cents: 350
+    cogs_cents: 40
+    requires_milk: false
+    tasks: [ { station: brew_tap } ]
+    assembly_s: 5
+  flat_white:
+    price_cents: 500
+    cogs_cents: 110
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 6 }, { station: group_head, shots: 2 } ]
+    assembly_s: 15
+  latte:
+    price_cents: 525
+    cogs_cents: 125
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 10 }, { station: group_head, shots: 2 } ]
+    assembly_s: 18
+  cappuccino:
+    price_cents: 500
+    cogs_cents: 115
+    requires_milk: true
+    tasks: [ { station: steam_wand, oz: 8 }, { station: group_head, shots: 2 } ]
+    assembly_s: 16
+
+mix:
+  source: assumed
+  # a bar that sells steamed milk, which is where batching has something to bite
+  drink: { latte: 0.34, flat_white: 0.24, cappuccino: 0.20, filter: 0.14, espresso: 0.08 }
+  milk:  { whole: 0.45, oat: 0.40, skim: 0.15 }
+  serve: { hot: 1.0 }
+  attach: { item: filter, rate: 0.0 }
+
+arrivals:
+  class_blocks:
+    - { ends_at: "08:30", sections: 10, avg_enrollment: 30 }
+    - { ends_at: "09:30", sections: 14, avg_enrollment: 30 }
+    - { ends_at: "10:30", sections: 12, avg_enrollment: 30 }
+  capture_rate: 0.11
+  offset_min: 3.0
+  sigma_min: 3.0
+  background_per_hour: 10
+  source: assumed
+
+customers:
+  time_budget_min:    { dist: lognormal, median: 9.0, sigma: 0.5 }
+  balk_tolerance_min: { dist: lognormal, median: 7.0, sigma: 0.45 }
+  preorder_adoption: 0.0
+  no_show_rate: 0.03
+  source: assumed
+
+policy:
+  name: fifo
+  lookahead_s: 180
+  reorder_window_s: 180
+  starvation_guard_s: 300
+  source: assumed
+
+slots:
+  enabled: false
+  width_min: 5
+  walkup_reserve_fraction: 0.30
+  min_lead_time_min: 10
+  source: assumed
