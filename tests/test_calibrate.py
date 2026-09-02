@@ -389,7 +389,9 @@ def test_the_pause_shows_as_a_gap_not_as_readings():
     """Nothing between 10:52 and 10:58 — because nobody was watching, which is
     the point of being able to pause."""
     seen = read_summary(TIMED)
-    minutes = [int(at.split(":")[1]) for at in seen.sample_times]
+    minutes = [
+        int(at.split(":")[0]) * 60 + int(at.split(":")[1]) for at in seen.sample_times
+    ]
     gaps = [b - a for a, b in zip(minutes, minutes[1:])]
     assert max(gaps) == 6
     assert gaps.count(2) == len(gaps) - 1
@@ -411,6 +413,36 @@ def test_an_untimed_observation_still_reads():
 def test_a_timed_observation_calibrates(params):
     seen = read_summary(TIMED)
     overlay = to_overlay(seen, params)
-    capture, produced = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
+    capture, produced = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1, 2, 3])
     assert 0 < capture < 1
-    assert produced == pytest.approx(seen.typical_line, rel=0.4)
+    assert produced == pytest.approx(seen.typical_line, rel=0.35)
+
+
+def test_the_fit_survives_a_stumble_in_the_objective():
+    """Each evaluation averages a handful of simulated days, so it carries
+    noise. One misstep sends bisection the wrong way with no route back, and
+    keeping the last midpoint rather than the best candidate seen would return
+    whatever it happened to land on."""
+    from core.events import EventLog, EventType
+    from core.states import State
+
+    seen = read_summary(TIMED)
+    target = seen.typical_line
+
+    def wobbly(params, seed):
+        """Queue depth rises with the capture rate, with a dip partway that a
+        naive bisection would fall into."""
+        capture = params.arrivals.capture_rate
+        depth = capture * 100
+        if 0.045 < capture < 0.055:
+            depth *= 0.2
+
+        log = EventLog("stub", seed)
+        for index in range(max(1, int(depth))):        # placed together, never leave
+            log.emit(EventType.STATE_CHANGE, 36000.0, order_id=f"o{index}",
+                     to_state=State.PLACED, channel="walkup")
+        return log
+
+    capture, produced = fit_capture_rate(seen, [BASE], {}, wobbly, seeds=[0])
+    assert 0 < capture < 1
+    assert abs(produced - target) < 1.5, (capture, produced, target)

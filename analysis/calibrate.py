@@ -400,17 +400,26 @@ def fit_capture_rate(
             f"demand: fix arrivals.class_blocks before fitting."
         )
 
-    best = low
+    # Keep the best candidate seen rather than whatever midpoint the loop ends
+    # on. Each evaluation is an average over a handful of simulated days, so it
+    # carries noise, and one misstep on a noisy objective sends bisection the
+    # wrong way with no route back.
+    best, best_produced, best_error = low, rate_at(low), float("inf")
     for _ in range(SEARCH_STEPS):
-        best = (low + high) / 2
-        produced = rate_at(best)
-        if abs(produced - target) / target <= VOLUME_TOLERANCE / 4:
+        middle = (low + high) / 2
+        produced = rate_at(middle)
+        error = abs(produced - target) / target
+
+        if error < best_error:
+            best, best_produced, best_error = middle, produced, error
+        if error <= VOLUME_TOLERANCE / 4:
             break
         if produced < target:
-            low = best
+            low = middle
         else:
-            high = best
-    return round(best, 5), rate_at(best)
+            high = middle
+
+    return round(best, 5), best_produced
 
 
 def _queue_over_time(log, window, every_s: float = 60.0) -> list[float]:
