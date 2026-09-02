@@ -1,0 +1,33 @@
+# Hypothesis: the food is pre-made and held in a fridge, then heated to order
+# in a microwave or a high-speed oven.
+#
+# Three changes at once, and the third is the one that matters:
+#
+#   1. The cycle is much shorter. Heating a wrapped sandwich is around a
+#      minute, against three to five for a press.
+#   2. There is nothing to assemble. Someone built it earlier; the barista
+#      takes it out, unwraps it and hands it over.
+#   3. IT HOLDS ONE. A press takes two side by side; a microwave takes one.
+#      That removes the batching this project found the whole saving in.
+#
+# UNCONFIRMED, from what the cafe looks like rather than a timed observation.
+# The station is still called panini_press, which is now a misnomer; it would
+# be renamed in base.yaml if this holds up.
+
+meta:
+  scenario: microwave
+  source: assumed
+
+stations:
+  panini_press:
+    run_s: 60
+    batch_size: 1
+    source_of: { run_s: assumed, batch_size: assumed }
+
+menu:
+  bacon_egg_cheese_bagel:   { assembly_s: 15 }
+  sausage_egg_cheese:       { assembly_s: 15 }
+  vegan_sausage_egg_cheese: { assembly_s: 15 }
+  italian_herb_chicken:     { assembly_s: 20 }
+  mona_lisa:                { assembly_s: 20 }
+  monterey_turkey:          { assembly_s: 20 }

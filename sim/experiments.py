@@ -76,6 +76,16 @@ ARMS: dict[str, Arm] = {
         ("params/experiments/reorder.yaml",),
         "batching plus a bounded reorder that avoids changeovers, guarded",
     ),
+    "microwave": Arm(
+        "microwave",
+        ("params/experiments/microwave.yaml",),
+        "food pre-made and heated to order, one at a time",
+    ),
+    "microwave_batched": Arm(
+        "microwave_batched",
+        ("params/experiments/microwave.yaml", "params/experiments/batch.yaml"),
+        "the same, with batching on — which now has only the wand to work with",
+    ),
     "batched": Arm(
         "batched",
         ("params/experiments/batch.yaml",),

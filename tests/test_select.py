@@ -195,3 +195,21 @@ def test_a_synthetic_configuration_says_it_is_synthetic():
     assert counts.get("synthetic", 0) > 0
     assert counts.get("observed", 0) == 0
     assert maven.source_of("arrivals.profile.rate_per_hour.0") == "synthetic"
+
+
+def test_every_params_file_reaches_the_runs():
+    """A selection that read the incumbent from the whole config stack but ran
+    the arms on the base alone would compare policies against a configuration
+    nobody asked about, and say nothing about the one they did."""
+    plain = select_policy(["params/base.yaml"], objective="margin", seeds=4)
+    overlaid = select_policy(
+        ["params/base.yaml", "params/experiments/microwave.yaml"],
+        objective="margin", seeds=4,
+    )
+    plain_margin = plain.candidates[0].value
+    overlaid_margin = overlaid.candidates[0].value
+    assert plain_margin != overlaid_margin
+
+    # and the overlay really is what changed it
+    assert overlaid.candidates[0].rows[0]["orders"] > 0
+    assert overlaid_margin > plain_margin      # a faster oven keeps more customers

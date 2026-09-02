@@ -247,11 +247,15 @@ def select_policy(
 
     candidates: list[Candidate] = []
     for policy in wanted:
-        arm = Arm(policy, (), f"policy {policy}")
+        # Every file after the first is an overlay and has to reach the runs.
+        # Reading the incumbent from the whole stack while running the arms on
+        # the base alone silently compares policies against a configuration
+        # nobody asked about.
+        arm = Arm(policy, tuple(str(path) for path in params_files[1:]), f"policy {policy}")
         result: ArmResult = run_arm(
             arm,
             seed_list,
-            base=params_files[0],
+            base=str(params_files[0]),
             overlay={"policy": {"name": policy}},
         )
         value, half = result.summary(goal.metric)
