@@ -31,7 +31,7 @@ from typing import Callable
 import yaml
 
 from analysis.metrics import balk_count_and_lost_margin, busiest_window
-from core.events import EventLog
+from core.events import EventLog, EventType
 from core.params import ConfigError, Params, load_params
 
 #: Runs one day and hands back its log. Injected so `analysis/` stays free of
@@ -59,6 +59,7 @@ class Observation:
     walked_out: int = 0
     longest_line: int = 0
     balk_lines: list[int] = field(default_factory=list)
+    line_samples: list[int] = field(default_factory=list)
     press_seconds: list[float] = field(default_factory=list)
     press_size: int = 0
 
@@ -70,6 +71,19 @@ class Observation:
     opens: str = ""
     closes: str = ""
     notes: list[str] = field(default_factory=list)
+
+    @property
+    def typical_line(self) -> float | None:
+        """The queue as it actually was, sampled on a timer.
+
+        Unbiased, unlike the depth recorded when somebody balked: that only
+        ever reads the queue when it was long enough that someone left.
+        """
+        return mean(self.line_samples) if self.line_samples else None
+
+    @property
+    def busiest_line(self) -> int | None:
+        return max(self.line_samples) if self.line_samples else None
 
     @property
     def typical_balk_line(self) -> float | None:
@@ -136,6 +150,10 @@ def read_summary(text: str) -> Observation:
                 seen.balk_lines = [
                     int(value) for value in re.findall(r"\d+", depths.group(1))
                 ]
+        elif line.startswith("line every minute:"):
+            seen.line_samples = [
+                int(value) for value in re.findall(r"\d+", line.split(":", 1)[1])
+            ]
         elif line.startswith("food machine:"):
             body = line.split(":", 1)[1]
             seen.machine = body.split(",")[0].strip()
@@ -285,6 +303,17 @@ def open_questions(seen: Observation) -> list[str]:
     return asks
 
 
+def _typical_queue(params: Params, seeds: list[int], runner: Runner) -> float:
+    """The simulated queue, averaged over the rush and over seeds."""
+    depths: list[float] = []
+    for seed in seeds:
+        log = runner(params, seed)
+        window = busiest_window(log)
+        if window is not None:
+            depths.extend(_queue_over_time(log, window))
+    return mean(depths) if depths else 0.0
+
+
 def _peak_orders_per_hour(params: Params, seeds: list[int], runner: Runner) -> float:
     """What the model thinks the busiest hour looks like."""
     rates: list[float] = []
@@ -310,29 +339,44 @@ def fit_capture_rate(
     *,
     seeds: list[int] | None = None,
 ) -> tuple[float, float]:
-    """Search for the capture rate that reproduces the volume that was counted.
+    """Search for the capture rate that reproduces what was counted.
+
+    Against volume where somebody counted orders, and against queue depth
+    otherwise — which is what the original plan fitted to, and what a person
+    watching a rush can actually produce. Either way one number is being
+    matched by one knob.
 
     Bisection rather than anything cleverer: demand rises monotonically with
-    the capture rate, the observation is one coarse number, and a smarter
-    search would only be fitting its noise.
+    the capture rate, the observation is coarse, and a smarter search would
+    only be fitting its noise.
 
-    Returns the rate and the peak orders an hour it produces.
+    Returns the rate and the value it produces, in whichever measure was used.
     """
     seeds = seeds or [0, 1, 2, 3]
-    target = seen.orders_per_hour
+
+    if seen.orders and seen.minutes:
+        target, measure = seen.orders_per_hour, _peak_orders_per_hour
+    elif seen.typical_line is not None:
+        target, measure = seen.typical_line, _typical_queue
+    else:
+        raise ConfigError(
+            "nothing to fit against: the observation records neither an order "
+            "count over a known time nor any queue depth. One or the other is "
+            "what pins the capture rate."
+        )
 
     def rate_at(capture: float) -> float:
         merged = dict(overlay)
         merged.setdefault("arrivals", {})["capture_rate"] = capture
         merged["arrivals"].setdefault("source_of", {})["capture_rate"] = "fitted"
-        return _peak_orders_per_hour(load_params(*base, overlay=merged), seeds, runner)
+        return measure(load_params(*base, overlay=merged), seeds, runner)
 
     low, high = 0.001, 1.0
     if rate_at(high) < target:
         raise ConfigError(
-            f"even capturing everyone gives {rate_at(high):.0f} orders an hour at peak, "
-            f"short of the {target:.0f} counted. The class blocks are too small: fix "
-            f"arrivals.class_blocks before fitting."
+            f"even capturing everyone reaches {rate_at(high):.1f} against the "
+            f"{target:.1f} counted. The class blocks are too small to supply that "
+            f"demand: fix arrivals.class_blocks before fitting."
         )
 
     best = low
@@ -348,6 +392,44 @@ def fit_capture_rate(
     return round(best, 5), rate_at(best)
 
 
+def _queue_over_time(log, window, every_s: float = 60.0) -> list[float]:
+    """The simulated queue, read on the same cadence a person reads it.
+
+    Membership, not a running tally: an order is in the queue from the moment
+    it is placed until it reaches the shelf or the customer gives up. Counting
+    a transition into each waiting state would add the same order three times
+    on its way through and the depth would only ever climb.
+    """
+    from core.states import State
+
+    leaves = {
+        str(State.READY), str(State.PICKED_UP), str(State.BALKED),
+        str(State.ABANDONED), str(State.CANCELLED),
+    }
+    moves = sorted(
+        (event.t_s, event.order_id, event.to_state)
+        for event in log
+        if event.type is EventType.STATE_CHANGE
+        and event.order_id is not None
+        and event.to_state is not None
+    )
+
+    waiting: set[str] = set()
+    index, out = 0, []
+    at = window.start_s
+    while at < window.end_s:
+        while index < len(moves) and moves[index][0] <= at:
+            _, order_id, to_state = moves[index]
+            if to_state == str(State.PLACED):
+                waiting.add(order_id)
+            elif to_state in leaves:
+                waiting.discard(order_id)
+            index += 1
+        out.append(float(len(waiting)))
+        at += every_s
+    return out
+
+
 @dataclass
 class Validation:
     """Whether the calibrated model reproduces what was actually seen."""
@@ -359,6 +441,8 @@ class Validation:
     observed_longest_line: int
     observed_balk_line: float | None
     modelled_balk_line: float | None
+    observed_line: float | None
+    modelled_line: float | None
     provenance: str
 
     @property
@@ -368,8 +452,21 @@ class Validation:
         return (self.modelled_per_hour - self.observed_per_hour) / self.observed_per_hour
 
     @property
+    def queue_error(self) -> float | None:
+        if not self.observed_line or self.modelled_line is None:
+            return None
+        return (self.modelled_line - self.observed_line) / self.observed_line
+
+    @property
+    def fitted_against(self) -> str:
+        """Whichever measure the capture rate was matched to. The other checks
+        are worth more precisely because nothing was fitted to them."""
+        return "volume" if self.observed_per_hour else "queue"
+
+    @property
     def passes(self) -> bool:
-        return abs(self.volume_error) <= VOLUME_TOLERANCE
+        error = self.volume_error if self.fitted_against == "volume" else self.queue_error
+        return error is not None and abs(error) <= VOLUME_TOLERANCE
 
     @property
     def balk_ratio(self) -> float | None:
@@ -385,15 +482,24 @@ class Validation:
         return self.modelled_balks_per_hour / self.observed_balks_per_hour
 
     def render(self) -> str:
-        lines = [
-            f"  volume   observed {self.observed_per_hour:5.0f}/h   "
-            f"modelled {self.modelled_per_hour:5.0f}/h   "
-            f"error {self.volume_error:+.0%}",
-        ]
+        lines = []
+        if self.observed_per_hour:
+            lines.append(
+                f"  volume   observed {self.observed_per_hour:5.0f}/h   "
+                f"modelled {self.modelled_per_hour:5.0f}/h   "
+                f"error {self.volume_error:+.0%}"
+            )
         if self.observed_balks_per_hour is not None:
             lines.append(
                 f"  balks    observed {self.observed_balks_per_hour:5.0f}/h   "
                 f"modelled {self.modelled_balks_per_hour:5.0f}/h"
+            )
+        if self.observed_line is not None and self.modelled_line is not None:
+            error = self.queue_error
+            lines.append(
+                f"  queue    observed {self.observed_line:5.1f} deep  "
+                f"modelled {self.modelled_line:5.1f} deep  "
+                + (f"error {error:+.0%}" if error is not None else "")
             )
         if self.observed_balk_line is not None and self.modelled_balk_line is not None:
             lines.append(
@@ -402,9 +508,9 @@ class Validation:
             )
         lines.append(f"  {self.provenance}")
         lines.append(
-            "  volume PASSES: the model reproduces what was counted"
+            f"  {self.fitted_against} PASSES: the model reproduces what was counted"
             if self.passes
-            else "  volume FAILS: fix the model, do not tune the fit"
+            else f"  {self.fitted_against} FAILS: fix the model, do not tune the fit"
         )
 
         ratio = self.balk_ratio
@@ -413,10 +519,10 @@ class Validation:
             lines += [
                 "",
                 f"  Balking is {ratio:.1f}x off, which is the number worth arguing with.",
-                "  Volume is what capture_rate was fitted to, so it agreeing proves",
-                "  little. Nothing was fitted to balks. Modelling customers as too",
-                f"  {direction} means customers.balk_tolerance_min is wrong, and it is the",
-                "  softest assumption left in the file.",
+                f"  {self.fitted_against.title()} is what capture_rate was turned to match,",
+                "  so it agreeing proves little. Nothing is fitted to balking. Modelling",
+                f"  customers as too {direction} means customers.balk_tolerance_min is",
+                "  wrong, and it is the softest assumption left in the file.",
             ]
         return "\n".join(lines)
 
@@ -439,14 +545,21 @@ def validate(
             balks.append(losses["balked"] * 3600.0 / window.length_s)
 
     depths: list[float] = []
+    queue: list[float] = []
     for seed in seeds:
-        for event in runner(params, seed):
+        log = runner(params, seed)
+        for event in log:
             if event.to_state == "balked" and "queue_depth" in event.payload:
                 depths.append(float(event.payload["queue_depth"]))
+        window = busiest_window(log)
+        if window is not None:
+            queue.extend(_queue_over_time(log, window))
 
     return Validation(
         observed_balk_line=seen.typical_balk_line,
         modelled_balk_line=mean(depths) if depths else None,
+        observed_line=seen.typical_line,
+        modelled_line=mean(queue) if queue else None,
         observed_per_hour=seen.orders_per_hour,
         modelled_per_hour=modelled,
         observed_balks_per_hour=seen.balks_per_hour,

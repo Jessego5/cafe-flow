@@ -210,6 +210,7 @@ FIELD = """Ground Truth, 2026-08-27
 watched: 15 min
 food machine: microwave, holds 1
 walked out: 3 (line was 8, 9, 6)
+line every minute: 2, 3, 5, 7, 9, 8, 6, 4, 3, 2, 2, 3, 5, 4, 3
 till person makes drinks: sometimes
 baristas at peak: 3
 hours: 07:30-15:00
@@ -295,3 +296,66 @@ def test_the_depth_people_gave_up_at_is_checked_against_the_model(field, params)
     assert report.observed_balk_line == pytest.approx(23 / 3)
     assert report.modelled_balk_line is not None
     assert "gave up" in report.render()
+
+
+# --------------------------------------------------------------------------
+# the queue over time
+# --------------------------------------------------------------------------
+
+
+def test_the_queue_samples_read_back(field):
+    assert field.line_samples == [2, 3, 5, 7, 9, 8, 6, 4, 3, 2, 2, 3, 5, 4, 3]
+    assert field.typical_line == pytest.approx(4.4, abs=0.05)
+    assert field.busiest_line == 9
+
+
+def test_the_depth_at_a_balk_is_biased_high(field):
+    """It only ever reads the queue when it was long enough that someone left,
+    which is why the timed samples are the honest measure."""
+    assert field.typical_balk_line > field.typical_line
+
+
+def test_an_order_is_counted_once_while_it_waits():
+    """Counting a transition into each waiting state would add the same order
+    three times on its way through, and the depth would only ever climb."""
+    from analysis.calibrate import _queue_over_time
+    from analysis.metrics import Interval
+    from core.events import EventLog, EventType
+    from core.states import State
+
+    log = EventLog("hand", 1)
+    for state, at in [(State.PLACED, 0), (State.ACCEPTED, 10), (State.IN_PROGRESS, 20),
+                      (State.READY, 200), (State.PICKED_UP, 210)]:
+        log.emit(EventType.STATE_CHANGE, float(at), order_id="a", to_state=state)
+
+    depths = _queue_over_time(log, Interval(0.0, 300.0), every_s=60.0)
+    assert depths == [1.0, 1.0, 1.0, 1.0, 0.0]
+
+
+def test_the_fit_falls_back_to_the_queue_when_nobody_counted_orders():
+    """The checklist collects depth, not volume — which is what the original
+    plan fitted against anyway."""
+    seen = read_summary(FIELD)
+    assert seen.orders == 0
+    overlay = to_overlay(seen, load_params(BASE))
+    capture, produced = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
+    assert 0 < capture < 1
+    assert produced == pytest.approx(seen.typical_line, rel=0.35)
+
+
+def test_an_observation_with_neither_measure_is_refused():
+    seen = read_summary("Ground Truth, 2026-08-27\nfood machine: microwave\n")
+    with pytest.raises(ConfigError, match="nothing to fit against"):
+        fit_capture_rate(seen, [BASE], {}, runner, seeds=[0])
+
+
+def test_the_gate_judges_whatever_was_actually_collected(field):
+    overlay = to_overlay(field, load_params(BASE))
+    capture, _ = fit_capture_rate(field, [BASE], overlay, runner, seeds=[0, 1])
+    overlay.setdefault("arrivals", {})["capture_rate"] = capture
+    report = validate(field, load_params(BASE, overlay=overlay), runner, seeds=[0, 1])
+
+    assert report.fitted_against == "queue"
+    assert report.queue_error is not None
+    assert "queue" in report.render()
+    assert "0/h" not in report.render()      # never claims a volume nobody counted
