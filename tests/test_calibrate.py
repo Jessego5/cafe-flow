@@ -359,3 +359,58 @@ def test_the_gate_judges_whatever_was_actually_collected(field):
     assert report.queue_error is not None
     assert "queue" in report.render()
     assert "0/h" not in report.render()      # never claims a volume nobody counted
+
+
+# --------------------------------------------------------------------------
+# clock-stamped observation
+# --------------------------------------------------------------------------
+
+TIMED = """Ground Truth, 2026-08-27
+watched: 10:46-11:04, 16 min recording (1 pause)
+food machine: microwave, holds 1
+walked out: 3 (10:51 at 5, 10:53 at 7, 10:59 at 9)
+line every 2 min: 10:46 2, 10:48 3, 10:50 5, 10:52 7, 10:58 9, 11:00 6, 11:02 4
+till person makes drinks: sometimes
+baristas at peak: 3
+"""
+
+
+def test_a_timed_observation_keeps_its_clock():
+    seen = read_summary(TIMED)
+    assert (seen.watched_from, seen.watched_to) == ("10:46", "11:04")
+    assert seen.minutes == 16.0
+    assert seen.sample_times[:3] == ["10:46", "10:48", "10:50"]
+    assert seen.line_samples == [2, 3, 5, 7, 9, 6, 4]
+    assert seen.balk_times == ["10:51", "10:53", "10:59"]
+    assert seen.balk_lines == [5, 7, 9]
+
+
+def test_the_pause_shows_as_a_gap_not_as_readings():
+    """Nothing between 10:52 and 10:58 — because nobody was watching, which is
+    the point of being able to pause."""
+    seen = read_summary(TIMED)
+    minutes = [int(at.split(":")[1]) for at in seen.sample_times]
+    gaps = [b - a for a, b in zip(minutes, minutes[1:])]
+    assert max(gaps) == 6
+    assert gaps.count(2) == len(gaps) - 1
+
+
+def test_an_untimed_observation_still_reads():
+    """The older format, without clock times, has to keep working."""
+    seen = read_summary(
+        "Ground Truth, 2026-08-27\nwatched: 15 min\n"
+        "walked out: 2 (line was 6, 8)\n"
+        "line every minute: 3, 4, 6, 8\n"
+    )
+    assert seen.minutes == 15.0
+    assert seen.line_samples == [3, 4, 6, 8]
+    assert seen.balk_lines == [6, 8]
+    assert seen.sample_times == []
+
+
+def test_a_timed_observation_calibrates(params):
+    seen = read_summary(TIMED)
+    overlay = to_overlay(seen, params)
+    capture, produced = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
+    assert 0 < capture < 1
+    assert produced == pytest.approx(seen.typical_line, rel=0.4)

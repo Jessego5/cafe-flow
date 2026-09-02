@@ -60,6 +60,15 @@ class Observation:
     longest_line: int = 0
     balk_lines: list[int] = field(default_factory=list)
     line_samples: list[int] = field(default_factory=list)
+
+    # clock times, where the observation carried them: "10:48 3" rather than a
+    # bare depth. Knowing when a reading was taken means it can be compared
+    # against the same time of day in the model rather than against its
+    # busiest hour, whenever that happened to fall.
+    sample_times: list[str] = field(default_factory=list)
+    balk_times: list[str] = field(default_factory=list)
+    watched_from: str = ""
+    watched_to: str = ""
     press_seconds: list[float] = field(default_factory=list)
     press_size: int = 0
 
@@ -136,8 +145,12 @@ def read_summary(text: str) -> Observation:
             seen.where, seen.on = header.group(1).strip(), header.group(2)
             continue
 
-        if match := re.match(rf"^watched:\s*{_NUMBER}", line):
-            seen.minutes = float(match.group(1))
+        if line.startswith("watched:"):
+            body = line.split(":", 1)[1]
+            if span := re.search(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", line):
+                seen.watched_from, seen.watched_to = span.group(1), span.group(2)
+            if match := re.search(rf"{_NUMBER}\s*min", body):
+                seen.minutes = float(match.group(1))
         elif match := re.match(rf"^orders:\s*{_NUMBER}", line):
             seen.orders = int(float(match.group(1)))
         elif match := re.match(rf"^iced:\s*{_NUMBER}", line):
@@ -146,14 +159,22 @@ def read_summary(text: str) -> Observation:
             seen.food = int(float(match.group(1)))
         elif match := re.match(rf"^walked out:\s*{_NUMBER}", line):
             seen.walked_out = int(float(match.group(1)))
-            if depths := re.search(r"line was ([\d,\s]+)", line):
+            stamped = re.findall(r"(\d{1,2}:\d{2})\s+at\s+(\d+)", line)
+            if stamped:
+                seen.balk_times = [at for at, _ in stamped]
+                seen.balk_lines = [int(depth) for _, depth in stamped]
+            elif depths := re.search(r"line was ([\d,\s]+)", line):
                 seen.balk_lines = [
                     int(value) for value in re.findall(r"\d+", depths.group(1))
                 ]
-        elif line.startswith("line every minute:"):
-            seen.line_samples = [
-                int(value) for value in re.findall(r"\d+", line.split(":", 1)[1])
-            ]
+        elif line.startswith("line every"):
+            body = line.split(":", 1)[1] if ":" in line else ""
+            stamped = re.findall(r"(\d{1,2}:\d{2})\s+(\d+)", line)
+            if stamped:
+                seen.sample_times = [at for at, _ in stamped]
+                seen.line_samples = [int(depth) for _, depth in stamped]
+            else:
+                seen.line_samples = [int(v) for v in re.findall(r"\d+", body)]
         elif line.startswith("food machine:"):
             body = line.split(":", 1)[1]
             seen.machine = body.split(",")[0].strip()
