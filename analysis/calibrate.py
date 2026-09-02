@@ -58,9 +58,24 @@ class Observation:
     food: int = 0
     walked_out: int = 0
     longest_line: int = 0
+    balk_lines: list[int] = field(default_factory=list)
     press_seconds: list[float] = field(default_factory=list)
     press_size: int = 0
+
+    # what the photographs could not settle
+    machine: str = ""
+    holds: int = 0
+    cashier: str = ""
+    baristas: int = 0
+    opens: str = ""
+    closes: str = ""
     notes: list[str] = field(default_factory=list)
+
+    @property
+    def typical_balk_line(self) -> float | None:
+        """How deep the queue was when people gave up. This is what identifies
+        the tolerance; the rate alone only says how many left."""
+        return mean(self.balk_lines) if self.balk_lines else None
 
     @property
     def orders_per_hour(self) -> float:
@@ -117,6 +132,23 @@ def read_summary(text: str) -> Observation:
             seen.food = int(float(match.group(1)))
         elif match := re.match(rf"^walked out:\s*{_NUMBER}", line):
             seen.walked_out = int(float(match.group(1)))
+            if depths := re.search(r"line was ([\d,\s]+)", line):
+                seen.balk_lines = [
+                    int(value) for value in re.findall(r"\d+", depths.group(1))
+                ]
+        elif line.startswith("food machine:"):
+            body = line.split(":", 1)[1]
+            seen.machine = body.split(",")[0].strip()
+            if holds := re.search(rf"holds\s*{_NUMBER}", body):
+                seen.holds = int(float(holds.group(1)))
+        elif line.startswith("till person makes drinks:"):
+            seen.cashier = line.split(":", 1)[1].strip()
+        elif match := re.match(rf"^baristas at peak:\s*{_NUMBER}", line):
+            seen.baristas = int(float(match.group(1)))
+        elif line.startswith("hours:"):
+            body = line.split(":", 1)[1].strip()
+            if "-" in body:
+                seen.opens, _, seen.closes = (part.strip() for part in body.partition("-"))
         elif match := re.match(rf"^longest line:\s*{_NUMBER}", line):
             seen.longest_line = int(float(match.group(1)))
         elif line.startswith("press:"):
@@ -163,6 +195,18 @@ def _rescaled_mix(params: Params, food_share: float) -> dict[str, float]:
     return out
 
 
+#: What each answer implies for the station that heats the food. A press holds
+#: two side by side; anything that heats a pre-made item holds one, which is
+#: what removes the batching. Times are conventional for the machine class and
+#: stay `published`; the class itself is what was observed.
+MACHINES: dict[str, tuple[float, int]] = {
+    "microwave": (60.0, 1),
+    "high-speed oven": (45.0, 1),
+    "panini press": (240.0, 2),
+    "contact grill": (240.0, 2),
+}
+
+
 def to_overlay(seen: Observation, params: Params) -> dict:
     """The observed parameters, ready to be written as `params/observed.yaml`.
 
@@ -186,15 +230,59 @@ def to_overlay(seen: Observation, params: Params) -> dict:
         overlay["mix"].setdefault("source_of", {})["drink"] = "observed"
 
     press: dict = {}
-    if seen.press_mean_s is not None:
+    if seen.press_mean_s is not None:                     # somebody timed it
         press["run_s"] = round(seen.press_mean_s, 1)
+        press["source_of"] = {"run_s": "observed"}
+    elif seen.machine in MACHINES:                        # or just said what it is
+        run_s, holds = MACHINES[seen.machine]
+        press["run_s"] = run_s
+        press["batch_size"] = seen.holds or holds
+        press["source_of"] = {"run_s": "published", "batch_size": "observed"}
     if seen.press_size:
         press["batch_size"] = seen.press_size
+        press.setdefault("source_of", {})["batch_size"] = "observed"
     if press:
-        press["source_of"] = {key: "observed" for key in press}
         overlay["stations"] = {"panini_press": press}
 
+    if seen.baristas:
+        opens = seen.opens or params.meta.sim_start
+        closes = seen.closes or params.meta.sim_end
+        overlay["staffing"] = [
+            {"from": opens, "to": closes, "baristas": seen.baristas, "source": "observed"}
+        ]
+    if seen.opens or seen.closes:
+        overlay["meta"] = {
+            **overlay.get("meta", {}),
+            "sim_start": seen.opens or params.meta.sim_start,
+            "sim_end": seen.closes or params.meta.sim_end,
+            "source_of": {"sim_start": "observed", "sim_end": "observed"},
+        }
+
     return overlay
+
+
+def open_questions(seen: Observation) -> list[str]:
+    """What the observation raises that a config change cannot answer.
+
+    A dedicated cashier is not a parameter: `serve()` always takes a barista
+    for the register, so the shared assumption is in the code and not only in
+    the YAML. Saying so is better than silently modelling something else.
+    """
+    asks: list[str] = []
+    if seen.cashier in ("never",):
+        asks.append(
+            "The till person never makes drinks, so the register does not compete "
+            "for barista time. That is an engine change, not a config one: serve() "
+            "always takes a barista for the register phase."
+        )
+    if seen.machine and seen.machine not in MACHINES:
+        asks.append(f"No timings on file for a {seen.machine!r}; it stays assumed.")
+    if seen.walked_out and not seen.balk_lines:
+        asks.append(
+            "Balks were counted without a queue depth, so the rate can be checked "
+            "but the tolerance cannot be fitted."
+        )
+    return asks
 
 
 def _peak_orders_per_hour(params: Params, seeds: list[int], runner: Runner) -> float:
@@ -269,6 +357,8 @@ class Validation:
     observed_balks_per_hour: float | None
     modelled_balks_per_hour: float | None
     observed_longest_line: int
+    observed_balk_line: float | None
+    modelled_balk_line: float | None
     provenance: str
 
     @property
@@ -304,6 +394,11 @@ class Validation:
             lines.append(
                 f"  balks    observed {self.observed_balks_per_hour:5.0f}/h   "
                 f"modelled {self.modelled_balks_per_hour:5.0f}/h"
+            )
+        if self.observed_balk_line is not None and self.modelled_balk_line is not None:
+            lines.append(
+                f"  gave up  observed {self.observed_balk_line:5.1f} deep  "
+                f"modelled {self.modelled_balk_line:5.1f} deep"
             )
         lines.append(f"  {self.provenance}")
         lines.append(
@@ -343,7 +438,15 @@ def validate(
         if window is not None:
             balks.append(losses["balked"] * 3600.0 / window.length_s)
 
+    depths: list[float] = []
+    for seed in seeds:
+        for event in runner(params, seed):
+            if event.to_state == "balked" and "queue_depth" in event.payload:
+                depths.append(float(event.payload["queue_depth"]))
+
     return Validation(
+        observed_balk_line=seen.typical_balk_line,
+        modelled_balk_line=mean(depths) if depths else None,
         observed_per_hour=seen.orders_per_hour,
         modelled_per_hour=modelled,
         observed_balks_per_hour=seen.balks_per_hour,
