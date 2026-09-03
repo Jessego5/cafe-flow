@@ -534,3 +534,24 @@ def test_a_day_drawn_from_a_curve_is_still_deterministic(root, tmp_path):
     first, second = run(params, 4), run(params, 4)
     assert first.log.digest() == second.log.digest()
     assert first.conserved()
+
+
+def test_every_distribution_consumes_exactly_one_draw(params, root, tmp_path):
+    """Swapping a lognormal for a constant must not re-shuffle every later
+    random number in the run, or no two configurations stay comparable."""
+    import numpy as np
+
+    from sim.balking import sample_minutes
+
+    def next_after(spec):
+        overlay = tmp_path / "dist.yaml"
+        overlay.write_text(f"customers:\n  balk_tolerance_min: {spec}\n")
+        dist = load_params(root / "params" / "base.yaml", overlay).customers.balk_tolerance_min
+        rng = np.random.default_rng(0)
+        sample_minutes(dist, rng)
+        return rng.random()
+
+    lognormal = next_after("{ dist: lognormal, median: 7.0, sigma: 0.45 }")
+    constant = next_after("{ dist: constant, value: 7.0 }")
+    normal = next_after("{ dist: normal, mean: 7.0, sigma: 2.0 }")
+    assert lognormal == constant == normal

@@ -369,3 +369,19 @@ def test_fairness_gap_is_none_when_only_one_channel_showed_up():
     assert gap["walkup_s"] == 100.0
     assert gap["preorder_s"] is None
     assert gap["gap_s"] is None
+
+
+def test_a_balk_leaves_the_queue_it_never_really_joined():
+    """Placed and balked land at the same instant. Ordered by state name,
+    "balked" sorts before "placed", the removal happens before the addition,
+    and the order sits in the queue for the rest of the day."""
+    from analysis.calibrate import _queue_over_time
+    from core.states import State
+
+    log = EventLog("hand", 1)
+    log.emit(EventType.STATE_CHANGE, 100.0, order_id="gone", from_state=None,
+             to_state=State.PLACED, channel="walkup")
+    log.emit(EventType.STATE_CHANGE, 100.0, order_id="gone",
+             from_state=State.PLACED, to_state=State.BALKED, channel="walkup")
+
+    assert _queue_over_time(log, Interval(0.0, 600.0), every_s=60.0) == [0.0] * 10

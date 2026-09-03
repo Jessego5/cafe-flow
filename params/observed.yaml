@@ -1,0 +1,52 @@
+# Ground Truth, observed 2026-09-03. 49 queue readings between 10:20 and 15:44,
+# plus notes across the day.
+#
+# What was seen rather than guessed: the hours, the staffing, what heats the
+# food and how many it holds, that the till is a dedicated station, and the
+# shape of the queue. capture_rate is fitted to reproduce the queue depth.
+#
+# One partial: the till person never makes drinks, so the register should not
+# draw on the barista pool at all. The engine always takes a barista for the
+# register phase, so capacity 1 is as close as the config can get — it stops
+# the register scaling with the crew, but still spends one barista's time.
+
+meta:
+  scenario: ground_truth_observed
+  sim_start: "07:30"
+  sim_end: "16:30"
+  source_of: { sim_start: observed, sim_end: observed }
+  source: assumed
+
+stations:
+  # a high-speed oven, and it holds three
+  panini_press:
+    run_s: 45
+    batch_size: 3
+    source_of: { run_s: published, batch_size: observed }
+  register:
+    capacity: 1
+    source_of: { capacity: observed }
+
+staffing:
+  - { from: "07:30", to: "10:00", baristas: 3, source: observed }
+  - { from: "10:00", to: "13:00", baristas: 5, source: observed }
+  - { from: "13:00", to: "16:30", baristas: 4, source: observed }
+
+arrivals:
+  # Fitted so the simulated queue reproduces the 3.7 people seen on average
+  # across 49 readings. The balk count agrees at the same rate without being
+  # fitted to, which is the only check here that means anything.
+  capture_rate: 0.065
+  source_of: { capture_rate: fitted }
+
+customers:
+  # One person left in a whole day of watching, at a line of eleven. The
+  # assumed seven-minute median had the cafe shedding a third of its demand,
+  # which is not what happens here: people wait.
+  #
+  # This is raised to the least it can be and still be consistent with that one
+  # balk. `time_budget_min` is left alone deliberately — the model still loses
+  # far more customers than were seen leaving, and turning a second patience
+  # knob to bury that would be tuning the fit rather than fixing the model.
+  balk_tolerance_min: { dist: lognormal, median: 20.0, sigma: 0.5 }
+  source_of: { balk_tolerance_min: fitted }

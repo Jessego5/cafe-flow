@@ -35,6 +35,10 @@ def sample_minutes(dist, rng: np.random.Generator) -> float:
     if kind == "normal":
         return float(rng.normal(dist.mean, dist.sigma))
     if kind == "constant":
+        # Draw and discard. Every distribution has to consume exactly one
+        # number, or swapping a lognormal for a constant re-shuffles every
+        # later draw in the run and nothing else stays comparable.
+        rng.random()
         return float(dist.value)
     raise ConfigError(f"cannot draw from distribution {kind!r}")
 

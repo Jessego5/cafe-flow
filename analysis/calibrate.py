@@ -436,8 +436,13 @@ def _queue_over_time(log, window, every_s: float = 60.0) -> list[float]:
         str(State.READY), str(State.PICKED_UP), str(State.BALKED),
         str(State.ABANDONED), str(State.CANCELLED),
     }
+    # Ordered by the log's own sequence, not by the state's name. A balk is
+    # placed and abandoned at the same instant, and sorting those two by string
+    # puts "balked" before "placed" — removing the order before it was added,
+    # so it stayed in the queue for the rest of the day and every balk inflated
+    # the measurement.
     moves = sorted(
-        (event.t_s, event.order_id, event.to_state)
+        (event.t_s, event.seq, event.order_id, event.to_state)
         for event in log
         if event.type is EventType.STATE_CHANGE
         and event.order_id is not None
@@ -449,7 +454,7 @@ def _queue_over_time(log, window, every_s: float = 60.0) -> list[float]:
     at = window.start_s
     while at < window.end_s:
         while index < len(moves) and moves[index][0] <= at:
-            _, order_id, to_state = moves[index]
+            _, _, order_id, to_state = moves[index]
             if to_state == str(State.PLACED):
                 waiting.add(order_id)
             elif to_state in leaves:
