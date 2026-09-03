@@ -1,0 +1,7 @@
+# A second register. The largest lever the calibrated model finds, and the only
+# one that touches the station the observation showed to be the constraint.
+meta:
+  scenario: second_till
+  source: assumed
+stations:
+  register: { capacity: 2, source_of: { capacity: assumed } }

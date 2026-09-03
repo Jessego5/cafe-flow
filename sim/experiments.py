@@ -86,6 +86,21 @@ ARMS: dict[str, Arm] = {
         ("params/experiments/microwave.yaml", "params/experiments/batch.yaml"),
         "the same, with batching on — which now has only the wand to work with",
     ),
+    "shown_wait": Arm(
+        "shown_wait",
+        ("params/observed.yaml", "params/experiments/shown_wait.yaml"),
+        "the wait on a screen; some people come back twenty minutes later",
+    ),
+    "second_till": Arm(
+        "second_till",
+        ("params/observed.yaml", "params/experiments/second_till.yaml"),
+        "a second register open at the peaks",
+    ),
+    "observed": Arm(
+        "observed",
+        ("params/observed.yaml",),
+        "the cafe as it was measured on 2026-09-03",
+    ),
     "batched": Arm(
         "batched",
         ("params/experiments/batch.yaml",),

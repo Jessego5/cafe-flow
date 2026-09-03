@@ -251,3 +251,80 @@ def test_a_preorder_is_collected_when_it_was_wanted(tmp_path_factory):
         assert order.entered_at(State.PICKED_UP) >= arrival.wanted_at_s - 1e-9
         assert order.placed_at_s <= arrival.wanted_at_s
     assert collected > 0
+
+
+# --------------------------------------------------------------------------
+# showing people the wait
+# --------------------------------------------------------------------------
+
+
+def _shown(tmp_path_factory, name, body):
+    return _with(tmp_path_factory, name, "customers:\n" + body + "  source: assumed\n")
+
+
+def test_nothing_defers_when_nothing_is_shown(params):
+    """Off by default. A cafe with no sign changes nobody's mind."""
+    assert params.customers.shown_wait is False
+    result = run(params, 0)
+    assert not [e for e in result.log if e.payload.get("deferred")]
+
+
+def test_showing_the_wait_moves_people_out_of_the_peak(tmp_path_factory):
+    params = _shown(tmp_path_factory, "shown",
+                    "  shown_wait: true\n  shift_fraction: 0.5\n"
+                    "  shift_threshold_min: 5.0\n  shift_delay_min: 20.0\n")
+    result = run(params, 0)
+    deferred = [e for e in result.log if e.payload.get("deferred")]
+    assert deferred
+    for event in deferred:
+        assert event.payload["shown_wait_s"] > 5 * 60
+        assert event.payload["queue_depth"] > 0
+
+
+def test_a_deferred_customer_is_delayed_not_lost(tmp_path_factory):
+    """The whole difference from balking: deferred revenue, not lost revenue."""
+    params = _shown(tmp_path_factory, "deferred",
+                    "  shown_wait: true\n  shift_fraction: 1.0\n"
+                    "  shift_threshold_min: 5.0\n  shift_delay_min: 20.0\n")
+    result = run(params, 0)
+    census = result.census()
+    assert census["placed"] == len(result.arrivals)      # everyone still orders
+    assert result.conserved()
+
+
+def test_nobody_defers_twice(tmp_path_factory):
+    """Coming back to the same queue forever is not a model of anything."""
+    params = _shown(tmp_path_factory, "once",
+                    "  shown_wait: true\n  shift_fraction: 1.0\n"
+                    "  shift_threshold_min: 0.5\n  shift_delay_min: 5.0\n")
+    result = run(params, 0)
+    per_customer = {}
+    for event in result.log:
+        if event.payload.get("deferred"):
+            per_customer[event.customer_id] = per_customer.get(event.customer_id, 0) + 1
+    assert per_customer
+    assert max(per_customer.values()) == 1
+
+
+def test_someone_who_orders_ahead_has_nothing_to_defer(tmp_path_factory):
+    params = _shown(tmp_path_factory, "ahead",
+                    "  preorder_adoption: 1.0\n  shown_wait: true\n"
+                    "  shift_fraction: 1.0\n  shift_threshold_min: 0.5\n"
+                    "  shift_delay_min: 20.0\n")
+    result = run(params, 0)
+    assert not [e for e in result.log if e.payload.get("deferred")]
+
+
+def test_the_draw_is_fixed_so_the_day_stays_reproducible(tmp_path_factory):
+    params = _shown(tmp_path_factory, "det",
+                    "  shown_wait: true\n  shift_fraction: 0.5\n"
+                    "  shift_threshold_min: 5.0\n  shift_delay_min: 20.0\n")
+    assert run(params, 3).log.digest() == run(params, 3).log.digest()
+
+
+def test_showing_the_wait_without_saying_what_long_means_is_refused(tmp_path_factory):
+    """A threshold and a delay are durations, and durations live in config."""
+    from core.params import ConfigError
+
+    with pytest.raises(ConfigError, match="shift_threshold_min"):
+        _shown(tmp_path_factory, "vague", "  shown_wait: true\n  shift_fraction: 0.5\n")

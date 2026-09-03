@@ -18,12 +18,15 @@ import numpy as np
 
 from core.params import SECONDS_PER_MINUTE, ConfigError, Params
 from core.types import Channel
+from core.waiting import estimate_wait_s, nominal_seconds_per_order, observable_queue_depth
 
 __all__ = [
     "sample_minutes",
     "nominal_seconds_per_order",
     "estimate_wait_s",
     "observable_queue_depth",
+    "draw_channel",
+    "preorder_lead_s",
 ]
 
 
@@ -41,51 +44,6 @@ def sample_minutes(dist, rng: np.random.Generator) -> float:
         rng.random()
         return float(dist.value)
     raise ConfigError(f"cannot draw from distribution {kind!r}")
-
-
-def nominal_seconds_per_order(params: Params, baristas: int) -> float:
-    """How long one person in the line is worth, roughly.
-
-    Derived rather than configured: the mix-weighted hands-on time of an order,
-    divided by the number of people working. It is a first-order estimate and
-    is meant to be — it stands in for what a customer can infer from watching
-    the counter, not for what the cafe actually achieves.
-    """
-    from core.menu import make_item, service_seconds
-
-    per_item: list[float] = []
-    for name, share in params.mix.drink.items():
-        spec = params.menu_item(name)
-        milk = next(iter(params.mix.milk)) if spec.requires_milk else None
-        item = make_item(
-            name, params, order_id="nominal", item_id=f"nominal-{name}", milk_type=milk
-        )
-        per_item.append(share * service_seconds(item))
-
-    register = params.station("register")
-    ringing_up = (register.base_s or 0.0) + (register.per_item_s or 0.0)
-    return (sum(per_item) + ringing_up) / max(1, baristas)
-
-
-def estimate_wait_s(depth: int, seconds_per_order: float) -> float:
-    """What the customer thinks the queue will cost them.
-
-    People ahead times how long each looks like taking. Nobody standing at a
-    counter computes anything better than this.
-    """
-    return max(0, depth) * seconds_per_order
-
-
-def observable_queue_depth(states) -> int:
-    """How many people are visibly still waiting for their order.
-
-    Anything already on the handoff shelf is not part of the line a customer
-    sees themselves joining.
-    """
-    from core.states import State
-
-    waiting = {State.PLACED, State.ACCEPTED, State.IN_PROGRESS}
-    return sum(1 for state in states if State(state) in waiting)
 
 
 def draw_channel(params: Params, rng: np.random.Generator) -> Channel:

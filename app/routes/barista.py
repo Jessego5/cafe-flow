@@ -15,6 +15,7 @@ from core.params import Params
 from core.policies import make_policy, plan_batches
 from core.states import State
 from core.types import Item
+from core.waiting import estimate_wait_s, nominal_seconds_per_order, observable_queue_depth
 
 router = APIRouter(tags=["barista"])
 
@@ -113,6 +114,12 @@ async def get_queue() -> dict:
         orders = [order_payload(row, items, now_s=now_s) for row, items in rows]
         batches = suggested_batches(rows, params, now_s)
 
+    # The same estimate the simulator uses to decide who gives up. If the two
+    # disagreed, the cafe would be telling people one thing while the model
+    # assumed another.
+    depth = observable_queue_depth(order["state"] for order in orders)
+    per_order = nominal_seconds_per_order(params, params.baristas_at(now_s))
+
     return {
         "now_s": now_s,
         "env": str(settings.env),
@@ -120,6 +127,9 @@ async def get_queue() -> dict:
         "policy": params.policy.name,
         "orders": orders,
         "batches": batches,
+        "queue_depth": depth,
+        "wait_estimate_s": round(estimate_wait_s(depth, per_order), 1),
+        "seconds_per_order": round(per_order, 1),
     }
 
 

@@ -23,7 +23,7 @@ import simpy
 from core.capacity import StationCapacityModel
 from core.events import EventLog, EventType
 from core.menu import make_order
-from core.params import Params, load_params
+from core.params import SECONDS_PER_MINUTE, Params, load_params
 from core.states import LOST, State, place, promise, transition
 from core.types import Channel, Item, Order, Task, TaskKind
 from sim.arrivals import Arrival, generate_arrivals
@@ -432,6 +432,11 @@ class Cafe:
         if arrival.at_s > self.env.now:
             yield self.env.timeout(arrival.at_s - self.env.now)
 
+        if self.defers(arrival):
+            yield self.env.timeout(
+                self.params.customers.shift_delay_min * SECONDS_PER_MINUTE
+            )
+
         self.log.emit(
             EventType.ARRIVAL,
             self.env.now,
@@ -466,6 +471,40 @@ class Cafe:
             return
 
         yield self.env.process(self.serve(order, arrival))
+
+    def defers(self, arrival: Arrival) -> bool:
+        """Does this customer see the wait and decide to come back later?
+
+        Only walk-ups, only once, and only if the cafe is showing a number at
+        all. Unlike a balk this is deferred revenue rather than lost revenue —
+        which is exactly why it is worth something even where nobody balks.
+        """
+        rules = self.params.customers
+        if not rules.shown_wait or arrival.channel is not Channel.WALKUP:
+            return False
+        if arrival.defer_roll >= rules.shift_fraction:
+            return False
+
+        depth = observable_queue_depth(order.state for order in self.orders.values())
+        shown_s = estimate_wait_s(depth, self.nominal_wait_per_person())
+        if shown_s <= rules.shift_threshold_min * SECONDS_PER_MINUTE:
+            return False
+
+        self.log.emit(
+            EventType.ARRIVAL,
+            self.env.now,
+            customer_id=arrival.customer_id,
+            order_id=arrival.order_id,
+            channel=arrival.channel,
+            actor="customer",
+            payload={
+                "deferred": True,
+                "shown_wait_s": round(shown_s, 1),
+                "queue_depth": depth,
+                "by_min": rules.shift_delay_min,
+            },
+        )
+        return True
 
     def nominal_wait_per_person(self) -> float:
         """Cached per staffing level: it walks the whole menu to work out what

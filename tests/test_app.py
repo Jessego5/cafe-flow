@@ -552,3 +552,32 @@ def test_a_finished_order_drops_out_of_the_suggestions(app_env, tmp_path, monkey
             batching.post(f"/orders/{first['order_id']}/transition", json={"to": state})
 
         assert batching.get("/queue").json()["batches"] == []
+
+
+def test_the_app_shows_the_wait_the_model_would_assume(client):
+    """One estimate, in core, used by both. If they disagreed the cafe would
+    tell people one thing while the model assumed another."""
+    from core.waiting import estimate_wait_s, nominal_seconds_per_order
+
+    empty = client.get("/menu").json()
+    assert empty["queue_depth"] == 0
+    assert empty["wait_estimate_s"] == 0
+
+    for _ in range(4):
+        place(client, LATTE)
+
+    menu = client.get("/menu").json()
+    queue = client.get("/queue").json()
+    assert menu["queue_depth"] == queue["queue_depth"] == 4
+
+    params = get_params()
+    per_order = nominal_seconds_per_order(params, params.baristas_at(8 * 3600))
+    assert menu["wait_estimate_s"] == pytest.approx(estimate_wait_s(4, per_order), abs=0.1)
+    assert menu["wait_estimate_s"] == queue["wait_estimate_s"]
+
+
+def test_a_drink_on_the_shelf_is_not_something_to_wait_behind(client):
+    order = place(client, LATTE)
+    for state in ("accepted", "in_progress", "ready"):
+        client.post(f"/orders/{order['order_id']}/transition", json={"to": state})
+    assert client.get("/menu").json()["queue_depth"] == 0

@@ -40,6 +40,7 @@ class Arrival:
     time_budget_s: float = float("inf")
     wanted_at_s: float | None = None
     no_show: bool = False
+    defer_roll: float = 1.0
 
     @property
     def size(self) -> int:
@@ -176,6 +177,7 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
         tolerance_s = sample_minutes(params.customers.balk_tolerance_min, rng) * SECONDS_PER_MINUTE
         budget_s = sample_minutes(params.customers.time_budget_min, rng) * SECONDS_PER_MINUTE
         no_show = rng.random() < params.customers.no_show_rate
+        defer_roll = float(rng.random())
 
         placed_at_s = (
             max(opens, wanted_at_s - lead_s)
@@ -195,6 +197,7 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
                 time_budget_s=budget_s,
                 wanted_at_s=wanted_at_s,
                 no_show=no_show and channel is Channel.PREORDER,
+                defer_roll=defer_roll,
             )
         )
 
@@ -213,6 +216,7 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
             time_budget_s=arrival.time_budget_s,
             wanted_at_s=arrival.wanted_at_s,
             no_show=arrival.no_show,
+            defer_roll=arrival.defer_roll,
         )
         for index, arrival in enumerate(drawn)
     ]

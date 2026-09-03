@@ -5,8 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter
 from sqlmodel import select
 
-from app.config import get_params
-from app.db import MenuItemRow, session_scope
+from app.config import day_seconds, get_params
+from app.db import MenuItemRow, open_orders, session_scope
+from core.states import State
+from core.waiting import estimate_wait_s, nominal_seconds_per_order, observable_queue_depth
 
 router = APIRouter(tags=["menu"])
 
@@ -16,6 +18,9 @@ async def get_menu() -> dict:
     params = get_params()
     with session_scope() as session:
         rows = {row.name: row for row in session.exec(select(MenuItemRow)).all()}
+        waiting = open_orders(session)
+    depth = observable_queue_depth(row.state for row, _ in waiting)
+    per_order = nominal_seconds_per_order(params, params.baristas_at(day_seconds(params)))
 
     items = []
     for name, spec in params.menu.items():
@@ -39,6 +44,13 @@ async def get_menu() -> dict:
         "milks": sorted(params.mix.milk),
         "serve_styles": list(params.mix.serve),
         "bottleneck_station": params.bottleneck_station,
+        # What the queue looks like before you commit to joining it. The point
+        # of showing it is not accuracy for its own sake: someone who sees
+        # twelve minutes at noon and comes back at twenty past has moved
+        # themselves out of the peak, which is worth more than anything the bar
+        # can do about it.
+        "queue_depth": depth,
+        "wait_estimate_s": round(estimate_wait_s(depth, per_order), 1),
         # every surface states how much of what it shows is still guessed
         "provenance": params.provenance_report().caption(),
     }

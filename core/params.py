@@ -462,7 +462,29 @@ class CustomersParams(_Strict):
     balk_tolerance_min: Dist
     preorder_adoption: float = Field(ge=0, le=1)
     no_show_rate: float = Field(ge=0, le=1)
+
+    # Showing people the wait does not add capacity; it moves arrivals. Someone
+    # who sees twelve minutes at noon and comes back at twenty past has taken
+    # themselves out of the peak, and their order is deferred rather than lost.
+    # That is the difference between this and balking, and it is the whole
+    # reason it is worth anything.
+    shown_wait: bool = False
+    shift_fraction: float = Field(default=0.0, ge=0, le=1)
+    # No defaults: a threshold and a delay are durations, and durations live in
+    # config (ground rule 1). A cafe that shows the wait has to say what counts
+    # as long and how much later people come back.
+    shift_threshold_min: float | None = Field(default=None, gt=0)
+    shift_delay_min: float | None = Field(default=None, gt=0)
     source: Source | None = None
+
+    @model_validator(mode="after")
+    def _showing_it_needs_both(self) -> "CustomersParams":
+        if self.shown_wait and (self.shift_threshold_min is None or self.shift_delay_min is None):
+            raise ValueError(
+                "shown_wait needs shift_threshold_min and shift_delay_min: what "
+                "counts as a long wait, and how much later people come back"
+            )
+        return self
 
 
 class PolicyParams(_Strict):

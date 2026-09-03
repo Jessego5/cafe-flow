@@ -1,0 +1,24 @@
+# Put the wait on a screen where people can see it before they commit.
+#
+# It adds no capacity. What it does is move arrivals: someone who sees twelve
+# minutes at noon and comes back at twenty past has taken themselves out of the
+# peak. Their order is deferred, not lost, and that is the whole difference
+# between this and balking — which is why it is worth something at a cafe where
+# almost nobody balks.
+#
+# It is the one lever here that targets what the observation found: two sharp
+# spikes against a single till, with deep troughs either side.
+#
+# The fraction is assumed. Nobody has ever shown these customers a number, so
+# there is no way to know how many would act on one.
+
+meta:
+  scenario: shown_wait
+  source: assumed
+
+customers:
+  shown_wait: true
+  shift_threshold_min: 5.0
+  shift_fraction: 0.4
+  shift_delay_min: 20.0
+  source: assumed
