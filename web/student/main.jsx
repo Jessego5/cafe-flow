@@ -1,204 +1,145 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { getConfig, getMenu, getOrder, placeOrder, money, elapsed, STATE_LABEL } from '../shared/api.js'
+import { getConfig, getMenu, placeOrder } from '../shared/api.js'
 import { useTicker } from '../shared/useLive.js'
-import '../shared/styles.css'
+import { Home } from './Home.jsx'
+import { OrderTab, lineKey } from './OrderTab.jsx'
+import { OrdersTab } from './OrdersTab.jsx'
+import { serviceHours } from './hours.js'
+import { onLive } from './stream.js'
+import { useMyOrders } from './useMyOrders.js'
+import './student.css'
 
-function MenuCard({ item, milks, onAdd }) {
-  const [milk, setMilk] = useState(milks[0])
-  const [variant, setVariant] = useState(item.default_variant || null)
-  return (
-    <div className="card">
-      <div className="spread">
-        <strong>{item.name.replace(/_/g, ' ')}</strong>
-        <span className="number">{money(item.price_cents)}</span>
-      </div>
-      <div className="muted">{item.stations.join(' → ')}</div>
-      {item.variants.length > 0 && (
-        <div className="row" style={{ marginTop: '0.6rem' }}>
-          {item.variants.map((option) => (
-            <button
-              key={option}
-              className={option === variant ? 'primary' : ''}
-              onClick={() => setVariant(option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      )}
-      {item.requires_milk && (
-        <div className="row" style={{ marginTop: '0.6rem' }}>
-          <label className="muted" htmlFor={`milk-${item.name}`}>Milk</label>
-          <select id={`milk-${item.name}`} value={milk} onChange={(e) => setMilk(e.target.value)}>
-            {milks.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      <button
-        className="primary wide"
-        style={{ marginTop: '0.6rem' }}
-        onClick={() =>
-          onAdd({
-            drink: item.name,
-            milk_type: item.requires_milk ? milk : null,
-            variant: item.variants.length > 0 ? variant : null,
-          })
-        }
-      >
-        Add
-      </button>
-    </div>
-  )
-}
+const TABS = [
+  { key: 'home', label: 'Home' },
+  { key: 'order', label: 'Order' },
+  { key: 'mine', label: 'My Orders' },
+]
 
-function Status({ orderId, onNew }) {
-  const [order, setOrder] = useState(null)
+// `/menu` carries the queue depth and the wait estimate along with the board,
+// so it is refetched on every event rather than loaded once: the number a
+// customer decides on has to be the number the bar is actually running.
+function useBoard() {
+  const [menu, setMenu] = useState(null)
   const [error, setError] = useState(null)
-  const now = useTicker()
 
   useEffect(() => {
     let alive = true
     const refresh = () =>
-      getOrder(orderId)
-        .then((next) => alive && setOrder(next))
+      getMenu()
+        .then((next) => alive && (setMenu(next), setError(null)))
         .catch((err) => alive && setError(err.message))
     refresh()
-    const source = new EventSource('/stream')
-    source.addEventListener('state_change', refresh)
-    source.onopen = refresh
+    const stop = onLive(refresh)
+    const safety = setInterval(refresh, 20000)
     return () => {
       alive = false
-      source.close()
+      clearInterval(safety)
+      stop()
     }
-  }, [orderId])
+  }, [])
 
-  if (error) return <p className="error">{error}</p>
-  if (!order) return <p className="muted">Loading…</p>
-
-  const waiting = (now - Date.parse(order.placed_at)) / 1000
-  return (
-    <div className="card">
-      <div className="spread">
-        <span className="number" style={{ fontSize: '2.5rem' }}>#{order.number}</span>
-        <span className="pill">{STATE_LABEL[order.state] || order.state}</span>
-      </div>
-      <ul className="items">
-        {order.items.map((item) => (
-          <li key={item.item_id}>
-            {item.variant ? `${item.variant} ` : ''}
-            {item.drink.replace(/_/g, ' ')}
-            {item.milk_type ? ` · ${item.milk_type}` : ''}
-          </li>
-        ))}
-      </ul>
-      <div className="muted">
-        {order.state === 'ready' ? 'Ready on the shelf' : `Waiting ${elapsed(waiting)}`} ·{' '}
-        {money(order.price_cents)} · payment {order.payment.status}
-      </div>
-      <button className="ghost wide" style={{ marginTop: '0.6rem' }} onClick={onNew}>
-        Start another order
-      </button>
-    </div>
-  )
+  return { menu, error }
 }
 
 function App() {
+  const [tab, setTab] = useState('home')
   const [config, setConfig] = useState(null)
-  const [menu, setMenu] = useState(null)
   const [cart, setCart] = useState([])
-  const [orderId, setOrderId] = useState(null)
-  const [error, setError] = useState(null)
+  const [channel, setChannel] = useState('walkup')
   const [placing, setPlacing] = useState(false)
+  const [error, setError] = useState(null)
+
+  const pane = useRef(null)
+  const { menu, error: boardError } = useBoard()
+  const { orders, fetchedAt, live, remember } = useMyOrders()
+  const now = useTicker()
 
   useEffect(() => {
-    Promise.all([getConfig(), getMenu()])
-      .then(([c, m]) => {
-        setConfig(c)
-        setMenu(m)
-      })
-      .catch((err) => setError(err.message))
+    getConfig().then(setConfig).catch((err) => setError(err.message))
   }, [])
 
-  const submit = () => {
+  // One scroller serves all three tabs, so it goes back to the top when the
+  // tab changes; otherwise the board opens halfway down where you left it.
+  useEffect(() => {
+    pane.current?.scrollTo({ top: 0 })
+  }, [tab])
+
+  const hours = serviceHours(config, new Date(now))
+  const since = (now - fetchedAt) / 1000     // how stale the orders on screen are
+
+  const openOrdering = (which) => {
+    setChannel(which)
+    setTab('order')
+  }
+
+  const place = (close) => {
     setPlacing(true)
-    placeOrder(cart)
+    setError(null)
+    placeOrder(cart, { channel })
       .then((order) => {
-        setOrderId(order.order_id)
+        remember(order.order_id)
         setCart([])
+        close?.()
+        setTab('mine')
       })
       .catch((err) => setError(err.message))
       .finally(() => setPlacing(false))
   }
 
-  const total = menu
-    ? cart.reduce((sum, line) => sum + menu.items.find((i) => i.name === line.drink).price_cents, 0)
-    : 0
-
   return (
-    <>
-      <header className="bar">
-        <h1>{config ? config.cafe.name : 'Campus Cafe'} · demo</h1>
-        <span className="muted">{config ? `open ${config.opens_at}–${config.closes_at}` : ''}</span>
-      </header>
-      <main>
-        {error && <p className="error">{error}</p>}
-        {orderId ? (
-          <Status orderId={orderId} onNew={() => setOrderId(null)} />
-        ) : (
-          <>
-            <h2>Menu</h2>
-            {menu && (
-              <div className="grid">
-                {menu.items.map((item) => (
-                  <MenuCard
-                    key={item.name}
-                    item={item}
-                    milks={menu.milks}
-                    onAdd={(line) => setCart((current) => [...current, line])}
-                  />
-                ))}
-              </div>
-            )}
-
-            <h2>Cart</h2>
-            {cart.length === 0 ? (
-              <p className="muted">Nothing yet.</p>
-            ) : (
-              <div className="card">
-                <ul className="items">
-                  {cart.map((line, index) => (
-                    <li key={index} className="spread">
-                      <span>
-                        {line.variant ? `${line.variant} ` : ''}
-                        {line.drink.replace(/_/g, ' ')}
-                        {line.milk_type ? ` · ${line.milk_type}` : ''}
-                      </span>
-                      <button
-                        className="ghost"
-                        onClick={() => setCart(cart.filter((_, i) => i !== index))}
-                      >
-                        remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <div className="spread" style={{ marginTop: '0.6rem' }}>
-                  <span className="number">{money(total)}</span>
-                  <button className="primary big" disabled={placing} onClick={submit}>
-                    {placing ? 'Placing…' : 'Place order'}
-                  </button>
-                </div>
-                <p className="muted">Payment is stubbed — pay at the register.</p>
-              </div>
-            )}
-          </>
+    <div className="phone">
+      <div className={`pane${tab === 'order' ? ' has-dock' : ''}`} ref={pane}>
+        {tab === 'home' && (
+          <Home
+            config={config}
+            menu={menu}
+            hours={hours}
+            live={live}
+            since={since}
+            onOrder={openOrdering}
+          />
         )}
-      </main>
-      <footer>{menu ? menu.provenance : ''}</footer>
-    </>
+        {tab === 'order' && (
+          <OrderTab
+            config={config}
+            menu={menu}
+            hours={hours}
+            cart={cart}
+            channel={channel}
+            onChannel={setChannel}
+            onAdd={(lines) => setCart((current) => [...current, ...lines])}
+            onRemove={(key) => setCart((current) => current.filter((line) => lineKey(line) !== key))}
+            onPlace={place}
+            placing={placing}
+            error={error}
+          />
+        )}
+        {tab === 'mine' && (
+          <OrdersTab
+            config={config}
+            menu={menu}
+            hours={hours}
+            orders={orders}
+            since={since}
+            onOrder={() => setTab('order')}
+          />
+        )}
+
+        {(error || boardError) && tab !== 'order' && (
+          <p className="strike" style={{ padding: '0 var(--pad)' }}>{error || boardError}</p>
+        )}
+      </div>
+
+      <nav className="tabbar">
+        {TABS.map(({ key, label }) => (
+          <button key={key} className={key === tab ? 'on' : ''} onClick={() => setTab(key)}>
+            {label}
+            {key === 'mine' && live.length > 0 && <span className="dot" />}
+          </button>
+        ))}
+      </nav>
+    </div>
   )
 }
 

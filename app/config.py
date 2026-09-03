@@ -44,8 +44,16 @@ class Settings:
     def __init__(self) -> None:
         self.env = Env(os.environ.get("CAFE_ENV", Env.DEV))
         self.db_path = Path(os.environ.get("CAFE_DB", ROOT / "out" / "cafe.db"))
+        # base plus whatever has actually been observed, which is the stack
+        # `deploy/entrypoint.sh` builds in production. A local run that loaded
+        # base alone would serve the assumed hours and the assumed staffing
+        # while the observed file sat right next to it saying otherwise.
+        default_params = str(ROOT / "params" / "base.yaml")
+        observed = ROOT / "params" / "observed.yaml"
+        if observed.is_file():
+            default_params = f"{default_params}:{observed}"
         self.param_files = [
-            Path(p) for p in os.environ.get("CAFE_PARAMS", str(ROOT / "params" / "base.yaml")).split(":")
+            Path(p) for p in os.environ.get("CAFE_PARAMS", default_params).split(":")
         ]
         self.web_dist = Path(os.environ.get("CAFE_WEB_DIST", ROOT / "web" / "dist"))
         self.heartbeat_s = float(os.environ.get("CAFE_SSE_HEARTBEAT_S", "15"))
