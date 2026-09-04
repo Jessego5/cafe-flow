@@ -1,7 +1,7 @@
 import React from 'react'
-import { FEATURE, blurb, title } from './catalog.js'
+import { FEATURE, nameLines, title } from './catalog.js'
 import { Price } from './Price.jsx'
-import { SeasonalArt } from './marks.jsx'
+import cafe from './cafe.webp'
 import { Ticket } from './Ticket.jsx'
 
 const minutes = (seconds) => Math.max(1, Math.round(seconds / 60))
@@ -22,11 +22,11 @@ function Wait({ menu, hours }) {
       <div className="spread" style={{ marginTop: '0.35rem' }}>
         <div>
           <div className="big">
-            {hours && !hours.open ? '—' : depth === 0 ? 'No wait' : `${minutes(wait)} min`}
+            {wait == null ? '—' : depth === 0 ? 'No wait' : `${minutes(wait)} min`}
           </div>
           <div className="hint">
-            {hours && !hours.open
-              ? hours.notice
+            {wait == null
+              ? hours?.notice || 'Closed'
               : depth === 0
                 ? 'Nobody ahead of you'
                 : `${depth} ${depth === 1 ? 'order' : 'orders'} ahead of you`}
@@ -42,12 +42,17 @@ function Wait({ menu, hours }) {
 
 export function Home({ config, menu, hours, live, since, onOrder }) {
   const byName = new Map((menu?.items || []).map((item) => [item.name, item]))
-  const seasonal = byName.get(FEATURE.seasonal)
-  const returning = byName.get(FEATURE.returning)
+  const featured = FEATURE.items.map((name) => byName.get(name)).filter(Boolean)
+  const [head, tail] = nameLines(config ? config.cafe.name : '')
 
   return (
     <div className="home">
-      <div className="chrome">
+      {/* The building, drawn. It is the one image on this screen that says
+          where you are going to be standing. Multiply blending drops the
+          sketch's white paper into the page's own, so there is no plate edge
+          around it. */}
+      <div className="banner">
+        <img src={cafe} alt={`${config ? config.cafe.name : 'The cafe'}, drawn from the street`} />
         <div className="capsule">
           <span>{config ? config.cafe.name : 'Cafe'}</span>
           <span className="rule" />
@@ -56,33 +61,25 @@ export function Home({ config, menu, hours, live, since, onOrder }) {
       </div>
 
       <div className="hero">
-        <span className="eyebrow">{FEATURE.eyebrow}</span>
         <h1>
-          {FEATURE.headline[0]}
+          {head}
           <br />
-          <em>{FEATURE.headline[1]}</em>
+          <em>{tail}</em>
         </h1>
-        <div className="art">
-          <SeasonalArt />
-        </div>
+        <span className="hint">{FEATURE.pouring}</span>
       </div>
 
+      {/* The four the bar makes most, by the drink shares in params. Nothing
+          here is billed as new or returning: the boards say no such thing, and
+          this app should not either. */}
       <div className="feature">
-        {seasonal && (
-          <div className="line">
-            <span className="name">{title(seasonal.name)}</span>
-            <span className="tag">New</span>
-            <Price cents={seasonal.price_cents} />
+        <span className="eyebrow">Most ordered</span>
+        {featured.map((item) => (
+          <div className="line" key={item.name}>
+            <span className="name">{title(item.name)}</span>
+            <Price cents={item.price_cents} />
           </div>
-        )}
-        {returning && (
-          <div className="line">
-            <span className="name">{title(returning.name)}</span>
-            <span className="tag back">Back</span>
-            <Price cents={returning.price_cents} />
-          </div>
-        )}
-        {seasonal && <p className="hint" style={{ margin: 0 }}>{blurb(seasonal.name)}</p>}
+        ))}
       </div>
 
       {/* The two front doors. Ordering ahead is the thing this cafe is trying

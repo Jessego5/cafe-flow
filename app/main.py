@@ -30,7 +30,14 @@ from app.stream import router as stream_router
 
 log = logging.getLogger("cafe")
 
-VIEWS = {"/": "student.html", "/bar": "barista.html", "/pickup": "display.html"}
+VIEWS = {
+    "/": "student.html",
+    "/bar": "barista.html",
+    "/pickup": "display.html",
+    # the student view inside a drawn phone, for looking at it on a desktop.
+    # Served from here rather than opened as a file so its API calls resolve.
+    "/frame": "frame.html",
+}
 
 
 @asynccontextmanager

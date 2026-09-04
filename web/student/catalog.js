@@ -45,11 +45,30 @@ export function milkOrder(milks) {
   return [...first, ...milks.filter((milk) => !first.includes(milk))]
 }
 
-// Blurbs describe the real build. Where a drink's plan is two stations, the
-// blurb names both, in the order the bar works them.
-const BLURB = {
+// What the boards themselves say, transcribed from the photographs. Where the
+// cafe has written a description, it is the cafe's description that shows.
+const BOARD = {
+  espresso: 'A single shot.',
+  black_tie: 'Cold brew sweetened with condensed milk, chicory syrup, half & half.',
+  brewed_tea: 'Black, green, or herbal.',
+  iced_tea: 'Black, green, or wild berry hibiscus.',
+  italian_herb_chicken:
+    'Chicken, prosciutto, arugula, provolone, sun-dried tomato and herb aioli on multi-grain bread.',
+  mona_lisa: 'Mozzarella cheese, fresh basil, tomato, balsamic glaze & pesto on sourdough.',
+  // one word of this line was not legible in the photograph and is left out
+  // rather than guessed at
+  monterey_turkey: 'Smoked turkey, marble monterey cheese, avocado and zesty sauce on sourdough bread.',
+  caesar_salad:
+    'Chopped romaine lettuce, parmesan cheese, croutons, creamy Caesar dressing and choice of protein.',
+  build_your_own_salad:
+    'Start with fresh greens, add up to 4 toppings, 1 premium topping, garnish & top it off with dressing.',
+}
+
+// For the rest the board gives a name and a price and nothing else, so these
+// describe the build instead — each one is that item's station plan in words,
+// and nothing is claimed here that `params/base.yaml` does not already say.
+const DERIVED = {
   drip_coffee: 'Off the urn, poured to order. The fastest cup on the board.',
-  espresso: 'One shot, pulled to a 27-second standard. Nothing else in the way.',
   americano: 'Two shots, lengthened with hot water.',
   cappuccino: 'Two shots under eight ounces of steamed milk. Hot only.',
   latte: 'Two shots under twelve ounces of steamed milk, or over ice.',
@@ -58,10 +77,7 @@ const BLURB = {
   mocha: 'Two shots, chocolate, steamed milk. Hot or over ice.',
   white_chocolate_mocha: 'White chocolate in place of dark, same build.',
   cold_brew: 'Steeped cold and poured from the tap. No heat anywhere in it.',
-  cold_brew_oat_latte: 'Cold brew from the tap, oat milk over ice. Iced by definition.',
-  black_tie: 'Cold brew, chicory, condensed milk and half & half.',
-  brewed_tea: 'Leaf tea, brewed hot to order.',
-  iced_tea: 'Brewed strong, poured long over ice.',
+  cold_brew_oat_latte: 'Cold brew from the tap, oat milk over ice.',
   matcha_latte: 'Whisked matcha under steamed milk. The board does not ice it.',
   chai_latte: 'Spiced chai concentrate under steamed milk.',
   sparkling_grapefruit_cold_brew: 'Cold brew, grapefruit and soda, built at the cold bar.',
@@ -71,16 +87,11 @@ const BLURB = {
   bacon_egg_cheese_bagel: 'Pressed on the grill until the cheese gives.',
   sausage_egg_cheese: 'Sausage patty, egg and cheese, pressed hot.',
   vegan_sausage_egg_cheese: 'Plant-based patty, egg and cheese, pressed hot.',
-  italian_herb_chicken: 'Herbed chicken pressed on the panini grill.',
-  mona_lisa: 'The house press: four minutes on the grill, worth the wait.',
-  monterey_turkey: 'Turkey and Monterey jack, pressed.',
-  caesar_salad: 'Built at the food counter, no grill time at all.',
-  build_your_own_salad: 'Pick it out at the counter and it is assembled in front of you.',
-  broccoli_cheese_soup: 'Ladled from the pot. Cup size.',
-  chicken_dumpling_soup: 'Ladled from the pot. Cup size.',
+  broccoli_cheese_soup: 'Ladled from the pot.',
+  chicken_dumpling_soup: 'Ladled from the pot.',
 }
 
-export const blurb = (name) => BLURB[name] || ''
+export const blurb = (name) => BOARD[name] || DERIVED[name] || ''
 
 // Badges are read off the item the API sent, never guessed.
 const STATION_BADGE = {
@@ -110,30 +121,37 @@ export function badges(item) {
 // this app has no idea who you are, and says so rather than pretending.
 const MOST_ORDERED = ['latte', 'drip_coffee', 'cold_brew', 'bacon_egg_cheese_bagel']
 
-// What is new on the board and what has come back for the season. Curated,
-// like a real board's chalk header.
-const SEASONAL = ['sparkling_grapefruit_cold_brew', 'sparkling_passion_fruit_black_tea']
-const RETURNING = ['cold_brew_oat_latte', 'black_tie']
-
+// The hero names the cafe, and takes that name from `/config` rather than
+// holding a copy of it. Beneath it, who the beans come from, in the size the
+// board gives it. Half of that line is the board's own wording — it reads
+// "PROUDLY POURING Peet's Coffee" above the Peet's logo — and half is from the
+// cafe rather than the wall: Ground Truth supplies it too, which no board we
+// photographed says.
 export const FEATURE = {
-  seasonal: SEASONAL[0],
-  returning: RETURNING[0],
-  eyebrow: 'In season',
-  headline: ['Cold brew,', 'and soda'],
+  pouring: "Proudly pouring Peet's and Ground Truth Coffee",
+  items: MOST_ORDERED,
 }
 
-const has = (item, station) => (item.stations || []).includes(station)
+// "Morgridge Coffee" -> ["Morgridge", "Coffee"], for the two-line display face.
+export function nameLines(name) {
+  const words = (name || '').split(' ').filter(Boolean)
+  if (words.length < 2) return [name || '', '']
+  return [words.slice(0, -1).join(' '), words[words.length - 1]]
+}
 
-// The left-hand rail. Order matters: this is the order a customer scrolls.
+// The rail, as the boards divide it.
+//
+// These are the cafe's sections, photographed 2026-09-03, in the cafe's own
+// order and wording: two drink boards reading Coffee & Espresso, Cold Brew,
+// Tea & Sparkling, Non-Coffee, then Breakfast Paninis, Lunch Paninis, Salads,
+// Soups. An earlier version of this file grouped by station instead — Espresso
+// bar, Brew & cold brew — which is how the drink is made rather than how it is
+// sold, and it disagreed with the board in three places: drip coffee sits
+// under Coffee & Espresso, the sparkling cold brew under Tea & Sparkling, and
+// cocoa in a section of its own.
+//
+// Only `Most ordered` is the app's own, and it says so.
 export const CATEGORIES = [
-  {
-    key: 'seasonal',
-    label: 'Seasonal',
-    tag: 'New',
-    heading: 'On the board this season',
-    note: 'Sparkling builds, made at the cold bar',
-    members: [...SEASONAL, ...RETURNING],
-  },
   {
     key: 'popular',
     label: 'Most ordered',
@@ -142,68 +160,86 @@ export const CATEGORIES = [
     members: MOST_ORDERED,
   },
   {
-    key: 'espresso',
-    label: 'Espresso bar',
-    heading: 'Espresso bar',
-    note: 'Two group heads, one steam wand',
-    match: (item) => has(item, 'group_head'),
+    key: 'coffee',
+    label: 'Coffee & espresso',
+    heading: 'Coffee & Espresso',
+    note: 'Regular or decaf',
+    members: [
+      'drip_coffee', 'espresso', 'americano', 'cappuccino', 'latte',
+      'vanilla_latte', 'caramel_macchiato', 'mocha', 'white_chocolate_mocha',
+    ],
   },
   {
-    key: 'brew',
-    label: 'Brew & cold brew',
-    heading: 'Brew & cold brew',
-    note: 'Urns and taps. The quickest things to hand you',
-    match: (item) =>
-      has(item, 'brew_tap') && !has(item, 'group_head') && !/tea/.test(item.name),
+    key: 'cold_brew',
+    label: 'Cold brew',
+    heading: 'Cold Brew',
+    members: ['cold_brew', 'cold_brew_oat_latte', 'black_tie'],
   },
   {
     key: 'tea',
-    label: 'Tea & matcha',
-    heading: 'Tea & matcha',
-    note: 'Leaf, matcha and chai',
-    match: (item) => /tea|matcha|chai/.test(item.name) && !has(item, 'group_head'),
+    label: 'Tea & sparkling',
+    heading: 'Tea & Sparkling',
+    members: [
+      'brewed_tea', 'matcha_latte', 'chai_latte', 'iced_tea',
+      'sparkling_grapefruit_cold_brew', 'sparkling_passion_fruit_black_tea',
+      'sparkling_lemonade',
+    ],
   },
   {
-    key: 'cold',
-    label: 'Sparkling & cocoa',
-    heading: 'Sparkling & cocoa',
-    note: 'No coffee in these',
-    match: (item) =>
-      !has(item, 'group_head') &&
-      !has(item, 'brew_tap') &&
-      !has(item, 'panini_press') &&
-      !has(item, 'food_counter') &&
-      !/tea|matcha|chai/.test(item.name),
+    key: 'non_coffee',
+    label: 'Non-coffee',
+    heading: 'Non-Coffee',
+    members: ['cocoa'],
   },
   {
     key: 'breakfast',
-    label: 'Breakfast',
-    tag: 'Back',
-    heading: 'Breakfast, pressed',
-    note: 'The grill takes four minutes and holds two at a time',
+    label: 'Breakfast paninis',
+    heading: 'Breakfast Paninis',
     members: ['bacon_egg_cheese_bagel', 'sausage_egg_cheese', 'vegan_sausage_egg_cheese'],
   },
   {
-    key: 'kitchen',
-    label: 'Sandwiches & salads',
-    heading: 'Sandwiches & salads',
-    note: 'Pressed on the grill or built at the counter',
-    match: (item) =>
-      (has(item, 'panini_press') || has(item, 'food_counter')) &&
-      !['bacon_egg_cheese_bagel', 'sausage_egg_cheese', 'vegan_sausage_egg_cheese'].includes(
-        item.name,
-      ),
+    key: 'lunch',
+    label: 'Lunch paninis',
+    heading: 'Lunch Paninis',
+    members: ['italian_herb_chicken', 'mona_lisa', 'monterey_turkey'],
+  },
+  {
+    key: 'salads',
+    label: 'Salads',
+    heading: 'Salads',
+    note: 'Extra topping +$1.00 · extra premium +$1.75',
+    members: ['caesar_salad', 'build_your_own_salad'],
+  },
+  {
+    key: 'soups',
+    label: 'Soups',
+    heading: 'Soups',
+    note: 'Cup priced here · bowl $4.39 · Vienna dinner roll +$1.00',
+    members: ['broccoli_cheese_soup', 'chicken_dumpling_soup'],
   },
 ]
 
-// Group the API's flat item list into the rail's sections. A curated section
-// keeps its listed order; a matched one keeps the board's order.
+// Group the API's flat item list into the rail's sections, keeping the board's
+// order. Anything the board does not list would go missing, so it is reported
+// rather than dropped quietly.
 export function sections(items) {
   const byName = new Map(items.map((item) => [item.name, item]))
-  return CATEGORIES.map((category) => ({
-    ...category,
-    items: category.members
-      ? category.members.map((name) => byName.get(name)).filter(Boolean)
-      : items.filter(category.match),
-  })).filter((category) => category.items.length > 0)
+  const placed = new Set()
+  const groups = CATEGORIES.map((category) => {
+    const found = category.members.map((name) => byName.get(name)).filter(Boolean)
+    if (category.key !== 'popular') found.forEach((item) => placed.add(item.name))
+    return { ...category, items: found }
+  }).filter((category) => category.items.length > 0)
+
+  const missing = items.filter((item) => !placed.has(item.name))
+  if (missing.length > 0) {
+    groups.push({
+      key: 'other',
+      label: 'Also on sale',
+      heading: 'Also on sale',
+      note: 'On the till but not on the boards we photographed',
+      items: missing,
+    })
+  }
+  return groups
 }

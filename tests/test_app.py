@@ -581,3 +581,50 @@ def test_a_drink_on_the_shelf_is_not_something_to_wait_behind(client):
     for state in ("accepted", "in_progress", "ready"):
         client.post(f"/orders/{order['order_id']}/transition", json={"to": state})
     assert client.get("/menu").json()["queue_depth"] == 0
+
+
+# --------------------------------------------------------------------------
+# quoting a time through the API
+# --------------------------------------------------------------------------
+
+BASKET = [{"drink": "latte", "milk_type": "oat", "variant": "hot"},
+          {"drink": "bacon_egg_cheese_bagel"}]
+
+
+def test_ordering_now_gets_a_time(client):
+    body = client.post("/plan", json={"lines": BASKET}).json()
+    assert body["wait_s"] > 0
+    assert body["ready_at_s"] == pytest.approx(body["order_at_s"] + body["wait_s"], abs=1)
+    assert body["achievable"] is True
+    assert body["order_in_s"] == 0
+
+
+def test_asking_for_a_time_says_when_to_order(client):
+    body = client.post("/plan", json={"lines": BASKET, "wanted_at": "13:00"}).json()
+    assert body["wanted_at"] == "13:00"
+    assert body["ready_at_s"] <= 13 * 3600
+    assert body["order_at_s"] <= body["ready_at_s"]
+    assert body["order_in_s"] > 0            # something to be reminded about
+
+
+def test_the_quote_says_where_it_came_from(client):
+    """A number on a screen with no provenance is a guess wearing a uniform."""
+    body = client.post("/plan", json={"lines": BASKET}).json()
+    assert body["from_forecast"]["days"] > 0
+    assert body["from_forecast"]["quantile"] >= 75
+    assert body["basket_s"] > 0 and body["typical_basket_s"] > 0
+
+
+def test_a_time_already_gone_is_refused_honestly(client):
+    body = client.post("/plan", json={"lines": BASKET, "wanted_at": "07:35"}).json()
+    assert body["achievable"] is False
+
+
+def test_an_unknown_drink_cannot_be_quoted(client):
+    assert client.post("/plan", json={"lines": [{"drink": "flat_white"}]}).status_code == 400
+
+
+def test_a_malformed_time_is_refused(client):
+    assert client.post(
+        "/plan", json={"lines": BASKET, "wanted_at": "half twelve"}
+    ).status_code == 400

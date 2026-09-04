@@ -1,0 +1,32 @@
+# Fitted by sim/fit_profile.py so the simulated queue reproduces the one
+# counted on 2026-09-03. Arrivals were never counted -- you cannot count
+# them standing in a cafe -- so the curve is inferred from its
+# consequences rather than measured.
+
+arrivals:
+  model: profile
+  class_blocks: null
+  capture_rate: 1.0
+  background_per_hour: 0.0
+  profile:
+    bin_minutes: 30.0
+    rate_per_hour:
+    - 20.0
+    - 20.0
+    - 20.0
+    - 20.0
+    - 20.0
+    - 69.901
+    - 81.272
+    - 23.256
+    - 60.858
+    - 90.588
+    - 23.245
+    - 59.846
+    - 22.125
+    - 68.635
+    - 24.857
+    - 49.266
+    - 55.963
+    - 20.0
+  source: fitted

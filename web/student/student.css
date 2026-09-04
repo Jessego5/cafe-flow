@@ -29,28 +29,28 @@
 
   --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif;
-
-  font-family: var(--sans);
-  color: var(--ink);
-  background: var(--paper);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 /* The pane scrolls, the page does not: a fixed-height shell is what makes the
  * header stick, the tab bar sit still, and the sheets slide over the content
- * instead of over the whole document. */
-html, body { height: 100%; }
+ * instead of over the whole document.
+ *
+ * These are the only rules that reach outside the app, and they are behind
+ * `.student-page`, which `main.jsx` sets when the app owns the browser tab.
+ * Rendered inside something else — the phone frame — the app claims nothing
+ * beyond its own box. */
+html.student-page,
+body.student-page { height: 100%; }
 
-body {
+body.student-page {
   margin: 0;
   overflow: hidden;
   background: #edeae5;
-  color: var(--ink);
-  -webkit-font-smoothing: antialiased;
-  font-size: 15px;
-  line-height: 1.45;
 }
+
+body.student-page > #root { height: 100%; }
 
 button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: default; }
@@ -63,14 +63,21 @@ button:disabled { cursor: default; }
   flex-direction: column;
   width: 100%;
   max-width: 26rem;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   margin: 0 auto;
   background: var(--paper);
   overflow: hidden;
+
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
+/* Standing on its own page it wants an edge; inside a device it already has
+   one, and a second would read as a seam. */
 @media (min-width: 30rem) {
-  .phone { box-shadow: 0 0 0 1px var(--line), 0 1.5rem 3rem rgba(26, 25, 23, 0.09); }
+  .student-page .phone { box-shadow: 0 0 0 1px var(--line), 0 1.5rem 3rem rgba(26, 25, 23, 0.09); }
 }
 
 .pane {
@@ -173,15 +180,21 @@ button:disabled { cursor: default; }
 .slab.filled { background: var(--charcoal); border-color: var(--charcoal); color: #fff; }
 
 .mark { display: block; width: 100%; height: 100%; }
+.art { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 /* ---------------------------------------------------------------------- home */
 
 .home { padding: 0 0 2rem; }
-.home .chrome {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.9rem var(--pad) 0;
+
+.banner { position: relative; }
+.banner img {
+  display: block;
+  width: 100%;
+  /* line art on white paper: multiplied into the page, the paper disappears
+     and only the ink and the wash are left */
+  mix-blend-mode: multiply;
 }
+.banner .capsule { position: absolute; top: 0.9rem; right: var(--pad); }
 .capsule {
   display: flex;
   align-items: center;
@@ -194,7 +207,7 @@ button:disabled { cursor: default; }
 }
 .capsule .rule { width: 1px; height: 0.85rem; background: rgba(26, 25, 23, 0.18); }
 
-.hero { padding: 2.2rem var(--pad) 0; }
+.hero { padding: 1.4rem var(--pad) 0; }
 .hero h1 {
   font-family: var(--display);
   font-weight: 400;
@@ -204,14 +217,8 @@ button:disabled { cursor: default; }
   margin: 0.7rem 0 0;
 }
 .hero h1 em { font-style: italic; }
-.hero .art {
-  position: relative;
-  height: 12.5rem;
-  margin: 1.4rem 0 0;
-}
-.hero .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-.feature { display: grid; gap: 0.6rem; padding: 1.6rem var(--pad) 0; }
+.hero .hint { display: block; margin-top: 0.55rem; }
+.feature { display: grid; gap: 0.6rem; padding: 1.2rem var(--pad) 0; }
 .feature .line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .feature .line .name { font-family: var(--display); font-size: 1.15rem; }
 
@@ -478,6 +485,15 @@ button:disabled { cursor: default; }
   padding: 1.1rem var(--pad) 0;
 }
 .sheet .top h3 { font-size: 1.25rem; margin: 0; letter-spacing: -0.01em; }
+.sheet .top > div:not(.shot) { flex: 1; }
+.sheet .shot {
+  flex: none;
+  width: 4.6rem;
+  height: 4.6rem;
+  background: #f2eee6;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
 .sheet .close { border: 0; background: none; color: var(--muted); font-size: 1.2rem; padding: 0 0.2rem; }
 .sheet .body { overflow-y: auto; padding: 0.6rem var(--pad) 1rem; }
 .sheet .foot {

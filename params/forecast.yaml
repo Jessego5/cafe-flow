@@ -1,0 +1,87 @@
+# Written by sim/forecast.py. The app reads this to answer 'when will
+# it be ready' and 'when should I order', so a promise made at the
+# counter is a prediction the model actually made -- and promise_error
+# can be run over the app's own log afterwards to see whether it held.
+# Quoted off the 80th percentile, not the mean: a promise
+# kept on average is missed half the time.
+
+forecast:
+  scenario: ground_truth_observed
+  seeds: 12
+  bin_minutes: 15.0
+  opens_at_s: 27000.0
+  quantile: 80
+  mean_wait_s:
+  - 122.4
+  - 138.7
+  - 137.6
+  - 126.5
+  - 135.0
+  - 134.5
+  - 121.0
+  - 125.6
+  - 128.2
+  - 130.7
+  - 166.0
+  - 253.7
+  - 337.9
+  - 453.4
+  - 188.1
+  - 138.9
+  - 193.0
+  - 168.6
+  - 401.6
+  - 555.5
+  - 233.3
+  - 132.1
+  - 156.4
+  - 227.2
+  - 145.2
+  - 127.9
+  - 263.0
+  - 277.9
+  - 147.8
+  - 124.0
+  - 141.4
+  - 148.9
+  - 145.9
+  - 157.5
+  - 134.3
+  - 127.1
+  safe_wait_s:
+  - 170.5
+  - 173.0
+  - 169.4
+  - 175.5
+  - 158.6
+  - 163.0
+  - 166.0
+  - 165.9
+  - 175.0
+  - 172.6
+  - 216.0
+  - 318.1
+  - 509.3
+  - 693.1
+  - 209.0
+  - 182.1
+  - 264.9
+  - 225.6
+  - 569.0
+  - 976.5
+  - 301.7
+  - 163.5
+  - 197.0
+  - 303.7
+  - 173.0
+  - 165.0
+  - 310.3
+  - 399.4
+  - 187.1
+  - 165.0
+  - 174.9
+  - 187.9
+  - 192.4
+  - 198.6
+  - 178.3
+  - 163.0

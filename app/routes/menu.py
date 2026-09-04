@@ -7,7 +7,7 @@ from sqlmodel import select
 
 from app.config import day_seconds, get_params
 from app.db import MenuItemRow, open_orders, session_scope
-from core.states import State
+from core.params import ConfigError
 from core.waiting import estimate_wait_s, nominal_seconds_per_order, observable_queue_depth
 
 router = APIRouter(tags=["menu"])
@@ -20,7 +20,15 @@ async def get_menu() -> dict:
         rows = {row.name: row for row in session.exec(select(MenuItemRow)).all()}
         waiting = open_orders(session)
     depth = observable_queue_depth(row.state for row, _ in waiting)
-    per_order = nominal_seconds_per_order(params, params.baristas_at(day_seconds(params)))
+
+    # Outside the staffing plan there is nobody on the bar, so there is no wait
+    # to quote and the endpoint says so rather than raising: the menu is still
+    # worth serving when the cafe is shut, and a quoted zero would read as
+    # "come now" to someone standing at a locked door.
+    try:
+        per_order = nominal_seconds_per_order(params, params.baristas_at(day_seconds(params)))
+    except ConfigError:
+        per_order = None
 
     items = []
     for name, spec in params.menu.items():
@@ -30,6 +38,8 @@ async def get_menu() -> dict:
             {
                 "name": name,
                 "price_cents": price_cents,
+                # posted on the board for the medium size, and only for drinks
+                "calories": spec.calories,
                 "requires_milk": spec.requires_milk,
                 "variants": list(spec.variant_names),
                 "default_variant": spec.default_variant,
@@ -50,7 +60,7 @@ async def get_menu() -> dict:
         # themselves out of the peak, which is worth more than anything the bar
         # can do about it.
         "queue_depth": depth,
-        "wait_estimate_s": round(estimate_wait_s(depth, per_order), 1),
+        "wait_estimate_s": None if per_order is None else round(estimate_wait_s(depth, per_order), 1),
         # every surface states how much of what it shows is still guessed
         "provenance": params.provenance_report().caption(),
     }

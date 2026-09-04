@@ -1,0 +1,45 @@
+/* The gallery around the component, not part of it. */
+:root {
+  --ink: #1a1917;
+  --muted: #8d867e;
+  --line: #e7e2da;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 2.5rem 1.5rem 4rem;
+  background: #edeae5;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.gallery { max-width: 64rem; margin: 0 auto; }
+.gallery h1 { font-size: 1.4rem; margin: 0 0 0.3rem; letter-spacing: -0.01em; }
+.gallery p.lede { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.6rem; max-width: 34rem; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.8rem 0 1.8rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2.4rem;
+}
+.controls button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+.controls button.on { border-color: var(--ink); font-weight: 600; }
+.controls .spacer { flex: 1; }
+.controls label { font-size: 0.85rem; color: var(--muted); display: flex; gap: 0.5rem; align-items: center; }
+
+.rack { display: flex; justify-content: center; padding-bottom: 2rem; }
+.rack figure { margin: 0; display: grid; gap: 0.7rem; justify-items: center; }
+.rack figcaption { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }

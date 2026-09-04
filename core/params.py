@@ -293,6 +293,11 @@ class MenuItemParams(_Strict):
     price_cents: int = Field(gt=0)
     cogs_cents: int = Field(ge=0)
     requires_milk: bool
+    #: As posted on the board, for the medium size. Nothing in the simulation
+    #: reads this — it is here so the app can show what the cafe shows, and so
+    #: the figure has one home rather than being retyped into the frontend.
+    #: The board's own footnote: milk drinks are calculated with 2% milk.
+    calories: int | None = Field(default=None, ge=0)
     tasks: list[TaskSpec] = Field(default_factory=list)
     assembly_s: float = Field(default=0.0, ge=0)
     variants: dict[str, VariantParams] = Field(default_factory=dict)

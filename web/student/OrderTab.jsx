@@ -21,6 +21,9 @@ function ItemSheet({ item, onClose, onAdd, milks: offered }) {
       <button className="scrim" aria-label="Close" onClick={onClose} />
       <div className="sheet" role="dialog" aria-label={title(item.name)}>
         <div className="top">
+          <div className="shot">
+            <ItemMark item={item} variant={variant} />
+          </div>
           <div>
             <h3>{title(item.name)}</h3>
             <div className="badges" style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
@@ -78,8 +81,15 @@ function ItemSheet({ item, onClose, onAdd, milks: offered }) {
             </div>
           </div>
 
-          {item.service_s != null && (
+          {item.calories != null && (
             <p className="hint" style={{ marginTop: '1.2rem' }}>
+              {item.calories} cal, medium — the board's figure
+              {item.requires_milk ? ', calculated with 2% milk' : ''}
+            </p>
+          )}
+
+          {item.service_s != null && (
+            <p className="hint" style={{ marginTop: item.calories != null ? '0.3rem' : '1.2rem' }}>
               About {Math.round(item.service_s)}s of hands-on work at the bar
               {item.stations?.length ? ` · ${item.stations.map((s) => s.replace(/_/g, ' ')).join(' → ')}` : ''}
             </p>
@@ -268,9 +278,11 @@ export function OrderTab({
           <div className="strip">
             <span>◷</span>
             <span>
-              {menu.queue_depth === 0
-                ? 'Nothing in the queue right now'
-                : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min`}
+              {menu.wait_estimate_s == null
+                ? 'Closed — the board is still here'
+                : menu.queue_depth === 0
+                  ? 'Nothing in the queue right now'
+                  : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min`}
             </span>
           </div>
         )}
@@ -287,7 +299,6 @@ export function OrderTab({
                 className={group.key === current ? 'on' : ''}
                 onClick={() => jump(group.key)}
               >
-                {group.tag && <span className={`tag ${group.tag === 'Back' ? 'back' : ''}`}>{group.tag}</span>}
                 {group.label}
               </button>
             ))}
@@ -300,7 +311,7 @@ export function OrderTab({
                   {group.heading}
                   <span className="pill">{group.items.length}</span>
                 </h2>
-                <p className="note">{group.note}</p>
+                {group.note && <p className="note">{group.note}</p>}
                 {group.items.map((item) => (
                   <button className="item" key={`${group.key}-${item.name}`} onClick={() => setOpened(item)}>
                     <div className="thumb">
@@ -345,7 +356,8 @@ export function OrderTab({
             <span className="chev">˄</span>
           </div>
         ) : (
-          menu && (
+          menu &&
+          menu.wait_estimate_s != null && (
             <div className="closed">
               <span>
                 {menu.queue_depth === 0

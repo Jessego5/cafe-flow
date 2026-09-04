@@ -1,0 +1,273 @@
+/* A phone, drawn.
+ *
+ * Bezel, dynamic island, side buttons and status bar are all CSS — no images,
+ * no device-mockup dependency. The point is the sizing: `--phone-width` sets
+ * the screen's width and every other dimension is derived from it, so one
+ * variable resizes the whole device and nothing drifts out of proportion.
+ *
+ * The mechanism is the font-size line below. It ties 1em to a fixed fraction
+ * of the screen width, after which every measurement in this file can be
+ * written in em and stay proportional for free. That is why the only pixel
+ * value here is the default width itself.
+ *
+ * Markup, if you are using this without React:
+ *
+ *   <div class="phone-frame" data-bezel="dark">
+ *     <div class="phone-frame__screen">
+ *       <div class="phone-frame__status">…</div>
+ *       <div class="phone-frame__content">your page</div>
+ *     </div>
+ *   </div>
+ */
+
+.phone-frame,
+.phone-frame *,
+.phone-frame *::before,
+.phone-frame *::after { box-sizing: border-box; }
+
+.phone-frame {
+  --phone-width: 390px;                     /* the one hardcoded length */
+
+  --screen-w: var(--phone-width);
+  --screen-h: calc(var(--screen-w) * 19.5 / 9);
+
+  /* 1em is a 39th of the screen width: 10px at the default 390px. Everything
+     below is written in em against this, so the device scales as one piece. */
+  font-size: calc(var(--screen-w) / 39);
+
+  --bezel: 1.15em;                          /* the band around the screen */
+  --screen-radius: 5.4em;
+  --frame-radius: calc(var(--screen-radius) + var(--bezel));
+  --button-w: 0.32em;
+
+  --bezel-face: #1c1c1e;
+  --bezel-edge: #4a4a4f;
+  --bezel-rim: rgba(255, 255, 255, 0.22);
+  --button-face: #3a3a3d;
+  --screen-bg: #ffffff;
+  --phone-ink: #14130f;
+
+  position: relative;
+  display: inline-block;
+  padding: var(--bezel);
+  border-radius: var(--frame-radius);
+  background: var(--bezel-face);
+  box-shadow:
+    /* the polished edge of the rail, catching light at the top */
+    inset 0 0.1em 0.1em var(--bezel-rim),
+    inset 0 -0.1em 0.1em rgba(0, 0, 0, 0.5),
+    /* the machined band that runs around the outside */
+    0 0 0 0.14em var(--bezel-edge),
+    0 0 0 0.2em rgba(0, 0, 0, 0.55),
+    /* and the device sitting above the page */
+    0 2.4em 4em -1.2em rgba(0, 0, 0, 0.45);
+}
+
+.phone-frame[data-bezel='light'] {
+  --bezel-face: #e8e6e1;
+  --bezel-edge: #fbfbfa;
+  --bezel-rim: rgba(255, 255, 255, 0.9);
+  --button-face: #cfccc5;
+  box-shadow:
+    inset 0 0.1em 0.1em var(--bezel-rim),
+    inset 0 -0.1em 0.1em rgba(0, 0, 0, 0.14),
+    0 0 0 0.14em var(--bezel-edge),
+    0 0 0 0.2em rgba(0, 0, 0, 0.18),
+    0 2.4em 4em -1.2em rgba(0, 0, 0, 0.3);
+}
+
+/* Side buttons. Two pseudo-elements draw three buttons: the volume pair is one
+   element plus a box-shadow copy of itself, since both are the same size. */
+.phone-frame::before,
+.phone-frame::after {
+  content: '';
+  position: absolute;
+  width: var(--button-w);
+  background: var(--button-face);
+  pointer-events: none;
+}
+
+.phone-frame::before {                       /* volume up, and down below it */
+  left: calc(var(--button-w) * -1 + 0.04em);
+  top: 12em;
+  height: 5.6em;
+  border-radius: var(--button-w) 0 0 var(--button-w);
+  box-shadow:
+    /* the second volume button: the same shape, moved down the rail */
+    0 6.8em 0 0 var(--button-face),
+    -0.05em 0 0.12em rgba(0, 0, 0, 0.55),
+    0 6.8em 0.12em -0.05em rgba(0, 0, 0, 0.55);
+}
+
+.phone-frame::after {                        /* power */
+  right: calc(var(--button-w) * -1 + 0.04em);
+  top: 16.4em;
+  height: 8.4em;
+  border-radius: 0 var(--button-w) var(--button-w) 0;
+  box-shadow: 0.05em 0 0.12em rgba(0, 0, 0, 0.55);
+}
+
+/* The screen. Everything the caller passes is clipped to this radius. */
+.phone-frame__screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--screen-w);
+  height: var(--screen-h);
+  border-radius: var(--screen-radius);
+  background: var(--screen-bg);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The dynamic island, over the content rather than beside it. */
+.phone-frame__screen::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: 1.05em;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12.4em;
+  height: 3.4em;
+  border-radius: 1.7em;
+  background: #000;
+  pointer-events: none;
+}
+
+.phone-frame--no-island .phone-frame__screen::after { display: none; }
+
+/* ------------------------------------------------------------- status bar */
+
+.phone-frame__status {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 5.4em;
+  padding: 0.6em 3.2em 0;
+  font-size: 1.5em;
+  font-weight: 600;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: 0.01em;
+  color: var(--phone-ink);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  pointer-events: none;
+}
+
+.phone-frame__status .phone-frame__glyphs {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+/* The three glyphs are proportioned against a reference photograph of the real
+   status bar, measured rather than eyeballed: bar cluster 1.31 times as wide as
+   tall, wifi 1.33, battery 2.16, with the cell's outline and its inner gap both
+   a sixteenth of its height. */
+
+/* signal: four bars, each taller than the last */
+.phone-frame__signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.105em;
+  height: 0.95em;
+}
+.phone-frame__signal i {
+  width: 0.23em;
+  border-radius: 0.07em;
+  background: currentColor;
+}
+.phone-frame__signal i:nth-child(1) { height: 34%; }
+.phone-frame__signal i:nth-child(2) { height: 56%; }
+.phone-frame__signal i:nth-child(3) { height: 78%; }
+.phone-frame__signal i:nth-child(4) { height: 100%; }
+
+/* wifi: two arcs and a dot, struck from one centre.
+   Each arc is a circle centred on the dot and clipped to the 104-degree wedge
+   above it. Colouring one border side instead leaves the mitred corners
+   showing, which is what made the first attempt look bent; and the circles are
+   wide relative to the glyph so the arcs read flat near the apex, as they do
+   on the real thing. */
+.phone-frame__wifi {
+  position: relative;
+  width: 1.24em;
+  height: 0.9em;
+}
+.phone-frame__wifi i { position: absolute; inset: 0; }
+
+.phone-frame__wifi::before,
+.phone-frame__wifi i::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0.14em;                 /* the common centre: the dot's own middle */
+  border: 0.16em solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, 50%);
+  clip-path: polygon(50% 50%, -14% 0, 114% 0);
+}
+.phone-frame__wifi::before   { width: 1.5em;  height: 1.5em; }
+.phone-frame__wifi i::before { width: 0.85em; height: 0.85em; }
+
+.phone-frame__wifi i::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0.14em;
+  width: 0.28em;
+  height: 0.28em;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, 50%);
+}
+
+/* battery: a rounded cell, a fill that follows the level, and the cap */
+.phone-frame__battery {
+  position: relative;
+  width: 1.754em;                 /* the cap counts towards the reference ratio */
+  height: 0.9em;
+  margin-left: 0.22em;
+  border: 0.06em solid currentColor;
+  border-radius: 0.26em;
+}
+.phone-frame__battery::before {
+  content: '';
+  position: absolute;
+  inset: 0.055em;
+  width: calc((100% - 0.11em) * var(--battery-level, 1));
+  border-radius: 0.17em;
+  background: currentColor;
+}
+.phone-frame__battery::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 0.13em;
+  height: 0.34em;
+  margin-left: 0.06em;
+  border-radius: 0 0.12em 0.12em 0;
+  background: currentColor;
+  transform: translateY(-50%);
+}
+
+/* ---------------------------------------------------------------- content */
+
+.phone-frame__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* back to a readable base, still tied to the frame: content written in em
+     or % scales with the device, content written in rem does not */
+  font-size: 1.6em;
+  color: var(--phone-ink);
+}
+
+/* no status bar: the island still needs somewhere to sit */
+.phone-frame--bare .phone-frame__content { padding-top: 0; }

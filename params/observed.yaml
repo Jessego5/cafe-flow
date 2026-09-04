@@ -1,5 +1,5 @@
 # Ground Truth, observed 2026-09-03. 49 queue readings between 10:20 and 15:44,
-# plus notes across the day.
+# plus notes across the day, plus the menu boards photographed the same day.
 #
 # What was seen rather than guessed: the hours, the staffing, what heats the
 # food and how many it holds, that the till is a dedicated station, and the
@@ -9,6 +9,20 @@
 # draw on the barista pool at all. The engine always takes a barista for the
 # register phase, so capacity 1 is as close as the config can get — it stops
 # the register scaling with the crew, but still spends one barista's time.
+#
+# Two things the boards say that this file cannot hold. The soups are priced by
+# size, cup 3.99 and bowl 4.39, and `variants` here means the hot-or-iced serve
+# choice drawn from mix.serve — a second axis would need a model, not a value,
+# so only the cup price is carried. Likewise the paid extras: whipped cream
+# +0.60, syrup +0.65, sauce +0.85, alternative milk at no charge, and on the
+# food board an extra salad topping +1.00, a premium topping +1.75, a Vienna
+# roll +1.00. Nothing here models a paid modifier.
+
+# The cafe's own name. base.yaml carries "Ground Truth" marked assumed — a
+# placeholder for the scenario, never something anyone at the counter says.
+cafe:
+  name: Morgridge Coffee
+  source_of: { name: observed }
 
 meta:
   scenario: ground_truth_observed
@@ -50,3 +64,42 @@ customers:
   # knob to bury that would be tuning the fit rather than fixing the model.
   balk_tolerance_min: { dist: lognormal, median: 20.0, sigma: 0.5 }
   source_of: { balk_tolerance_min: fitted }
+
+# ---------------------------------------------------------------------------
+# menu
+#
+# Read off the two boards photographed 2026-09-03. Calories are the board's own
+# figures for the medium size, and the board's footnote applies: milk drinks
+# are calculated with 2% milk, the Black Tie excepted. The food board posts no
+# calories at all, so the sandwiches, salads and soups have none here.
+#
+# The prices already in base.yaml were read from an earlier photograph and all
+# still agree, so nothing is restated except the Caesar salad, whose price sat
+# at the edge of that frame and was carried as a guess. It was right.
+# ---------------------------------------------------------------------------
+menu:
+  drip_coffee:      { calories: 0,   source_of: { calories: observed } }
+  espresso:         { calories: 10,  source_of: { calories: observed } }
+  americano:        { calories: 25,  source_of: { calories: observed } }
+  cappuccino:       { calories: 140, source_of: { calories: observed } }
+  latte:            { calories: 220, source_of: { calories: observed } }
+  vanilla_latte:    { calories: 320, source_of: { calories: observed } }
+  caramel_macchiato: { calories: 350, source_of: { calories: observed } }
+  mocha:            { calories: 410, source_of: { calories: observed } }
+  white_chocolate_mocha: { calories: 400, source_of: { calories: observed } }
+
+  cold_brew:        { calories: 0,   source_of: { calories: observed } }
+  cold_brew_oat_latte: { calories: 230, source_of: { calories: observed } }
+  black_tie:        { calories: 190, source_of: { calories: observed } }
+
+  brewed_tea:       { calories: 0,   source_of: { calories: observed } }
+  matcha_latte:     { calories: 300, source_of: { calories: observed } }
+  chai_latte:       { calories: 240, source_of: { calories: observed } }
+  iced_tea:         { calories: 0,   source_of: { calories: observed } }
+  sparkling_grapefruit_cold_brew: { calories: 120, source_of: { calories: observed } }
+  sparkling_passion_fruit_black_tea: { calories: 130, source_of: { calories: observed } }
+  sparkling_lemonade: { calories: 130, source_of: { calories: observed } }
+
+  cocoa:            { calories: 530, source_of: { calories: observed } }
+
+  caesar_salad:     { price_cents: 1100, source_of: { price_cents: observed } }

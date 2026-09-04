@@ -22,6 +22,9 @@ export default defineConfig({
         student: resolve(__dirname, 'student.html'),
         barista: resolve(__dirname, 'barista.html'),
         display: resolve(__dirname, 'display.html'),
+        // the component gallery: not a product surface, so `app/main.py` does
+        // not route to it — open frame.html directly
+        frame: resolve(__dirname, 'frame.html'),
       },
     },
   },

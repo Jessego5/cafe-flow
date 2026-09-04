@@ -30,7 +30,8 @@ from app.routes.common import event_payload, order_payload
 from app.stream import broadcaster
 from core.capacity import StationCapacityModel
 from core.menu import Line, make_order
-from core.params import ConfigError, SECONDS_PER_MINUTE
+from core.params import ConfigError, SECONDS_PER_MINUTE, format_hhmm, parse_hhmm
+from core.promise import load_forecast, plan_for, ready_if_ordered_now
 from core.states import IllegalTransition, State, place, promise, transition
 from core.types import Channel
 
@@ -55,6 +56,14 @@ class OrderIn(BaseModel):
 class TransitionIn(BaseModel):
     to: State
     actor: str = "barista"
+
+
+class PlanIn(BaseModel):
+    """Either direction. Give a `wanted_at` and it works backwards; leave it out
+    and it answers for ordering right now."""
+
+    lines: list[LineIn] = Field(min_length=1)
+    wanted_at: str | None = None      # HH:MM, local
 
 
 def _simulated(header: str | None) -> bool:
@@ -170,6 +179,53 @@ async def create_order(
         return payload
 
     raise HTTPException(503, "could not allocate an order number")
+
+
+@router.post("/plan")
+async def plan(body: PlanIn) -> dict:
+    """When it will be ready, or when to order for a time you have in mind.
+
+    The wait comes from a forecast the simulator produced, so the number quoted
+    here is a prediction the model actually made — which means `promise_error`
+    can be run over this app's own log afterwards to see whether it held.
+    """
+    params = get_params()
+    now_s = day_seconds(params)
+
+    try:
+        lines = [Line(line.drink, line.milk_type, line.variant) for line in body.lines]
+        forecast = load_forecast(settings.forecast_path)
+    except ConfigError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    try:
+        if body.wanted_at is None:
+            quote = ready_if_ordered_now(forecast, params, lines, now_s)
+        else:
+            quote = plan_for(
+                forecast, params, lines, parse_hhmm(body.wanted_at, field="wanted_at"), now_s
+            )
+    except ConfigError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    return {
+        "order_at": format_hhmm(quote.order_at_s),
+        "order_at_s": quote.order_at_s,
+        "ready_at": format_hhmm(quote.ready_at_s),
+        "ready_at_s": quote.ready_at_s,
+        "wait_s": round(quote.wait_s, 1),
+        "order_in_s": round(max(0.0, quote.order_at_s - now_s), 1),
+        "achievable": quote.achievable,
+        "wanted_at": None if quote.wanted_at_s is None else format_hhmm(quote.wanted_at_s),
+        # what the quote is built on, so it can be argued with
+        "basket_s": round(quote.basket_s, 1),
+        "typical_basket_s": round(quote.typical_basket_s, 1),
+        "from_forecast": {
+            "scenario": forecast.scenario,
+            "days": forecast.seeds,
+            "quantile": forecast.quantile,
+        },
+    }
 
 
 @router.get("/orders/{order_id}")
