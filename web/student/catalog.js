@@ -141,6 +141,10 @@ export function nameLines(name) {
 
 // The rail, as the boards divide it.
 //
+// `heading` is the board's own wording and `rail` is the short form the
+// left-hand jump list uses, where a two-word label wraps and reads as two
+// entries. Sections without a `rail` are short enough already.
+//
 // These are the cafe's sections, photographed 2026-09-03, in the cafe's own
 // order and wording: two drink boards reading Coffee & Espresso, Cold Brew,
 // Tea & Sparkling, Non-Coffee, then Breakfast Paninis, Lunch Paninis, Salads,
@@ -155,6 +159,7 @@ export const CATEGORIES = [
   {
     key: 'popular',
     label: 'Most ordered',
+    rail: 'Popular',
     heading: 'Most ordered',
     note: 'What the bar makes most of, not a guess about you',
     members: MOST_ORDERED,
@@ -162,6 +167,7 @@ export const CATEGORIES = [
   {
     key: 'coffee',
     label: 'Coffee & espresso',
+    rail: 'Coffee',
     heading: 'Coffee & Espresso',
     note: 'Regular or decaf',
     members: [
@@ -178,6 +184,7 @@ export const CATEGORIES = [
   {
     key: 'tea',
     label: 'Tea & sparkling',
+    rail: 'Tea',
     heading: 'Tea & Sparkling',
     members: [
       'brewed_tea', 'matcha_latte', 'chai_latte', 'iced_tea',
@@ -194,12 +201,14 @@ export const CATEGORIES = [
   {
     key: 'breakfast',
     label: 'Breakfast paninis',
+    rail: 'Breakfast',
     heading: 'Breakfast Paninis',
     members: ['bacon_egg_cheese_bagel', 'sausage_egg_cheese', 'vegan_sausage_egg_cheese'],
   },
   {
     key: 'lunch',
     label: 'Lunch paninis',
+    rail: 'Lunch',
     heading: 'Lunch Paninis',
     members: ['italian_herb_chicken', 'mona_lisa', 'monterey_turkey'],
   },

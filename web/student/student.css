@@ -87,8 +87,12 @@ button:disabled { cursor: default; }
   -webkit-overflow-scrolling: touch;
   padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom));
 }
-/* the dark slab sits between the list and the tab bar; the list scrolls clear of it */
-.pane.has-dock { padding-bottom: calc(var(--tabbar) + 4.2rem + env(safe-area-inset-bottom)); }
+/* The dark slab sits between the list and the tab bar, and the list scrolls
+   clear of it. `--dock-h` is measured from the slab itself, because it grows a
+   line when there is a cart to review. */
+.pane.has-dock {
+  padding-bottom: calc(var(--tabbar) + var(--dock-h, 3rem) + env(safe-area-inset-bottom));
+}
 
 /* ------------------------------------------------------------------ tab bar */
 
@@ -226,13 +230,9 @@ button:disabled { cursor: default; }
 .doors .door { display: grid; gap: 0.35rem; }
 .doors .under { text-align: center; font-size: 0.72rem; color: var(--faint); }
 
-.rule-row { display: flex; gap: 0.4rem; padding: 1.8rem var(--pad) 0; }
-.rule-row span { height: 2px; border-radius: 2px; background: var(--line); flex: 1; }
-.rule-row span.on { background: var(--ink); flex: 0 0 5.5rem; }
-
 /* the wait, stated plainly, because seeing it is the intervention */
 .wait-card {
-  margin: 1.6rem var(--pad) 0;
+  margin: 1.3rem var(--pad) 0;
   padding: 1rem 1.05rem;
   background: var(--card);
   border: 1px solid var(--hair);

@@ -69,18 +69,12 @@ export function Home({ config, menu, hours, live, since, onOrder }) {
         <span className="hint">{FEATURE.pouring}</span>
       </div>
 
-      {/* The four the bar makes most, by the drink shares in params. Nothing
-          here is billed as new or returning: the boards say no such thing, and
-          this app should not either. */}
-      <div className="feature">
-        <span className="eyebrow">Most ordered</span>
-        {featured.map((item) => (
-          <div className="line" key={item.name}>
-            <span className="name">{title(item.name)}</span>
-            <Price cents={item.price_cents} />
-          </div>
-        ))}
-      </div>
+      {/* The wait comes before the two doors, not after them. It is the whole
+          reason this screen exists — someone who reads twelve minutes at noon
+          and comes back at twenty past has moved themselves out of the peak —
+          and a number placed below the buttons is read after the decision it
+          was meant to inform. */}
+      <Wait menu={menu} hours={hours} />
 
       {/* The two front doors. Ordering ahead is the thing this cafe is trying
           to find out about, so it gets equal weight, not a link in a menu. */}
@@ -101,12 +95,19 @@ export function Home({ config, menu, hours, live, since, onOrder }) {
         </div>
       </div>
 
-      <div className="rule-row">
-        <span className="on" />
-        <span />
-      </div>
 
-      <Wait menu={menu} hours={hours} />
+      {/* The four the bar makes most, by the drink shares in params. Nothing
+          here is billed as new or returning: the boards say no such thing, and
+          this app should not either. */}
+      <div className="feature">
+        <span className="eyebrow">Most ordered</span>
+        {featured.map((item) => (
+          <div className="line" key={item.name}>
+            <span className="name">{title(item.name)}</span>
+            <Price cents={item.price_cents} />
+          </div>
+        ))}
+      </div>
 
       {live.length > 0 && (
         <div style={{ padding: '1.4rem var(--pad) 0', display: 'grid', gap: '0.7rem' }}>

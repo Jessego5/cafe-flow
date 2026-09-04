@@ -225,6 +225,7 @@ export function OrderTab({
   const [opened, setOpened] = useState(null)
   const [showCart, setShowCart] = useState(false)
   const listRef = useRef(null)
+  const dockRef = useRef(null)
 
   // The rail follows the scroll rather than only driving it, so the two never
   // disagree about which section you are looking at.
@@ -247,6 +248,23 @@ export function OrderTab({
     list.querySelectorAll('section[data-key]').forEach((node) => observer.observe(node))
     return () => observer.disconnect()
   }, [groups])
+
+  // The dock grows a second line once there is a cart to review, so the list
+  // is told how much room to leave rather than guessing at a constant and
+  // hiding the last item behind it.
+  useEffect(() => {
+    const dock = dockRef.current
+    const shell = dock?.closest('.phone')
+    if (!dock || !shell) return undefined
+    const sync = () => shell.style.setProperty('--dock-h', `${dock.offsetHeight}px`)
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(dock)
+    return () => {
+      observer.disconnect()
+      shell.style.removeProperty('--dock-h')
+    }
+  }, [])
 
   const byName = new Map((menu?.items || []).map((item) => [item.name, item]))
   const total = cart.reduce((sum, line) => sum + (byName.get(line.drink)?.price_cents || 0), 0)
@@ -274,18 +292,6 @@ export function OrderTab({
           <span className="chev">›</span>
         </div>
         <div className="sub">{hours ? `Today ${hours.label}` : ''}</div>
-        {menu && (
-          <div className="strip">
-            <span>◷</span>
-            <span>
-              {menu.wait_estimate_s == null
-                ? 'Closed — the board is still here'
-                : menu.queue_depth === 0
-                  ? 'Nothing in the queue right now'
-                  : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min`}
-            </span>
-          </div>
-        )}
       </div>
 
       {!menu ? (
@@ -299,7 +305,7 @@ export function OrderTab({
                 className={group.key === current ? 'on' : ''}
                 onClick={() => jump(group.key)}
               >
-                {group.label}
+                {group.rail || group.label}
               </button>
             ))}
           </nav>
@@ -338,18 +344,29 @@ export function OrderTab({
         </div>
       )}
 
-      <div className="dock">
+      <div className="dock" ref={dockRef}>
         {cart.length > 0 ? (
-          <button className="cart" onClick={() => setShowCart(true)}>
-            <span className="count">{cart.length}</span>
-            <span className="total">
-              <Price cents={total} />
-              <span className="hint" style={{ display: 'block' }}>
-                {channel === 'preorder' ? 'ordering ahead' : 'ordering now'}
+          <>
+            <button className="cart" onClick={() => setShowCart(true)}>
+              <span className="count">{cart.length}</span>
+              <span className="total">
+                <Price cents={total} />
+                <span className="hint" style={{ display: 'block' }}>
+                  {channel === 'preorder' ? 'ordering ahead' : 'ordering now'}
+                </span>
               </span>
-            </span>
-            <span className="go">Review</span>
-          </button>
+              <span className="go">Review</span>
+            </button>
+            {/* the wait is stated once on this screen, and it stays stated
+                while there is a cart — that is the moment it bears on */}
+            {menu?.wait_estimate_s != null && (
+              <div className="wait-strip">
+                {menu.queue_depth === 0
+                  ? 'Nothing in the queue right now'
+                  : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min to pickup`}
+              </div>
+            )}
+          </>
         ) : hours && !hours.open ? (
           <div className="closed">
             <span>{hours.notice}</span>
@@ -361,8 +378,8 @@ export function OrderTab({
             <div className="closed">
               <span>
                 {menu.queue_depth === 0
-                  ? 'No wait right now — pick something'
-                  : `About ${minutes(menu.wait_estimate_s)} min from ordering to pickup`}
+                  ? 'Nothing in the queue right now — no wait'
+                  : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min to pickup`}
               </span>
             </div>
           )

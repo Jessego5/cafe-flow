@@ -161,7 +161,9 @@
 .phone-frame__status .phone-frame__glyphs {
   display: flex;
   align-items: center;
-  gap: 0.35em;
+  /* every box now bounds its own ink, so this reads as the space you see:
+     half the height of the tallest glyph, as the photographed bar has it */
+  gap: 0.48em;
 }
 
 /* The three glyphs are proportioned against a reference photograph of the real
@@ -186,60 +188,68 @@
 .phone-frame__signal i:nth-child(3) { height: 78%; }
 .phone-frame__signal i:nth-child(4) { height: 100%; }
 
-/* wifi: two arcs and a dot, struck from one centre.
-   Each arc is a circle centred on the dot and clipped to the 104-degree wedge
-   above it. Colouring one border side instead leaves the mitred corners
-   showing, which is what made the first attempt look bent; and the circles are
-   wide relative to the glyph so the arcs read flat near the apex, as they do
-   on the real thing. */
+/* wifi: a wedge and two arcs, concentric on the wedge's apex.
+   Each ring is a circle with only its top border coloured, so it draws a clean
+   90-degree sweep with mitred ends and nothing to clip. Radii step by --pitch,
+   and --s is the only input. `data-signal` dims the outer arcs.
+
+   `content-box` is load-bearing, and is why this is spelled out against the
+   border-box reset above. Under content-box a ring's box is its content plus
+   two borders, so `width: 2r + w` puts the stroke's *inner* edge at r and the
+   rings sit a full stroke apart. Under border-box the same numbers make the
+   stroke straddle r, which closes the gaps and welds the three rings into one
+   blob — and collapses the r=0 wedge into a degenerate box whose border eats
+   it, whose two 45-degree mitres then round to different whole pixels and grow
+   a step down one side. */
 .phone-frame__wifi {
+  --s: 1.8em;
+  --stroke: calc(var(--s) * 0.1147);
+  --pitch: calc(var(--s) * 0.164);
+  --tip: calc(var(--stroke) * 1.3);
+
   position: relative;
-  width: 1.24em;
-  height: 0.9em;
+  /* --s is the outer ring's box, but a 90-degree sweep only paints sin(45) of
+     it. Boxing the ink instead of the circle is what lets one flex gap sit
+     evenly between all three glyphs. */
+  width: calc(var(--s) * 0.7071);
+  height: calc(var(--s) / 2);
 }
-.phone-frame__wifi i { position: absolute; inset: 0; }
 
-.phone-frame__wifi::before,
-.phone-frame__wifi i::before {
-  content: '';
+.phone-frame__wifi i {
+  box-sizing: content-box;              /* the look depends on this */
   position: absolute;
   left: 50%;
-  bottom: 0.14em;                 /* the common centre: the dot's own middle */
-  border: 0.16em solid currentColor;
+  bottom: 0;
+  translate: -50% 50%;
+  width: calc(2 * var(--r) + var(--w, var(--stroke)));
+  aspect-ratio: 1;
+  border: var(--w, var(--stroke)) solid transparent;
+  border-top-color: currentColor;
   border-radius: 50%;
-  transform: translate(-50%, 50%);
-  clip-path: polygon(50% 50%, -14% 0, 114% 0);
 }
-.phone-frame__wifi::before   { width: 1.5em;  height: 1.5em; }
-.phone-frame__wifi i::before { width: 0.85em; height: 0.85em; }
 
-.phone-frame__wifi i::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0.14em;
-  width: 0.28em;
-  height: 0.28em;
-  border-radius: 50%;
-  background: currentColor;
-  transform: translate(-50%, 50%);
-}
+.phone-frame__wifi i:nth-child(1) { --r: 0; --w: var(--tip); }
+.phone-frame__wifi i:nth-child(2) { --r: calc(1 * var(--pitch)); }
+.phone-frame__wifi i:nth-child(3) { --r: calc(2 * var(--pitch)); }
+
+.phone-frame__wifi[data-signal='2'] i:nth-child(3) { opacity: 0.22; }
+.phone-frame__wifi[data-signal='1'] i:nth-child(2),
+.phone-frame__wifi[data-signal='1'] i:nth-child(3) { opacity: 0.22; }
 
 /* battery: a rounded cell, a fill that follows the level, and the cap */
 .phone-frame__battery {
   position: relative;
-  width: 1.754em;                 /* the cap counts towards the reference ratio */
-  height: 0.9em;
-  margin-left: 0.22em;
-  border: 0.06em solid currentColor;
-  border-radius: 0.26em;
+  width: 1.28em;                  /* the cap counts towards the reference ratio */
+  height: 0.68em;
+  border: 0.055em solid currentColor;
+  border-radius: 0.2em;
 }
 .phone-frame__battery::before {
   content: '';
   position: absolute;
-  inset: 0.055em;
-  width: calc((100% - 0.11em) * var(--battery-level, 1));
-  border-radius: 0.17em;
+  inset: 0.05em;
+  width: calc((100% - 0.1em) * var(--battery-level, 1));
+  border-radius: 0.13em;
   background: currentColor;
 }
 .phone-frame__battery::after {
@@ -247,10 +257,10 @@
   position: absolute;
   top: 50%;
   left: 100%;
-  width: 0.13em;
-  height: 0.34em;
-  margin-left: 0.06em;
-  border-radius: 0 0.12em 0.12em 0;
+  width: 0.11em;
+  height: 0.24em;
+  margin-left: 0.055em;
+  border-radius: 0 0.09em 0.09em 0;
   background: currentColor;
   transform: translateY(-50%);
 }

@@ -27,6 +27,7 @@ export function PhoneFrame({
   island = true,
   time = '9:41',
   battery = 1,
+  wifi = 3,                        // 3 full, 2 or 1 dims the outer arcs
   className = '',
   style,
   ...rest
@@ -61,7 +62,10 @@ export function PhoneFrame({
                 <i />
                 <i />
               </span>
-              <span className="phone-frame__wifi">
+              {/* the wedge, then two arcs */}
+              <span className="phone-frame__wifi" data-signal={wifi}>
+                <i />
+                <i />
                 <i />
               </span>
               <span
