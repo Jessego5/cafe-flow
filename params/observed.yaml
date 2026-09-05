@@ -39,7 +39,18 @@ stations:
     source_of: { run_s: published, batch_size: observed }
   register:
     capacity: 1
-    source_of: { capacity: observed }
+    # Watched rather than timed: an order of one item runs 30-40s, and each
+    # further item adds about eight. Taken as 35 + 8 per extra, which is
+    # base_s + per_item_s * items = 27 + 8n.
+    #
+    # This is recall to about +/-5s, not a stopwatch, and it is doing more work
+    # than any other number here: the published 40 + 3n it replaces put the
+    # register at 74% and the p90 wait at 12.5 minutes, and 88% of baskets are
+    # a single item, so base_s alone decides whether the till is a constraint
+    # at all. It wants twenty laps behind it before anything is quoted off it.
+    base_s: 27
+    per_item_s: 8
+    source_of: { capacity: observed, base_s: observed, per_item_s: observed }
 
 staffing:
   - { from: "07:30", to: "10:00", baristas: 3, source: observed }
