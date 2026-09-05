@@ -416,7 +416,11 @@ mix:
 
   serve: { hot: 0.45, iced: 0.55 }
 
-  attach: { item: bacon_egg_cheese_bagel, rate: 0.12 }
+  # Food is an attachment, not a first choice. `item` is left out so the food
+  # is drawn from the food share of `drink` above -- a salad is 110 seconds and
+  # eleven dollars where a bagel is 75 and five, so turning all food into one
+  # bagel distorts both the bar and the till.
+  attach: { rate: 0.286, alone: 0.09 }
 
 arrivals:
   class_blocks:

@@ -57,6 +57,10 @@ FROM_STAFFING = "from_staffing"
 #: describing a different thing, not amending this one, so it replaces the
 #: mapping instead of merging into it: swapping a lognormal for a constant must
 #: not leave the lognormal's median and sigma behind.
+#: Stations that mean the item is food. Used to tell a basket's drink from its
+#: attachment without a flag on every menu entry.
+FOOD_STATIONS: frozenset[str] = frozenset({"panini_press", "food_counter"})
+
 SHAPE_KEYS: tuple[str, ...] = ("dist",)
 
 # Station cost terms. A station's service time is the sum of the terms it
@@ -356,10 +360,22 @@ class MenuItemParams(_Strict):
 
 
 class AttachParams(_Strict):
-    """The thing people add to a drink order."""
+    """The thing people add to a drink order.
 
-    item: str
+    Food is an attachment, not a first choice. Drawing every basket's first
+    item from the whole menu made a quarter of all orders a sandwich with no
+    drink, which is not what a coffee shop sells: of the food orders counted at
+    the shelf, every one came with a drink.
+
+    `item` names a fixed attachment; leaving it out draws from the food share
+    of `mix.drink`, which keeps salads and soups in proportion instead of
+    turning all food into one bagel. `alone` is the small remainder who really
+    do just want the sandwich.
+    """
+
+    item: str | None = None
     rate: float = Field(ge=0, le=1)
+    alone: float = Field(default=0.0, ge=0, le=1)
     source: Source | None = None
 
 
@@ -616,7 +632,9 @@ class Params(_Strict):
                     f"menu.{name}.variants: {sorted(item.variant_names)} does not match "
                     f"mix.serve {sorted(self.mix.serve)}"
                 )
-        if self.mix.attach.item not in self.menu:
+        # None means "draw from the food side of mix.drink" rather than naming
+        # one fixed attachment, so only a named one has to exist.
+        if self.mix.attach.item is not None and self.mix.attach.item not in self.menu:
             problems.append(f"mix.attach.item: {self.mix.attach.item!r} is not on the menu")
 
         mix_only = set(self.mix.drink) - set(self.menu)
@@ -669,6 +687,42 @@ class Params(_Strict):
     @property
     def bottleneck(self) -> StationParams:
         return self.stations[self.bottleneck_station]
+
+    def is_food(self, name: str) -> bool:
+        """Whether a menu item is something to eat.
+
+        Read off the stations it uses rather than carried as a flag: anything
+        that goes through the oven or the food counter is food, and nothing has
+        to be kept in step with a list.
+        """
+        item = self.menu_item(name)
+        stations = {task.station for task in item.tasks}
+        for variant in item.variants.values():
+            stations |= {task.station for task in variant.tasks}
+        return bool(stations & FOOD_STATIONS)
+
+    def split_mix(self) -> tuple[dict[str, float], dict[str, float]]:
+        """`mix.drink` divided into what people drink and what they eat.
+
+        Both come back renormalised, because a basket picks its first item from
+        the drinks and its attachment from the food, and each draw needs its own
+        distribution to sum to one.
+
+        Either side may be empty: an espresso bar with no kitchen sells no food,
+        and a config is entitled to say so. An empty side is simply never drawn
+        from.
+        """
+        food = {k: v for k, v in self.mix.drink.items() if self.is_food(k)}
+        drink = {k: v for k, v in self.mix.drink.items() if not self.is_food(k)}
+        if not drink:
+            drink, food = food, {}
+        for share in (food, drink):
+            total = sum(share.values())
+            if total <= 0:
+                continue
+            for key in share:
+                share[key] /= total
+        return drink, food
 
     def baristas_at(self, t_s: float) -> int:
         """Staffing level at a time given in seconds since midnight."""

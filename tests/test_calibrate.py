@@ -358,7 +358,12 @@ def test_the_gate_judges_whatever_was_actually_collected(field):
     assert report.fitted_against == "queue"
     assert report.queue_error is not None
     assert "queue" in report.render()
-    assert "0/h" not in report.render()      # never claims a volume nobody counted
+    # Never claims a volume nobody counted. Asserted on the row rather than on
+    # "0/h", which this used to look for and which matches inside any modelled
+    # rate ending in a zero -- "140/h" broke it the first time one did.
+    assert not any(
+        line.strip().startswith("volume") for line in report.render().splitlines()
+    ), report.render()
 
 
 # --------------------------------------------------------------------------

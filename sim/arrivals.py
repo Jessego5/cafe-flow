@@ -61,39 +61,52 @@ def _pick(names: list[str], shares: dict[str, float], rng: np.random.Generator) 
     return names[int(rng.choice(len(names), p=weights / weights.sum()))]
 
 
-def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
-    """One basket: an item from the mix, its milk, how it is served, and maybe
-    something to eat.
+def line_of(params: Params, name: str, milk: str, serve: str) -> Line:
+    """One menu item as a line, taking milk and serve only where they apply."""
+    spec = params.menu_item(name)
+    return Line(
+        drink=name,
+        milk_type=milk if spec.requires_milk else None,
+        variant=serve if spec.variants else None,
+    )
 
-    Four draws, always in this order and always all four, even when the answer
-    is discarded — a conditional draw would make the seed mean different things
+
+def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
+    """One basket: a drink, its milk, how it is served, and maybe food with it.
+
+    Food is an attachment. Drawing the first item from the whole menu made a
+    quarter of every day's orders a sandwich with nobody buying a coffee, which
+    is not what this shop sells -- of the food orders counted at the shelf,
+    every one came with a drink. So the first line is a drink, food arrives by
+    `mix.attach.rate`, and `mix.attach.alone` is the small remainder who really
+    did just come in for the sandwich.
+
+    Six draws, always in this order and always all six, even when the answer is
+    discarded -- a conditional draw would make the seed mean different things
     for different baskets.
     """
-    drink = _pick(list(params.mix.drink), params.mix.drink, rng)
+    drinks, foods = params.split_mix()
+    drink = _pick(list(drinks), drinks, rng)
     milk = _pick(list(params.mix.milk), params.mix.milk, rng)
     serve = _pick(list(params.mix.serve), params.mix.serve, rng)
     attaches = rng.random() < params.mix.attach.rate
+    alone = rng.random() < params.mix.attach.alone
+    # Drawn even when there is nothing to draw, so a menu without a kitchen
+    # still consumes the same number of numbers and a seed keeps its meaning.
+    picked = _pick(list(foods), foods, rng) if foods else None
 
-    spec = params.menu_item(drink)
-    lines = [
-        Line(
-            drink=drink,
-            milk_type=milk if spec.requires_milk else None,
-            variant=serve if spec.variants else None,
-        )
-    ]
+    food = params.mix.attach.item or picked
+    if food is None:
+        return (line_of(params, drink, milk, serve),)
 
-    food = params.mix.attach.item
+    def line(name: str) -> Line:
+        return line_of(params, name, milk, serve)
+
+    if alone:
+        return (line(food),)
+    lines = [line(drink)]
     if attaches and food != drink:
-        food_spec = params.menu_item(food)
-        lines.append(
-            Line(
-                drink=food,
-                milk_type=milk if food_spec.requires_milk else None,
-                variant=serve if food_spec.variants else None,
-            )
-        )
-
+        lines.append(line(food))
     return tuple(lines)
 
 

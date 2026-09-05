@@ -59,3 +59,14 @@ W = L / lambda gives an observed wait with no model in it.
 Consequence for what customers are told: the app quotes 6.8 minutes at 09:00
 from the hybrid, against 2.8 from the free fit. The count says the longer quote
 is the honest one.
+
+---
+
+Shelf tally, same visit: 8 orders, 2 with food, both of those with a drink too.
+Six were a single drink. So 10 items, 20% of them food, mean basket 1.25.
+
+Eight orders cannot pin a share -- the 95% interval on 2 of 8 runs from 7% to
+59%, which at roughly $3 of daily margin per point is worth +/-$156 on a figure
+of about $2000. What it does settle is structure rather than level: food came
+with a drink both times, and the model was generating a quarter of every day's
+orders as a sandwich with no coffee.
