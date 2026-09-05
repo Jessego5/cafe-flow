@@ -1,10 +1,12 @@
 Ground Truth, order count in the morning window
-09:15-09:35  20 orders
+09:15-09:35  20 orders, a Thursday
 
 Counted, not estimated: one mark per completed order for twenty minutes.
 
-DATE NOT YET RECORDED. This matters less than it looks -- see below -- but it
-should be filled in before this is cited anywhere.
+The calendar date is not recorded, only the weekday, which is what the model
+takes: params/schedule/thursday.yaml is the day this is compared against and
+the day the hybrid was fitted on. Thursday predicts 20.1 and twenty were
+counted.
 
 Why this window was chosen, and what the count decides.
 
@@ -37,8 +39,22 @@ three fitted parameters to each day's own schedule:
     friday      13.7  [ 6-19]
 
 A count of twenty is consistent with any weekday except Friday, and excludes
-the free fit on every one of them. So the missing date affects how well the
-level is pinned, not which model is right.
+the free fit on every one of them. It landed on Thursday, which is both the
+closest prediction and the day the model was fitted against, so the comparison
+is like for like.
+
+It also settles an apparent contradiction in the first day of observation,
+which recorded "not a lot of people around 9:00 to 10:40". Twenty orders in
+twenty minutes is sixty an hour, which sounds busy. Both are true: the model
+has a queue of 3.5 people in this window against a rate of one order a minute.
+A short line and a steady rate is a fast cafe, not a quiet one -- and it is
+exactly the distinction the queue counts alone could never draw, because they
+measure the line and not the throughput.
+
+Still missing, and now the cheapest thing left: the queue depth in this same
+window. Rate is counted and the line is not, so Little's Law cannot be closed
+here yet. Count the line every couple of minutes while tallying orders and
+W = L / lambda gives an observed wait with no model in it.
 
 Consequence for what customers are told: the app quotes 6.8 minutes at 09:00
 from the hybrid, against 2.8 from the free fit. The count says the longer quote
