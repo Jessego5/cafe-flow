@@ -103,9 +103,14 @@ def forecast(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Forecast the wait by time of day.")
+    # The hybrid, not the free fit. The free fit never saw the morning -- nobody
+    # was counting before 10:20, so its early bins hold the flat value its
+    # search started from, and the app was quoting 2.8 minutes at 09:00 for a
+    # building that lets 520 students out at 09:15. A promise is the one place
+    # a placeholder cannot be allowed to stand in for a measurement.
     parser.add_argument("--params", nargs="+",
                         default=["params/base.yaml", "params/observed.yaml",
-                                 "params/fitted_arrivals.yaml"])
+                                 "params/hybrid_arrivals.yaml"])
     parser.add_argument("--seeds", type=int, default=24)
     parser.add_argument("--bin-minutes", type=float, default=15.0)
     parser.add_argument("--out", default="params/forecast.yaml")
