@@ -1,0 +1,45 @@
+Ground Truth, order count in the morning window
+09:15-09:35  20 orders
+
+Counted, not estimated: one mark per completed order for twenty minutes.
+
+DATE NOT YET RECORDED. This matters less than it looks -- see below -- but it
+should be filled in before this is cited anywhere.
+
+Why this window was chosen, and what the count decides.
+
+Nobody counted anything before 10:20 on 2026-09-03, so the free-rate fit in
+params/fitted_arrivals.yaml has no data for the morning at all: its early bins
+still hold the flat 20/hour that sim/fit_profile.py seeds its search with. The
+room schedule says 520 students leave classes in this building at 09:15. One of
+those is a placeholder and one is a measurement, and until now nothing had told
+them apart.
+
+Predicted orders in this window, 20 simulated days each:
+
+    fitted profile      7.3   [ 2-12]
+    hybrid             20.1   [10-26]
+    timetable          16.8   [12-20]
+
+Twenty is the hybrid's mean and did not occur once in twenty days of the free
+fit. That excludes it rather than merely disfavouring it, and it is the first
+number in this project that was predicted before it was counted -- the schedule
+route was built from a registrar's export and fitted only against the *midday*
+queue, so the morning was never fitted to anything.
+
+The weekday changes the prediction but not the conclusion. Applying the same
+three fitted parameters to each day's own schedule:
+
+    monday      15.7  [ 8-21]
+    tuesday     16.5  [ 8-26]
+    wednesday   17.4  [ 9-29]
+    thursday    20.1  [10-26]
+    friday      13.7  [ 6-19]
+
+A count of twenty is consistent with any weekday except Friday, and excludes
+the free fit on every one of them. So the missing date affects how well the
+level is pinned, not which model is right.
+
+Consequence for what customers are told: the app quotes 6.8 minutes at 09:00
+from the hybrid, against 2.8 from the free fit. The count says the longer quote
+is the honest one.
