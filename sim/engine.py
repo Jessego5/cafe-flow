@@ -368,39 +368,21 @@ class Cafe:
             duration_s=StationCapacityModel(self.params, REGISTER).order_cost(order),
         )
 
-        # The crew is never handed back with `yield`: a generator that yields
-        # from `finally` cannot be closed, and the harness closes every
-        # unfinished order when the day is cut off at closing time. Putting a
-        # worker back can never block — the pool is exactly as large as the
-        # bench — so the plain call is both correct and safe to unwind.
+        # Somebody who ordered on their phone does not use the till. They chose,
+        # paid and left before they got here, so they spend no register seconds
+        # and no barista's time taking them — which is the entire mechanism the
+        # app has. Charging them for it had every pre-order queueing twice.
         #
-        # Patience is spent here, in the line, and nowhere after it. A walk-up
-        # who does not reach the till inside their budget leaves; one who does
-        # has ordered and paid, and stays for a drink being made in front of
-        # them. Spending the budget after the register instead had the model
-        # shedding ~77 customers a day at a cafe where a full day of watching
-        # produced one, and no amount of widening the budget fixes a clock
-        # started in the wrong place.
-        waiting = self.crew.get()
-        if arrival.channel is Channel.WALKUP and math.isfinite(arrival.time_budget_s):
-            left_s = arrival.time_budget_s - (self.env.now - order.placed_at_s)
-            if left_s <= 0:
-                waiting.cancel()
-                self.renege(order, arrival)
-                return
-            outcome = yield waiting | self.env.timeout(left_s)
-            if waiting not in outcome:
-                waiting.cancel()
-                self.renege(order, arrival)
-                return
-            barista: Barista = outcome[waiting]
+        # It matters more than a transaction's worth of seconds, because part of
+        # `base_s` is deciding rather than paying, and deciding is what varies
+        # between people. The register is a decision point that happens to have
+        # a card reader on it, and this is what moves the deciding off it.
+        if arrival.channel is Channel.PREORDER:
+            transition(order, State.ACCEPTED, at=self.env.now, actor="app", log=self.log)
         else:
-            barista = yield waiting
-        try:
-            yield from barista.work(register_task, order, station=REGISTER, kind="register")
-            transition(order, State.ACCEPTED, at=self.env.now, actor=barista.name, log=self.log)
-        finally:
-            self.crew.put(barista)
+            yield from self.take_the_order(order, arrival, register_task)
+            if order.state is not State.ACCEPTED:
+                return
 
         barista = yield self.crew.get()
         try:
@@ -527,6 +509,39 @@ class Cafe:
         if baristas not in self._nominal:
             self._nominal[baristas] = nominal_seconds_per_order(self.params, baristas)
         return self._nominal[baristas]
+
+    def take_the_order(self, order: Order, arrival: Arrival, register_task: Task):
+        """A walk-up at the till: waiting for a free barista, then ordering.
+
+        Patience is spent here and nowhere after it. Reach the register and you
+        stay, because you have paid and the drink is being made in front of you.
+        Spending it later instead had the model shedding ~77 customers a day at
+        a cafe where a full day of watching produced one.
+        """
+        waiting = self.crew.get()
+        if math.isfinite(arrival.time_budget_s):
+            left_s = arrival.time_budget_s - (self.env.now - order.placed_at_s)
+            if left_s <= 0:
+                waiting.cancel()
+                self.renege(order, arrival)
+                return
+            outcome = yield waiting | self.env.timeout(left_s)
+            if waiting not in outcome:
+                waiting.cancel()
+                self.renege(order, arrival)
+                return
+            barista: Barista = outcome[waiting]
+        else:
+            barista = yield waiting
+
+        # The crew is never handed back with `yield`: a generator that yields
+        # from `finally` cannot be closed, and the harness closes every
+        # unfinished order when the day is cut off at closing time.
+        try:
+            yield from barista.work(register_task, order, station=REGISTER, kind="register")
+            transition(order, State.ACCEPTED, at=self.env.now, actor=barista.name, log=self.log)
+        finally:
+            self.crew.put(barista)
 
     def renege(self, order: Order, arrival: Arrival) -> None:
         """A walk-up who gave up in the line before ever reaching the till.
