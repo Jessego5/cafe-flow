@@ -1,0 +1,46 @@
+# Fitted by sim/fit_hybrid.py: the room schedule's shape, the counted queue's
+# level. rate(t) = capture(t) * released(t) + background.
+#
+# Three numbers were fitted against 12 counted bins, and the registrar's
+# timetable carries everything else. The free-rate fit in fitted_arrivals.yaml
+# uses twelve for the same twelve bins, which leaves it no way to tell a real
+# trough from a bin somebody happened to glance at twice.
+#
+#   capture at noon        0.040   of a released class
+#   afternoon decay        0.10/h  a 15:45 class is going home, not to lunch
+#   background              24/h  everyone not walking out of a class here
+#
+# The background is the finding. base.yaml assumed 8 an hour; the fit wants
+# 24, so most of the demand between classes is not this building's
+# students at all -- which is also why the timetable alone emptied the cafe at
+# half past one and the counted queue did not.
+#
+# Mean absolute error 1.04 people across the counted bins.
+
+arrivals:
+  model: profile
+  class_blocks: null
+  capture_rate: 1.0
+  background_per_hour: 0.0
+  profile:
+    bin_minutes: 30.0
+    rate_per_hour:
+    - 24.0
+    - 24.00192948332967
+    - 26.806070516682862
+    - 65.61596749422456
+    - 29.11203250573616
+    - 24.00000000004404
+    - 81.4559544185204
+    - 24.267007216376662
+    - 27.808541335723408
+    - 88.18044611673476
+    - 26.99887377210478
+    - 24.76677876740472
+    - 24.000000164683
+    - 72.79631526235028
+    - 24.00003563728399
+    - 25.422369855313605
+    - 62.154602733948785
+    - 26.300037873785005
+  source: fitted

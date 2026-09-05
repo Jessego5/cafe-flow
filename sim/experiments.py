@@ -74,6 +74,14 @@ TIMETABLE: tuple[str, ...] = (
     "params/schedule/thursday.yaml",
 )
 
+#: Both at once, which is what the disagreement between them turned out to be
+#: asking for: the schedule supplies the shape, and three fitted numbers supply
+#: the level the schedule cannot know. See `sim/fit_hybrid.py`.
+HYBRID: tuple[str, ...] = (
+    "params/observed.yaml",
+    "params/hybrid_arrivals.yaml",
+)
+
 
 #: The two readings of the espresso bar. Both are assumed until the machine is
 #: identified; running them side by side costs the question before answering it.
@@ -132,6 +140,11 @@ ARMS: dict[str, Arm] = {
         "timetable",
         TIMETABLE,
         "the same cafe, demand built from the room schedule instead of the fit",
+    ),
+    "hybrid": Arm(
+        "hybrid",
+        HYBRID,
+        "the schedule's shape and the queue's level, three fitted numbers",
     ),
     "batched": Arm(
         "batched",
