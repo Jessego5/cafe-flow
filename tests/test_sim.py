@@ -197,18 +197,22 @@ def _solo(params, drink="latte", milk="oat", variant="hot", at_s=None):
 
 def test_a_lone_latte_takes_exactly_the_make_time(params):
     """Stated as the formula, so it still means something after the service
-    times are revised."""
+    times are revised.
+
+    The shot pulls while the milk steams -- the group head is unattended, so it
+    needs a slot and not a person -- and the pour waits for whichever finishes
+    last. `max`, not `+`. Summing them priced a latte at 112 seconds against a
+    sandwich's 90 and made drinks the slower half of the menu, which is the
+    wrong way round from what the cafe does.
+    """
     wand = params.station("steam_wand")
     head = params.station("group_head")
     tasks, assembly_s, _ = params.menu_item("latte").plan("hot")
     steam = next(task for task in tasks if task.station == "steam_wand")
     shot = next(task for task in tasks if task.station == "group_head")
-    expected = (
-        wand.setup_s
-        + wand.per_6oz_s * (steam.oz / 6)
-        + head.shot_s * shot.shots
-        + assembly_s
-    )
+    steaming = wand.setup_s + wand.per_6oz_s * (steam.oz / 6)
+    pulling = head.shot_s * shot.shots
+    expected = max(steaming, pulling) + assembly_s
 
     result = _solo(params)
     order = result.orders["o0"]
@@ -228,8 +232,18 @@ def test_a_lone_customer_waits_only_for_the_register_and_the_drink(params):
     ringing_up = StationCapacityModel(params, "register").order_cost(order)
 
     assert order.entered_at(State.ACCEPTED) - placed == pytest.approx(ringing_up)
+    # service_seconds sums the item's tasks; the bar overlaps whatever needs
+    # no person, so the drink is ready by the longest strand and not the total.
+    building = max(
+        max((task.duration_s for task in order.items[0].tasks
+             if task.station is not None
+             and not params.station(task.station).attended), default=0.0),
+        sum(task.duration_s for task in order.items[0].tasks
+            if task.station is not None and params.station(task.station).attended),
+    ) + sum(task.duration_s for task in order.items[0].tasks if task.station is None)
+    assert building < service_seconds(order.items[0])
     assert order.entered_at(State.PICKED_UP) - placed == pytest.approx(
-        ringing_up + service_seconds(order.items[0])
+        ringing_up + building
     )
 
 
@@ -327,15 +341,19 @@ def test_one_wand_serialises_two_simultaneous_lattes(params):
     assert overlaps(wand_spans) == []
     assert max_concurrent(wand_spans) == 1
 
-    # the second latte is late by exactly one steam
+    # Both shots pull at once -- two group heads -- so the second latte is late
+    # by the wand alone, and only by however much its second steam outruns the
+    # extraction it was already overlapping.
     ready = sorted(result.orders[o].entered_at(State.READY) for o in result.orders)
     steam = params.station("steam_wand")
-    steam_oz = next(
-        task.oz for task in params.menu_item("latte").plan("hot")[0]
-        if task.station == "steam_wand"
-    )
+    head = params.station("group_head")
+    tasks = params.menu_item("latte").plan("hot")[0]
+    steam_oz = next(task.oz for task in tasks if task.station == "steam_wand")
+    shots = next(task.shots for task in tasks if task.station == "group_head")
+    steaming = steam.setup_s + steam.per_6oz_s * (steam_oz / 6)
+    pulling = head.shot_s * shots
     assert ready[1] - ready[0] == pytest.approx(
-        steam.setup_s + steam.per_6oz_s * (steam_oz / 6)
+        max(2 * steaming, pulling) - max(steaming, pulling)
     )
 
 

@@ -294,66 +294,123 @@ class Cafe:
             },
         )
 
+    def unattended(self, task: Task, order: Order, item: Item, starter: "Barista"):
+        """A machine cycle that needs a slot but nobody to watch it.
+
+        Run as its own process so the barista is free the whole time. No
+        try/finally: a generator that yields from `finally` cannot be closed,
+        and the harness closes every unfinished order at the cut-off.
+        """
+        with self.stations[task.station].request() as slot:
+            yield slot
+            self.emit_station(
+                EventType.STATION_START, order, task, starter, task.station, "machine",
+            )
+            yield self.env.timeout(task.duration_s)
+            self.emit_station(
+                EventType.STATION_END, order, task, starter, task.station, "machine",
+            )
+
     def make(self, order: Order, barista: Barista):
-        """Work the order's items, standing aside while machines run.
+        """Work the order's items, overlapping whatever a person is not needed for.
 
-        A press or a super-automatic occupies a machine, not a person: the
-        barista loads it and goes back to the floor, so the coffee for the next
-        order gets made while the panini presses.
+        A barista does not stand and watch an extraction. They start the shot,
+        steam the milk while it pulls, and pour when both are done — so a latte
+        costs `max(shot, steam) + pour`, not the sum. Working strictly in series
+        priced a latte at 112 seconds against a sandwich's 90 and made drinks
+        the slower half of the menu, which is the wrong way round from what the
+        cafe does.
 
-        Resources are always taken in the same order — a person, then a machine
-        — and never the other way round. Holding a machine while queueing for a
-        person deadlocks a busy cafe: the press waits for a barista who is
-        waiting for the press.
+        So: everything needing no person starts at once and runs in the
+        background — the group head, and the oven, which is why a sandwich heats
+        while the coffee gets made. Attended work is done in series by the one
+        barista holding the order, because a person cannot steam and pour at the
+        same time. Assembly waits for its own item's machines and nothing else.
 
-        The press is released when its cycle ends rather than when someone
-        collects, so a finished sandwich does not block the next one. That is
-        optimistic by however long a tray sits waiting.
+        Resources are still taken in the same order — a person, then a machine —
+        and never the other way round. The background processes only ever take a
+        machine, so they cannot be holding one while the foreground waits for a
+        person: that cycle is what deadlocked a busy cafe once already.
 
         Returns whoever is holding the order at the end, which need not be
         whoever started it.
         """
+        started = self.env.now
+        machines: dict[str, list] = {item.item_id: [] for item in order.items}
+        attended: list[tuple[Item, Task]] = []
+        assembly: list[tuple[Item, Task]] = []
+
         for item in order.items:
             for task in item.tasks:
                 station = (
                     self.params.station(task.station) if task.station is not None else None
                 )
-                if station is not None and station.groups_work:
-                    # Queue it and stand aside: the station's server decides
-                    # what runs with what, and holding a person while waiting
-                    # for a machine is what deadlocks a busy cafe.
-                    self.crew.put(barista)
-                    barista = None
-                    entry = self.submit(task.station, task, order, item)
-                    yield entry.done
-                    barista = yield self.crew.get()
-                    continue
+                if station is None or task.kind is TaskKind.ASSEMBLY:
+                    assembly.append((item, task))
+                elif station.groups_work:
+                    # The station's server decides what runs with what; standing
+                    # aside for it is the whole point of batching.
+                    machines[item.item_id].append(
+                        self.submit(task.station, task, order, item).done
+                    )
+                elif station.attended:
+                    attended.append((item, task))
+                else:
+                    machines[item.item_id].append(
+                        self.env.process(self.unattended(task, order, item, barista))
+                    )
 
-                if station is None or station.attended:
-                    yield from barista.work(task, order, kind=str(task.kind))
-                    continue
+        for _item, task in attended:
+            yield from barista.work(task, order, kind=str(task.kind))
 
-                # No try/finally around this: a generator that yields from
-                # `finally` cannot be closed, and the harness closes every
-                # unfinished order when the day is cut off. The crew is handed
-                # back before the wait, so an order abandoned mid-cycle leaves
-                # the floor correctly staffed and simply never collects.
-                starter = barista
+        for item, task in assembly:
+            waiting = machines.get(item.item_id) or []
+            if waiting:
+                # Hand the crew back before waiting on machines, never after.
                 self.crew.put(barista)
                 barista = None
-                with self.stations[task.station].request() as slot:
-                    yield slot
-                    self.emit_station(
-                        EventType.STATION_START, order, task, starter,
-                        task.station, "machine",
-                    )
-                    yield self.env.timeout(task.duration_s)
-                    self.emit_station(
-                        EventType.STATION_END, order, task, starter,
-                        task.station, "machine",
-                    )
+                for event in waiting:
+                    yield event
+                machines[item.item_id] = []
                 barista = yield self.crew.get()
+            yield from barista.work(task, order, kind=str(task.kind))
+            self.item_ready(order, item, started)
+
+        # An item with no assembly step still has to finish its machines.
+        for item in order.items:
+            waiting = machines.get(item.item_id) or []
+            if not waiting:
+                continue
+            self.crew.put(barista)
+            barista = None
+            for event in waiting:
+                yield event
+            machines[item.item_id] = []
+            barista = yield self.crew.get()
+            self.item_ready(order, item, started)
         return barista
+
+    def item_ready(self, order: Order, item: Item, started_s: float) -> None:
+        """This item is on the shelf, whatever the rest of the order is doing.
+
+        Watched behaviour: a drink goes out when it is poured and the sandwich
+        follows when the oven is done. The order is not ready until its last
+        item is, but the customer has had part of it for a while by then, and
+        an app that says "#42 is ready" once cannot describe that.
+        """
+        self.log.emit(
+            EventType.STATION_END,
+            self.env.now,
+            order_id=order.order_id,
+            item_id=item.item_id,
+            actor="bar",
+            station="shelf",
+            payload={
+                "kind": "item_ready",
+                "drink": item.drink,
+                "since_start_s": self.env.now - started_s,
+            },
+        )
 
     def serve(self, order: Order, arrival: Arrival):
         """One placed order, from the register to the handoff shelf."""

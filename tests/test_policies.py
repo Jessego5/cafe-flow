@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from collections import Counter
 
+import math
+
 import pytest
 import simpy
 
@@ -271,12 +273,16 @@ def test_the_press_does_not_hold_itself_idle_waiting_for_a_fuller_batch(batching
     assert all(size <= batching.station("panini_press").batch_size for size in sizes)
 
 
-def test_items_on_one_order_are_worked_one_after_another(batching):
-    """A known limit of the dispatcher, recorded rather than glossed: an order's
-    own items go through a station in sequence, so three sandwiches on a single
-    ticket take three cycles. Baskets are almost always one or two items, and
-    the saving measured across orders is unaffected — but a large single order
-    is modelled pessimistically."""
+def test_three_sandwiches_on_one_ticket_share_an_oven_cycle(batching):
+    """This used to record the opposite, as a known limit of the dispatcher: an
+    order's own items went through a station in sequence, so three sandwiches on
+    one ticket took three cycles and a large order was modelled pessimistically.
+
+    They no longer do. An item's machine work is submitted without holding the
+    barista, so all three reach the dispatcher together and the press runs as
+    many at once as it holds -- two here, so three sandwiches take two cycles
+    rather than three. That is what the cafe is doing when food comes back
+    slower than drinks: waiting to fill the tray."""
     at_s = 11 * 3600
     arrival = Arrival(
         "c0", "o0", float(at_s), Channel.WALKUP,
@@ -288,8 +294,11 @@ def test_items_on_one_order_are_worked_one_after_another(batching):
         event for event in result.log
         if event.station == "panini_press" and event.type is EventType.STATION_END
     ]
-    assert len(cycles) == 3
-    assert all(event.payload["size"] == 1 for event in cycles)
+    press = batching.station("panini_press")
+    assert len(cycles) == math.ceil(3 / press.batch_size)
+    # and they are full: it used to be three cycles of one.
+    assert sorted(event.payload["size"] for event in cycles) == [1, 2]
+    assert sum(event.payload["size"] for event in cycles) == 3
 
 
 # --------------------------------------------------------------------------
