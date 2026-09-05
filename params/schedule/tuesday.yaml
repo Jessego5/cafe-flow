@@ -1,0 +1,65 @@
+# Tuesday in Morgridge Hall, from the Fall 2026 room schedule.
+#
+# Written by `python -m tools.schedule_to_blocks`. Every end time and headcount
+# here is read from the registrar's export rather than guessed -- which is the
+# whole point, because the invented blocks it replaces put the day's peak an
+# hour early and stopped at 12:50 while the cafe stays open until 16:30.
+#
+# What this file does NOT settle is how many of those students walk over.
+# That is `capture_rate`, and it is still fitted against a counted queue.
+#
+#   91 section-meetings, 3516 students released inside opening
+#   hours; 715 more are in evening classes the cafe is shut for.
+arrivals:
+  model: class_blocks
+  class_blocks:
+  - ends_at: '08:35'
+    sections: 3
+    avg_enrollment: 16.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '09:15'
+    sections: 7
+    avg_enrollment: 54.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '09:40'
+    sections: 3
+    avg_enrollment: 21.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '10:45'
+    sections: 21
+    avg_enrollment: 36.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '11:50'
+    sections: 1
+    avg_enrollment: 24.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '12:15'
+    sections: 21
+    avg_enrollment: 38.2
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '12:55'
+    sections: 1
+    avg_enrollment: 24.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '14:15'
+    sections: 12
+    avg_enrollment: 60.2
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '15:45'
+    sections: 21
+    avg_enrollment: 32.1
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '16:20'
+    sections: 1
+    avg_enrollment: 25.0
+    building: Morgridge Hall
+    source: observed

@@ -1,0 +1,75 @@
+# Friday in Morgridge Hall, from the Fall 2026 room schedule.
+#
+# Written by `python -m tools.schedule_to_blocks`. Every end time and headcount
+# here is read from the registrar's export rather than guessed -- which is the
+# whole point, because the invented blocks it replaces put the day's peak an
+# hour early and stopped at 12:50 while the cafe stays open until 16:30.
+#
+# What this file does NOT settle is how many of those students walk over.
+# That is `capture_rate`, and it is still fitted against a counted queue.
+#
+#   46 section-meetings, 2229 students released inside opening
+#   hours; 14 more are in evening classes the cafe is shut for.
+arrivals:
+  model: class_blocks
+  class_blocks:
+  - ends_at: '09:15'
+    sections: 2
+    avg_enrollment: 73.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '09:40'
+    sections: 7
+    avg_enrollment: 49.3
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '10:45'
+    sections: 7
+    avg_enrollment: 65.3
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '11:30'
+    sections: 5
+    avg_enrollment: 7.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '11:50'
+    sections: 3
+    avg_enrollment: 62.3
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '12:15'
+    sections: 5
+    avg_enrollment: 9.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '12:55'
+    sections: 2
+    avg_enrollment: 134.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '14:10'
+    sections: 8
+    avg_enrollment: 50.9
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '14:15'
+    sections: 1
+    avg_enrollment: 8.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '15:00'
+    sections: 1
+    avg_enrollment: 12.0
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '15:45'
+    sections: 4
+    avg_enrollment: 74.2
+    building: Morgridge Hall
+    source: observed
+  - ends_at: '16:20'
+    sections: 1
+    avg_enrollment: 24.0
+    building: Morgridge Hall
+    source: observed

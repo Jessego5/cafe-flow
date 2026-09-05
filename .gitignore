@@ -9,3 +9,8 @@ out/
 .DS_Store
 node_modules/
 web/dist/
+
+# Raw source material: course schedules, exports, photographs. Derived
+# parameters get committed as YAML; the originals stay local.
+data/*
+!data/README.md
