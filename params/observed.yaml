@@ -59,9 +59,16 @@ customers:
   # which is not what happens here: people wait.
   #
   # This is raised to the least it can be and still be consistent with that one
-  # balk. `time_budget_min` is left alone deliberately — the model still loses
+  # balk. `time_budget_min` was left alone deliberately — the model still lost
   # far more customers than were seen leaving, and turning a second patience
-  # knob to bury that would be tuning the fit rather than fixing the model.
+  # knob to bury that would have been tuning the fit rather than fixing the
+  # model.
+  #
+  # Fixing the model is what happened instead. The budget was being spent after
+  # the register, so anyone whose drink took too long was recorded as having
+  # walked out on an order they had already paid for. It is now spent in the
+  # line, before the till, and abandonment falls to about one a day on its own
+  # — with the number itself never touched.
   balk_tolerance_min: { dist: lognormal, median: 20.0, sigma: 0.5 }
   source_of: { balk_tolerance_min: fitted }
 

@@ -14,6 +14,7 @@ every result the project produces.
 from __future__ import annotations
 
 import argparse
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -372,7 +373,29 @@ class Cafe:
         # unfinished order when the day is cut off at closing time. Putting a
         # worker back can never block — the pool is exactly as large as the
         # bench — so the plain call is both correct and safe to unwind.
-        barista: Barista = yield self.crew.get()
+        #
+        # Patience is spent here, in the line, and nowhere after it. A walk-up
+        # who does not reach the till inside their budget leaves; one who does
+        # has ordered and paid, and stays for a drink being made in front of
+        # them. Spending the budget after the register instead had the model
+        # shedding ~77 customers a day at a cafe where a full day of watching
+        # produced one, and no amount of widening the budget fixes a clock
+        # started in the wrong place.
+        waiting = self.crew.get()
+        if arrival.channel is Channel.WALKUP and math.isfinite(arrival.time_budget_s):
+            left_s = arrival.time_budget_s - (self.env.now - order.placed_at_s)
+            if left_s <= 0:
+                waiting.cancel()
+                self.renege(order, arrival)
+                return
+            outcome = yield waiting | self.env.timeout(left_s)
+            if waiting not in outcome:
+                waiting.cancel()
+                self.renege(order, arrival)
+                return
+            barista: Barista = outcome[waiting]
+        else:
+            barista = yield waiting
         try:
             yield from barista.work(register_task, order, station=REGISTER, kind="register")
             transition(order, State.ACCEPTED, at=self.env.now, actor=barista.name, log=self.log)
@@ -411,20 +434,11 @@ class Cafe:
             )
             return
 
-        # A pre-order's lead time is not waiting: they asked for it at a
-        # particular time and turned up then. Their patience is spent from when
-        # they arrive to collect, not from when they tapped the order in an
-        # hour earlier.
-        joined_s = arrival.wanted_at_s if arrival.preordered else order.placed_at_s
-        waited_s = self.env.now - joined_s
-        if waited_s > arrival.time_budget_s:
-            transition(
-                order, State.ABANDONED, at=self.env.now, actor="customer", log=self.log,
-                reason="out_of_time", waited_s=waited_s,
-                time_budget_s=arrival.time_budget_s, margin_cents=order.margin_cents,
-            )
-            return
-
+        # Nothing is checked against the time budget here any more. By this
+        # point the customer has been through the register, and somebody who
+        # has paid does not walk away from a drink on the shelf in front of
+        # them. What can still go wrong is a pre-order nobody comes back for,
+        # which is `no_show` above.
         transition(order, State.PICKED_UP, at=self.env.now, actor="customer", log=self.log)
 
     def admit(self, arrival: Arrival):
@@ -513,6 +527,22 @@ class Cafe:
         if baristas not in self._nominal:
             self._nominal[baristas] = nominal_seconds_per_order(self.params, baristas)
         return self._nominal[baristas]
+
+    def renege(self, order: Order, arrival: Arrival) -> None:
+        """A walk-up who gave up in the line before ever reaching the till.
+
+        Distinct from balking, which is a decision taken on arrival by looking
+        at the queue. This one joined it and then ran out of time — the cafe
+        never took the order, so unlike the old accounting there is no drink
+        made for somebody who has already gone.
+        """
+        transition(
+            order, State.ABANDONED, at=self.env.now, actor="customer", log=self.log,
+            reason="left_the_line",
+            waited_s=self.env.now - order.placed_at_s,
+            time_budget_s=arrival.time_budget_s,
+            margin_cents=order.margin_cents,
+        )
 
     def balks(self, arrival: Arrival, order: Order) -> bool:
         """Does this customer look at the line and leave?

@@ -48,67 +48,99 @@ class Arm:
         return load_params(base, *self.overlays, overlay=overlay)
 
 
+#: The cafe as it was actually measured, and the base of every arm below.
+#:
+#: The second file is the one that was missing. `observed.yaml` fits a single
+#: `capture_rate` on top of the *invented* class timetable in `base.yaml`;
+#: `fitted_arrivals.yaml` replaces that timetable with a curve fitted to the
+#: queue counted on 2026-09-03. Without it every experiment here ran on a
+#: fabricated demand shape while `sim/forecast.py` -- and therefore every
+#: promise the app quotes a customer -- ran on the fitted one. The analysis and
+#: the product disagreed about what day it was.
+OBSERVED: tuple[str, ...] = (
+    "params/observed.yaml",
+    "params/fitted_arrivals.yaml",
+)
+
+#: The other route to the same curve: the registrar's room schedule rather than
+#: a fit to the counted queue. Its own arm rather than a replacement, because
+#: the two routes agreeing is evidence and disagreeing is a finding -- and
+#: because only this one has content the queue counts did not put there.
+#:
+#: Thursday: it is the weekday both logged observations fall on. The other four
+#: are written out beside it and none of them is loaded by anything yet.
+TIMETABLE: tuple[str, ...] = (
+    "params/observed.yaml",
+    "params/schedule/thursday.yaml",
+)
+
+
 #: The two readings of the espresso bar. Both are assumed until the machine is
 #: identified; running them side by side costs the question before answering it.
 ARMS: dict[str, Arm] = {
     "manual_bar": Arm(
         "manual_bar",
-        (),
+        OBSERVED,
         "pitcher and separate group head; milk drinks can be batched",
     ),
     "superauto": Arm(
         "superauto",
-        ("params/experiments/superauto.yaml",),
+        OBSERVED + ("params/experiments/superauto.yaml",),
         "one Schaerer super-automatic; no pitcher, so nothing batches",
     ),
     "adoption": Arm(
         "adoption",
-        ("params/experiments/adoption.yaml",),
+        OBSERVED + ("params/experiments/adoption.yaml",),
         "30% order ahead, so that share never sees the line",
     ),
     "adoption_batched": Arm(
         "adoption_batched",
-        ("params/experiments/adoption.yaml", "params/experiments/batch.yaml"),
+        OBSERVED + ("params/experiments/adoption.yaml", "params/experiments/batch.yaml"),
         "both: ordering ahead and running compatible work together",
     ),
     "reordered": Arm(
         "reordered",
-        ("params/experiments/reorder.yaml",),
+        OBSERVED + ("params/experiments/reorder.yaml",),
         "batching plus a bounded reorder that avoids changeovers, guarded",
     ),
     "microwave": Arm(
         "microwave",
-        ("params/experiments/microwave.yaml",),
+        OBSERVED + ("params/experiments/microwave.yaml",),
         "food pre-made and heated to order, one at a time",
     ),
     "microwave_batched": Arm(
         "microwave_batched",
-        ("params/experiments/microwave.yaml", "params/experiments/batch.yaml"),
+        OBSERVED + ("params/experiments/microwave.yaml", "params/experiments/batch.yaml"),
         "the same, with batching on — which now has only the wand to work with",
     ),
     "shown_wait": Arm(
         "shown_wait",
-        ("params/observed.yaml", "params/experiments/shown_wait.yaml"),
+        OBSERVED + ("params/experiments/shown_wait.yaml",),
         "the wait on a screen; some people come back twenty minutes later",
     ),
     "second_till": Arm(
         "second_till",
-        ("params/observed.yaml", "params/experiments/second_till.yaml"),
+        OBSERVED + ("params/experiments/second_till.yaml",),
         "a second register open at the peaks",
     ),
     "observed": Arm(
         "observed",
-        ("params/observed.yaml",),
+        OBSERVED,
         "the cafe as it was measured on 2026-09-03",
+    ),
+    "timetable": Arm(
+        "timetable",
+        TIMETABLE,
+        "the same cafe, demand built from the room schedule instead of the fit",
     ),
     "batched": Arm(
         "batched",
-        ("params/experiments/batch.yaml",),
+        OBSERVED + ("params/experiments/batch.yaml",),
         "manual bar, running compatible work together at every station that can",
     ),
     "superauto_batched": Arm(
         "superauto_batched",
-        ("params/experiments/superauto.yaml", "params/experiments/batch.yaml"),
+        OBSERVED + ("params/experiments/superauto.yaml", "params/experiments/batch.yaml"),
         "super-automatic, so only the press has anything left to batch",
     ),
 }

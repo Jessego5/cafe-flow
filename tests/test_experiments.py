@@ -184,15 +184,28 @@ def test_a_sweep_runs_every_arm_at_every_value():
         assert point.result.params.customers.preorder_adoption == point.value
 
 
-def test_more_people_ordering_ahead_means_fewer_lost(tmp_path):
+def test_more_people_ordering_ahead_means_a_shorter_line(tmp_path):
     """The mechanism the plan cares about, swept rather than asserted at a
-    single point."""
+    single point.
+
+    This asserted `lost_fraction` falling until the arms were moved onto the
+    observed configuration. It passed for a reason that turned out not to be
+    true: patience was being spent *after* the register, so the model shed
+    customers who had already ordered, and ordering ahead 'rescued' them.
+    Once the budget is spent in the line where it belongs, almost nobody is
+    lost at all — which is what a full day of watching found — and there is no
+    lost revenue left for the app to recover.
+
+    What survives is the claim worth making anyway: ordering ahead takes people
+    out of the queue, so the queue gets shorter for everyone still in it. The
+    tail is where it shows, which is why this reads p90 and not the median.
+    """
     from sim.experiments import sweep
 
     points = sweep(["batched"], "customers.preorder_adoption", [0.0, 0.3, 0.6], list(range(6)))
-    lost = [point.summary("lost_fraction")[0] for point in points]
-    assert lost == sorted(lost, reverse=True), lost
-    assert lost[0] - lost[-1] > 0.05
+    p90 = [point.summary("wait_p90_walkup_s")[0] for point in points]
+    assert p90 == sorted(p90, reverse=True), p90
+    assert p90[0] - p90[-1] > 60.0, p90
 
 
 def test_figures_carry_their_provenance(tmp_path):
