@@ -171,3 +171,49 @@ def test_an_amendment_is_refused_for_a_sold_out_item(client):
 def test_an_empty_basket_is_not_an_amendment(client):
     order = place(client)
     assert client.patch(f"/orders/{order['order_id']}", json={"lines": []}).status_code == 422
+
+
+# --------------------------------------------------------------------------
+# the schema change that made this possible
+# --------------------------------------------------------------------------
+
+
+def test_a_database_that_predates_a_column_still_boots(tmp_path):
+    """`create_all` creates missing tables and never missing columns, so a
+    schema that grew a field passes every test and a fresh container while
+    refusing to start against any database that already exists.
+
+    Found the only way it can be: the HTTP replay would not start after
+    `available` was added, because out/cafe.db predated it.
+    """
+    import sqlite3
+
+    from sqlalchemy import create_engine
+
+    from app.db import MenuItemRow, add_missing_columns
+
+    target = tmp_path / "old.db"
+    connection = sqlite3.connect(target)
+    connection.execute(
+        "CREATE TABLE menu_items (name VARCHAR PRIMARY KEY, price_cents INTEGER,"
+        " cogs_cents INTEGER, requires_milk BOOLEAN, assembly_s FLOAT,"
+        " service_s FLOAT, stations VARCHAR, bottleneck_cost_s FLOAT, variants VARCHAR)"
+    )
+    connection.execute(
+        "INSERT INTO menu_items VALUES ('latte',575,200,1,20.0,74.0,'steam_wand',26.0,'hot,iced')"
+    )
+    connection.commit()
+    connection.close()
+
+    engine = create_engine(f"sqlite:///{target}")
+    added = add_missing_columns(engine)
+    assert "menu_items.available" in added
+
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        row = session.get(MenuItemRow, "latte")
+        assert row.available is True, "an existing item defaults to on sale"
+        assert row.price_cents == 575, "and keeps everything else"
+
+    assert add_missing_columns(engine) == [], "idempotent"

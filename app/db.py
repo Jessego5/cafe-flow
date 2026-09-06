@@ -14,7 +14,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Sequence
 
-from sqlalchemy import Column, UniqueConstraint, event as sa_event, text, update
+import logging
+
+from sqlalchemy import Column, UniqueConstraint, event as sa_event, inspect as sa_inspect, text, update
 from sqlalchemy.engine import Engine
 from sqlmodel import JSON, Field, Session, SQLModel, create_engine, select
 
@@ -23,6 +25,8 @@ from core.capacity import StationCapacityModel
 from core.events import Event, EventLog, EventType
 from core.menu import resolve_tasks
 from core.params import Params, SECONDS_PER_MINUTE
+
+log = logging.getLogger("cafe.db")
 from core.states import PENDING_SEQ, State
 from core.types import Channel, Item, Order
 
@@ -37,6 +41,7 @@ __all__ = [
     "DbEventLog",
     "get_engine",
     "init_db",
+    "add_missing_columns",
     "session_scope",
     "seed_menu",
     "ensure_slots",
@@ -271,7 +276,49 @@ def get_engine(url: str | None = None, *, echo: bool = False) -> Engine:
 def init_db(engine: Engine | None = None) -> Engine:
     engine = engine or get_engine()
     SQLModel.metadata.create_all(engine)
+    add_missing_columns(engine)
     return engine
+
+
+def add_missing_columns(engine: Engine) -> list[str]:
+    """Add columns the models have and the database does not.
+
+    `create_all` creates missing *tables* and never missing columns, so a schema
+    that grew a field boots fine against an empty database and fails on the
+    first query against a real one -- which means tests and a fresh container
+    both pass while every deployed instance refuses to start.
+
+    Deliberately small: ADD COLUMN with a default, nothing else. Renames, drops
+    and type changes are not survivable this way and should not be smuggled in
+    here; if one is ever needed it is worth the migration tool.
+    """
+    added: list[str] = []
+    inspector = sa_inspect(engine)
+    with engine.begin() as connection:
+        for table in SQLModel.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            have = {column["name"] for column in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in have:
+                    continue
+                if column.default is None and not column.nullable:
+                    raise RuntimeError(
+                        f"{table.name}.{column.name} is new, NOT NULL and has no "
+                        "default: it cannot be added to an existing database here"
+                    )
+                ddl = f"ALTER TABLE {table.name} ADD COLUMN {column.name} "
+                ddl += column.type.compile(engine.dialect)
+                if column.default is not None:
+                    literal = column.default.arg
+                    if isinstance(literal, bool):
+                        literal = int(literal)
+                    ddl += f" DEFAULT {literal!r}" if isinstance(literal, str) else f" DEFAULT {literal}"
+                connection.exec_driver_sql(ddl)
+                added.append(f"{table.name}.{column.name}")
+    if added:
+        log.info("added missing columns: %s", ", ".join(added))
+    return added
 
 
 def session_scope(engine: Engine | None = None) -> Session:
