@@ -1,0 +1,36 @@
+# Arm: the app holds a paid pre-order and puts it in the queue itself.
+#
+# The customer scrolls to a time, pays, and stops thinking about it. Nothing
+# reaches the bar until the *live* line says ordering now lands by the time they
+# asked for -- which is the whole advantage over pushing them a reminder, since
+# a person who has been told to order cannot be re-timed when the queue moves.
+#
+# It also removes the hardest thing in the notification spec. The reminder that
+# had to reach a closed tab minutes later becomes a server-side release loop,
+# so no web push, no VAPID, and no iOS home-screen install standing between a
+# customer and their coffee.
+
+meta:
+  scenario: adaptive_release
+  source: assumed
+
+customers:
+  preorder_adoption: 0.5
+  preorder_release: adaptive
+  # Re-check every half minute, and leave two minutes of slack when deciding.
+  # The margin is the whole dial between a cold drink and a waiting customer,
+  # swept over twelve days at half adoption:
+  #
+  #       margin   p50 gap   p90 gap   late  >2min early  shelf p50
+  #           0s      1.1m      2.0m    88%           0%       0.3m
+  #          60s      0.1m      1.0m    56%           2%       0.7m
+  #         120s     -0.8m     -0.0m     9%          11%       0.9m
+  #         240s     -2.9m     -2.0m     0%          90%       2.9m
+  #         480s     -6.8m     -6.0m     0%          99%       6.8m
+  #
+  # Two minutes is 91% on time with the p90 landing exactly on target and the
+  # median drink under a minute on the shelf. Past it you buy punctuality with
+  # cold coffee: four minutes is never late and almost always early.
+  release_poll_s: 30.0
+  release_margin_s: 120.0
+  source: assumed

@@ -485,6 +485,16 @@ class Cafe:
         if arrival.at_s > self.env.now:
             yield self.env.timeout(arrival.at_s - self.env.now)
 
+        # A pre-order under adaptive release has been paid for but not yet
+        # placed. `at_s` is when they committed; this is the wait until the line
+        # says it is time.
+        if (
+            arrival.preordered
+            and arrival.wanted_at_s is not None
+            and self.params.customers.preorder_release == "adaptive"
+        ):
+            yield from self.hold_until_release(arrival)
+
         if self.defers(arrival):
             yield self.env.timeout(
                 self.params.customers.shift_delay_min * SECONDS_PER_MINUTE
@@ -524,6 +534,34 @@ class Cafe:
             return
 
         yield self.env.process(self.serve(order, arrival))
+
+    def hold_until_release(self, arrival: Arrival):
+        """Keep a paid pre-order back, and join the queue at the last safe moment.
+
+        The customer chose a time and paid; nothing has reached the bar yet. The
+        quote that got them here came off a forecast, but by the time it matters
+        the live line is knowable, so this re-decides against that instead of
+        committing to the prediction.
+
+        Release when ordering now would land at the wanted time, plus a margin
+        of slack. Hold no later than the wanted time itself: a held order that
+        never releases is worse than a late one, and a line that grows faster
+        than the poll can follow has to be given up on rather than waited out.
+
+        This is what a pushed reminder cannot do. Once somebody has been told to
+        order, they cannot be re-timed.
+        """
+        wanted = arrival.wanted_at_s
+        poll = self.params.customers.release_poll_s
+        margin = self.params.customers.release_margin_s
+        while self.env.now < wanted:
+            depth = observable_queue_depth(
+                other.state for other in self.orders.values()
+            )
+            estimate = estimate_wait_s(depth, self.nominal_wait_per_person())
+            if self.env.now + estimate + margin >= wanted:
+                return
+            yield self.env.timeout(min(poll, wanted - self.env.now))
 
     def defers(self, arrival: Arrival) -> bool:
         """Does this customer see the wait and decide to come back later?

@@ -548,6 +548,20 @@ class CustomersParams(_Strict):
     # themselves out of the peak, and their order is deferred rather than lost.
     # That is the difference between this and balking, and it is the whole
     # reason it is worth anything.
+    #: What happens between paying for a pre-order and it reaching the bar.
+    #:
+    #: `fixed` is the old behaviour: it goes in one class block ahead, whatever
+    #: the line looks like when it lands. `adaptive` holds the paid order and
+    #: puts it in the queue at the last moment the *live* line still says it
+    #: will be ready on time -- which is the thing a reminder pushed to a phone
+    #: can never do, because once somebody has been told to order, they cannot
+    #: be re-timed.
+    preorder_release: Literal["fixed", "adaptive"] = "fixed"
+    #: How often a held order re-checks the line, and how much slack it leaves
+    #: when it decides. Durations, so they live here (ground rule 1).
+    release_poll_s: float | None = Field(default=None, gt=0)
+    release_margin_s: float | None = Field(default=None, ge=0)
+
     shown_wait: bool = False
     shift_fraction: float = Field(default=0.0, ge=0, le=1)
     # No defaults: a threshold and a delay are durations, and durations live in
@@ -556,6 +570,17 @@ class CustomersParams(_Strict):
     shift_threshold_min: float | None = Field(default=None, gt=0)
     shift_delay_min: float | None = Field(default=None, gt=0)
     source: Source | None = None
+
+    @model_validator(mode="after")
+    def _adaptive_release_has_its_clocks(self) -> "CustomersParams":
+        if self.preorder_release == "adaptive" and (
+            self.release_poll_s is None or self.release_margin_s is None
+        ):
+            raise ValueError(
+                "customers.preorder_release is adaptive but release_poll_s "
+                "and release_margin_s are not both set"
+            )
+        return self
 
     @model_validator(mode="after")
     def _showing_it_needs_both(self) -> "CustomersParams":

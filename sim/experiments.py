@@ -146,6 +146,16 @@ ARMS: dict[str, Arm] = {
         HYBRID,
         "the schedule's shape and the queue's level, three fitted numbers",
     ),
+    "fixed_release": Arm(
+        "fixed_release",
+        HYBRID + ("params/experiments/fixed_release.yaml",),
+        "half order ahead, a class block early, whatever the line is doing",
+    ),
+    "adaptive_release": Arm(
+        "adaptive_release",
+        HYBRID + ("params/experiments/adaptive_release.yaml",),
+        "the app holds the paid order and joins the queue at the last safe moment",
+    ),
     "batched": Arm(
         "batched",
         OBSERVED + ("params/experiments/batch.yaml",),
