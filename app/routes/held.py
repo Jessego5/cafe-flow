@@ -40,6 +40,7 @@ from app.db import (
     persist_order,
     session_scope,
 )
+from app.routes.catalog import unavailable
 from app.routes.common import order_payload
 from app.stream import broadcaster
 from core.capacity import StationCapacityModel
@@ -115,6 +116,14 @@ async def hold_order(body: HeldIn) -> dict:
 
     if not body.lines:
         raise HTTPException(400, "a held order needs at least one line")
+
+    # Refused now rather than at release: taking money for a sandwich the cafe
+    # has run out of and discovering it an hour later is the worst order of
+    # events available here.
+    with session_scope() as session:
+        out = unavailable(session, [line.drink for line in body.lines])
+    if out:
+        raise HTTPException(409, f"sold out: {', '.join(sorted(set(out)))}")
 
     try:
         wanted_at_s = parse_hhmm(body.wanted_at, field="wanted_at")

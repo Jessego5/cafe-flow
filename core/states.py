@@ -19,6 +19,7 @@ if TYPE_CHECKING:  # avoids a cycle: core.types imports State from here
     from core.types import Order
 
 __all__ = [
+    "amend",
     "State",
     "LEGAL",
     "TERMINAL",
@@ -149,6 +150,55 @@ def promise(
         channel=order.channel,
         is_simulated=order.is_simulated,
         payload={"promised_at_s": promised_at_s, **payload},
+    )
+    if log is not None:
+        event = log.append(event)
+    order.history.append(event)
+    return event
+
+
+def amend(
+    order: "Order",
+    replacement: "Order",
+    at: float,
+    actor: str = "customer",
+    *,
+    log: "EventLog | None" = None,
+    bottleneck_delta_s: float = 0.0,
+    **payload: Any,
+) -> Event:
+    """Change what an order is for, before anyone has started making it.
+
+    Not a state change either: the order stays where it is, it is just for
+    something else now. It still has to be an event, because every margin in
+    `analysis/` is summed from what `placed` offered, so an edit the log cannot
+    see is an edit the metrics report the old basket for.
+
+    Deltas rather than new totals. The log already said what was offered and
+    this says what changed, which means a reader does not have to reconstruct an
+    order's history to know what it is worth.
+    """
+    if order.state is not State.PLACED:
+        raise IllegalTransition(
+            f"{order.order_id} is {order.state} and can no longer be amended"
+        )
+    event = Event(
+        seq=PENDING_SEQ,
+        event_id="",
+        t_s=at,
+        type=EventType.ORDER_AMENDED,
+        order_id=order.order_id,
+        customer_id=order.customer_id,
+        actor=actor,
+        channel=order.channel,
+        is_simulated=order.is_simulated,
+        payload={
+            "items": [item.drink for item in replacement.items],
+            "price_delta_cents": replacement.price_cents - order.price_cents,
+            "margin_delta_cents": replacement.margin_cents - order.margin_cents,
+            "bottleneck_delta_s": bottleneck_delta_s,
+            **payload,
+        },
     )
     if log is not None:
         event = log.append(event)

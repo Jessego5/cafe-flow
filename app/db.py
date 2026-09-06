@@ -70,6 +70,12 @@ class MenuItemRow(SQLModel, table=True):
     stations: str                          # comma separated, in order
     bottleneck_cost_s: float               # seconds at params.bottleneck_station
     variants: str = ""                     # comma separated, empty if only one
+    #: Sold out, in the operational sense. Lives on the row rather than in
+    #: params because it changes hourly and params changes on a redeploy: the
+    #: bagels run out at eleven and nobody should be rebuilding an image for
+    #: that. `seed_menu` rewrites everything else from params and leaves this
+    #: alone, so it survives a restart.
+    available: bool = Field(default=True, index=True)
 
 
 class OrderRow(SQLModel, table=True):

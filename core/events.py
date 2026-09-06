@@ -29,6 +29,11 @@ class EventType(StrEnum):
     BATCH_FORMED = "batch_formed"      # items grouped for one station run
     PROMISE_SET = "promise_set"        # a ready-by time was quoted
     ARRIVAL = "arrival"                # a customer appeared (may then balk)
+    #: The basket changed before anyone started making it. Carries the deltas
+    #: rather than the new totals, so `analysis.metrics` can add them to what
+    #: the `placed` event already offered without knowing an order's history.
+    #: An edit that is not in the log is an edit the metrics cannot see.
+    ORDER_AMENDED = "order_amended"
 
 
 class Event(BaseModel):

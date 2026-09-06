@@ -403,6 +403,14 @@ def balk_count_and_lost_margin(
     lost_cents: dict[str, int] = defaultdict(int)
 
     for event in events:
+        # Before the state-change guard, not after it: an amendment is not a
+        # state change, and putting this below the `continue` made it
+        # unreachable while looking like it worked.
+        if event.type is EventType.ORDER_AMENDED:
+            # A basket edited before work started is worth what it is now, not
+            # what it was when placed.
+            offered_cents += int(event.payload.get("margin_delta_cents", 0))
+            continue
         if event.type is not EventType.STATE_CHANGE:
             continue
         if event.to_state == State.PLACED:

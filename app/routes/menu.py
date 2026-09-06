@@ -46,6 +46,10 @@ async def get_menu() -> dict:
                 "service_s": row.service_s if row else None,
                 "stations": [task.station for task in task_specs],
                 "bottleneck_cost_s": row.bottleneck_cost_s if row else None,
+                # Sold out, in the operational sense. The screen greys it out;
+                # the order endpoints refuse it. Absent a projection row the
+                # item has never been seeded, which is not the same as sold out.
+                "available": row.available if row else True,
             }
         )
 
@@ -61,6 +65,10 @@ async def get_menu() -> dict:
         # can do about it.
         "queue_depth": depth,
         "wait_estimate_s": None if per_order is None else round(estimate_wait_s(depth, per_order), 1),
+        # What one order is worth on its own. An empty queue is not a zero
+        # wait — there is still a drink to make — and the menu header says so
+        # rather than promising nothing. `/queue` already reports this.
+        "seconds_per_order": None if per_order is None else round(per_order, 1),
         # every surface states how much of what it shows is still guessed
         "provenance": params.provenance_report().caption(),
     }

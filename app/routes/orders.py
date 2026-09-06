@@ -13,6 +13,7 @@ import uuid
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import delete, select
 
 from app.config import day_seconds, get_params, service_date, settings
 from app.db import (
@@ -24,15 +25,19 @@ from app.db import (
     release_slot_capacity,
     reserve_slot_capacity,
     session_scope,
+    OrderItemRow,
+    OrderRow,
     SlotRow,
 )
+from app.routes.catalog import unavailable
 from app.routes.common import event_payload, order_payload
 from app.stream import broadcaster
 from core.capacity import StationCapacityModel
+from core.events import EventType
 from core.menu import Line, make_order
 from core.params import ConfigError, SECONDS_PER_MINUTE, format_hhmm, parse_hhmm
 from core.promise import load_forecast, plan_for, ready_if_ordered_now
-from core.states import IllegalTransition, State, place, promise, transition
+from core.states import IllegalTransition, State, amend, place, promise, transition
 from core.types import Channel
 
 router = APIRouter(tags=["orders"])
@@ -51,6 +56,12 @@ class OrderIn(BaseModel):
     channel: Channel = Channel.WALKUP
     slot_id: str | None = None
     customer_id: str | None = None
+    #: The caller showed this customer a ready time before they committed, so
+    #: record what was quoted. Off by default, and deliberately so: an order
+    #: placed without a quote must move through exactly the states `core` moves
+    #: it through, or the app and the simulator no longer describe the same
+    #: cafe (ground rule 2). The time itself is still the server's own.
+    quoted: bool = False
 
 
 class TransitionIn(BaseModel):
@@ -76,6 +87,22 @@ def _simulated(header: str | None) -> bool:
     return wanted
 
 
+def _forecast_quote(params, lines, now_s):
+    """What the app would tell this customer their order is ready by.
+
+    Quoted here rather than taken from the client: a promise the cafe is going
+    to be measured against has to be the cafe's own number, not one a caller
+    can name. Returns None when there is no forecast to quote from — an order
+    is still an order, it just carries no promise.
+    """
+    try:
+        forecast = load_forecast(settings.forecast_path)
+        quote = ready_if_ordered_now(forecast, params, lines, now_s)
+    except ConfigError:
+        return None
+    return forecast, quote
+
+
 @router.post("/orders", status_code=201)
 async def create_order(
     body: OrderIn,
@@ -95,16 +122,22 @@ async def create_order(
 
     for attempt in range(NUMBER_RETRIES):
         with session_scope() as session:
+            # A replay is reproducing a day that already happened, so it is not
+            # refused for something the counter is out of today: that would make
+            # history depend on the present.
+            if not is_simulated:
+                out = unavailable(session, [line.drink for line in body.lines])
+                if out:
+                    raise HTTPException(409, f"sold out: {', '.join(sorted(set(out)))}")
             number = next_order_number(session, on)
             order_id = uuid.uuid4().hex[:12]
 
+            lines = [Line(line.drink, line.milk_type, line.variant) for line in body.lines]
             try:
                 order = make_order(
                     order_id,
                     params,
-                    lines=[
-                        Line(line.drink, line.milk_type, line.variant) for line in body.lines
-                    ],
+                    lines=lines,
                     channel=body.channel,
                     placed_at_s=now_s,
                     customer_id=body.customer_id,
@@ -147,7 +180,27 @@ async def create_order(
             )
             if promised_at_s is not None:
                 promise(order, at=now_s, promised_at_s=promised_at_s, log=log,
-                        slot_id=order.slot_id)
+                        slot_id=order.slot_id, source="slot")
+            elif body.quoted:
+                # No window booked, but a time was put in front of someone, and
+                # a quote nobody records is a promise nobody can check. Writing
+                # it here is what lets `analysis.promise_error` run over this
+                # app's own log and say whether the number held.
+                quoted = _forecast_quote(params, lines, now_s)
+                if quoted is not None:
+                    forecast, quote = quoted
+                    promised_at_s = quote.ready_at_s
+                    promise(
+                        order,
+                        at=now_s,
+                        promised_at_s=promised_at_s,
+                        log=log,
+                        source="forecast",
+                        wait_s=round(quote.wait_s, 1),
+                        basket_s=round(quote.basket_s, 1),
+                        quantile=forecast.quantile,
+                        days=forecast.seeds,
+                    )
 
             # after the promise, so the row records the time that was quoted
             row = persist_order(
@@ -250,6 +303,115 @@ async def get_order(order_id: str) -> dict:
         for item in order.items
     ]
     payload["events"] = [event_payload(event) for event in events]
+    return payload
+
+
+class AmendIn(BaseModel):
+    lines: list[LineIn] = Field(min_length=1)
+
+
+@router.patch("/orders/{order_id}")
+async def amend_order(order_id: str, body: AmendIn) -> dict:
+    """Change the basket, while nobody has started making it.
+
+    Only from `placed`. Once a barista has accepted the order they are holding
+    the cup, and editing what is in it from a phone is not a thing a cafe can
+    honour -- so this is a 409 rather than a silent no-op, because the customer
+    needs to know their change did not take.
+
+    The amendment is written to the log, not just to the row. Every margin in
+    `analysis/` is summed from `placed` events, so an edit that only updated the
+    projection would leave the metrics reporting the basket the customer changed
+    their mind about. The event carries deltas rather than new totals: the log
+    already said what was offered, and this says what changed.
+    """
+    params = get_params()
+    now_s = day_seconds(params)
+
+    with session_scope() as session:
+        found = load_order(session, order_id, params)
+        if found is None:
+            raise HTTPException(404, f"no order {order_id!r}")
+        row, order = found
+
+        if order.state is not State.PLACED:
+            raise HTTPException(
+                409,
+                f"order {order_id} is {row.state} and can no longer be changed",
+            )
+
+        if not row.is_simulated:
+            out = unavailable(session, [line.drink for line in body.lines])
+            if out:
+                raise HTTPException(409, f"sold out: {', '.join(sorted(set(out)))}")
+
+        lines = [Line(line.drink, line.milk_type, line.variant) for line in body.lines]
+        try:
+            amended = make_order(
+                order_id,
+                params,
+                lines=lines,
+                channel=order.channel,
+                placed_at_s=row.placed_at_s,
+                customer_id=row.customer_id,
+                is_simulated=row.is_simulated,
+            )
+        except ConfigError as exc:
+            raise HTTPException(400, str(exc)) from None
+
+        cost_s = StationCapacityModel(params).order_cost(amended)
+        log = DbEventLog(
+            session, scenario=str(settings.env), is_simulated=row.is_simulated,
+            policy=params.policy.name,
+        )
+        try:
+            amend(
+                order, amended, at=now_s, actor="customer", log=log,
+                bottleneck_delta_s=cost_s - row.bottleneck_cost_s,
+            )
+        except IllegalTransition as exc:
+            raise HTTPException(409, str(exc)) from None
+
+        # A booked slot was sized for the old basket. Rather than reason about a
+        # partial re-reservation, give the old cost back and take the new one;
+        # if the slot cannot hold it, the amendment is refused and nothing moved.
+        if row.slot_id:
+            release_slot_capacity(session, row.slot_id, row.bottleneck_cost_s)
+            if not reserve_slot_capacity(session, row.slot_id, cost_s):
+                raise HTTPException(409, f"slot {row.slot_id} cannot hold the new order")
+
+        # Updated in place rather than re-persisted: the order keeps its id and
+        # the number on the pickup display, which is the whole point of amending
+        # rather than cancelling and re-placing.
+        session.exec(delete(OrderItemRow).where(OrderItemRow.order_id == order_id))
+        row.price_cents = amended.price_cents
+        row.margin_cents = amended.margin_cents
+        row.bottleneck_cost_s = cost_s
+        row.updated_at = log.published[-1].wall_ts
+        session.add(row)
+        session.flush()
+        for position, item in enumerate(amended.items):
+            session.add(
+                OrderItemRow(
+                    item_id=item.item_id,
+                    order_id=order_id,
+                    position=position,
+                    drink=item.drink,
+                    milk_type=item.milk_type,
+                    variant=item.variant,
+                    price_cents=item.price_cents,
+                    cogs_cents=item.cogs_cents,
+                    requires_milk=item.requires_milk,
+                )
+            )
+        session.commit()
+        row = session.get(OrderRow, order_id)
+        items = session.exec(
+            select(OrderItemRow).where(OrderItemRow.order_id == order_id)
+        ).all()
+        payload = order_payload(row, items, now_s=now_s)
+
+    broadcaster.publish(log.published)
     return payload
 
 
