@@ -188,3 +188,18 @@ def test_holding_needs_its_clocks_configured(client, at, monkeypatch):
     response = client.post("/held", json={"lines": LINES, "wanted_at": "09:00"})
     assert response.status_code == 503
     assert "release_margin_s" in response.text
+
+
+def test_a_held_order_keeps_its_name_through_release(client, at):
+    """The hold is paid for. Losing the name on the way to the bar is losing the
+    only handle the counter has on a coffee somebody has been charged for."""
+    from app.routes.held import release_due
+
+    held = client.post(
+        "/held", json={"lines": LINES, "wanted_at": "09:00", "customer_name": "Sam"}
+    ).json()
+    at(9 * HOUR + 600.0)
+    assert release_due() != []
+
+    order_id = client.get(f"/held/{held['held_id']}").json()["order_id"]
+    assert client.get(f"/orders/{order_id}").json()["customer_name"] == "Sam"

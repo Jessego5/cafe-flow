@@ -68,6 +68,7 @@ class HeldIn(BaseModel):
     lines: list[LineIn]
     wanted_at: str
     customer_id: str | None = None
+    customer_name: str | None = None
 
 
 def _release_clocks(params: Params) -> tuple[float, float]:
@@ -158,6 +159,7 @@ async def hold_order(body: HeldIn) -> dict:
         quoted_ready_at_s=quote.ready_at_s,
         lines_json=json.dumps([line.model_dump() for line in body.lines]),
         customer_id=body.customer_id,
+        customer_name=(body.customer_name or "").strip() or None,
         price_cents=priced.price_cents,
         created_at=now_utc(),
     )
@@ -246,7 +248,10 @@ def _release(session: Session, row: HeldOrderRow, params: Params, now_s: float):
         source="held", held_id=row.held_id,
         quoted_order_at_s=round(row.quoted_order_at_s, 1),
     )
-    persist_order(session, order, params, number=number, on=on, bottleneck_cost_s=cost_s)
+    persist_order(
+        session, order, params, number=number, on=on, bottleneck_cost_s=cost_s,
+        customer_name=row.customer_name,
+    )
 
     row.state = "released"
     row.released_at_s = now_s

@@ -140,7 +140,7 @@ function grouped(cart) {
   return [...rows.values()]
 }
 
-function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRemove, onPlace, onHold, placing, error, editing }) {
+function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRemove, onPlace, onHold, placing, error, editing, name, onName }) {
   const byName = new Map(menu.items.map((item) => [item.name, item]))
   return (
     <>
@@ -184,6 +184,20 @@ function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRem
             />
           ) : (
             <>
+              {/* What the bar calls out. Optional on purpose: somebody in a
+                  hurry gets a number, and nobody is made to type before they
+                  can buy a coffee. */}
+              <label className="who">
+                <span>Name for the order</span>
+                <input
+                  type="text"
+                  value={name}
+                  maxLength={40}
+                  placeholder="Optional"
+                  autoComplete="given-name"
+                  onChange={(event) => onName(event.target.value)}
+                />
+              </label>
               {error && <p className="strike">{error}</p>}
               <button
                 className="slab filled wide"
@@ -230,6 +244,8 @@ export function OrderTab({
   error,
   editing,
   onStopEditing,
+  name,
+  onName,
 }) {
   const groups = useMemo(() => (menu ? sections(menu.items) : []), [menu])
   const [active, setActive] = useState(null)
@@ -441,6 +457,8 @@ export function OrderTab({
           nowMinutes={hours?.now ?? 0}
           mode={editing ? 'now' : mode}
           editing={editing}
+          name={name}
+          onName={onName}
           onClose={() => setShowCart(false)}
           onRemove={onRemove}
           onPlace={() => onPlace(() => setShowCart(false))}

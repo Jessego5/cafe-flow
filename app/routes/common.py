@@ -27,6 +27,9 @@ def order_payload(
         "number": row.number,
         "state": row.state,
         "channel": row.channel,
+        # The bar calls this out; `/display` builds its own dict and does not
+        # include it, which is the point.
+        "customer_name": row.customer_name,
         "is_simulated": row.is_simulated,
         "service_date": row.service_date,
         "placed_at": row.placed_at.isoformat(),

@@ -78,6 +78,9 @@ function Card({ order, since, onMove, busy, nowS, quotedS }) {
     <div className={`card${late ? ' at-risk' : ''}`}>
       <div className="head">
         <span className="number">#{order.number}</span>
+        {/* What gets called across the counter. The number is what the public
+            display shows; this is not on it. */}
+        {order.customer_name && <span className="called">{order.customer_name}</span>}
         <span className={waiting > LATE_S ? 'waiting warn' : 'waiting muted'}>{elapsed(waiting)}</span>
         <span className="pill">{order.state.replace(/_/g, ' ')}</span>
         {order.is_simulated && <span className="pill sim">simulated</span>}

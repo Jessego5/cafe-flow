@@ -30,7 +30,7 @@ export function Ticket({ order, since, onChange }) {
     <div className="ticket">
       <div className="head">
         <div>
-          <span className="eyebrow">Order</span>
+          <span className="eyebrow">{order.customer_name || 'Order'}</span>
           <div className="no">#{order.number}</div>
         </div>
         <span className={stateClass(order.state)}>{STATE_LABEL[order.state] || order.state}</span>

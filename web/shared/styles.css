@@ -229,3 +229,11 @@ footer { padding: 1.5rem 1.25rem; color: var(--faint); font-size: 0.78rem; text-
 }
 .sold-out .pill.out { cursor: pointer; }
 .sold-out .chip[disabled], .sold-out .pill[disabled] { opacity: 0.5; cursor: wait; }
+
+/* The name the bar calls out. Beside the number, never on /pickup: a public
+   screen showing a wall of first names is a different thing from one showing
+   #42. */
+.card .head .called {
+  font-weight: 600;
+  margin-right: 0.15rem;
+}

@@ -56,6 +56,11 @@ class OrderIn(BaseModel):
     channel: Channel = Channel.WALKUP
     slot_id: str | None = None
     customer_id: str | None = None
+    #: What the bar calls out. Trimmed and capped rather than validated: a name
+    #: is whatever somebody says it is, and refusing one because it has a space
+    #: or an accent in it is how an app tells a person they are wrong about
+    #: their own name.
+    customer_name: str | None = Field(default=None, max_length=40)
     #: The caller showed this customer a ready time before they committed, so
     #: record what was quoted. Off by default, and deliberately so: an order
     #: placed without a quote must move through exactly the states `core` moves
@@ -204,7 +209,8 @@ async def create_order(
 
             # after the promise, so the row records the time that was quoted
             row = persist_order(
-                session, order, params, number=number, on=on, bottleneck_cost_s=cost_s
+                session, order, params, number=number, on=on, bottleneck_cost_s=cost_s,
+                customer_name=(body.customer_name or "").strip() or None,
             )
 
             try:

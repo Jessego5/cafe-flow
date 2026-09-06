@@ -817,3 +817,26 @@ button:disabled { cursor: default; }
   color: inherit; font: inherit; opacity: 0.7; text-decoration: underline;
 }
 .ticket .drop { margin-top: 0.6rem; }
+
+/* Name for the order. Optional, and it looks optional. */
+.who {
+  display: block;
+  margin-top: 1rem;
+}
+.who span {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  margin-bottom: 0.3rem;
+}
+.who input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.who input::placeholder { opacity: 0.45; }

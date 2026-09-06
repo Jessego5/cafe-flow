@@ -217,3 +217,58 @@ def test_a_database_that_predates_a_column_still_boots(tmp_path):
         assert row.price_cents == 575, "and keeps everything else"
 
     assert add_missing_columns(engine) == [], "idempotent"
+
+
+# --------------------------------------------------------------------------
+# the name the bar calls out
+# --------------------------------------------------------------------------
+
+
+def test_a_name_reaches_the_bar_and_never_the_public_display(client):
+    """The number is what a screen strangers stand in front of shows. A wall of
+    first names is a different thing, and this is the test that keeps it one."""
+    placed = client.post(
+        "/orders",
+        json={"lines": LATTE, "channel": "walkup", "customer_name": "  Jessica  "},
+    ).json()
+    assert placed["customer_name"] == "Jessica", "trimmed, not rejected"
+
+    queue = client.get("/queue").json()
+    assert [o["customer_name"] for o in queue["orders"]] == ["Jessica"]
+
+    for state in ("accepted", "in_progress", "ready"):
+        client.post(f"/orders/{placed['order_id']}/transition",
+                    json={"to": state, "actor": "barista"})
+
+    display = client.get("/display").json()
+    assert display["ready"][0]["number"] == placed["number"]
+    assert "Jessica" not in str(display)
+    assert "customer_name" not in str(display)
+
+
+def test_a_name_is_optional_and_blank_is_no_name(client):
+    """Nobody is made to type before they can buy a coffee."""
+    assert client.post(
+        "/orders", json={"lines": LATTE, "channel": "walkup"}
+    ).json()["customer_name"] is None
+    assert client.post(
+        "/orders", json={"lines": LATTE, "channel": "walkup", "customer_name": "   "}
+    ).json()["customer_name"] is None
+
+
+def test_a_name_is_whatever_somebody_says_it_is(client):
+    """Capped, not validated. Refusing a name for having an apostrophe or an
+    accent in it is how an app tells a person they are wrong about their own."""
+    body = {"lines": LATTE, "channel": "walkup", "customer_name": "Zoë O'Brien-史"}
+    assert client.post("/orders", json=body).json()["customer_name"] == "Zoë O'Brien-史"
+
+    too_long = {"lines": LATTE, "channel": "walkup", "customer_name": "x" * 60}
+    assert client.post("/orders", json=too_long).status_code == 422
+
+
+def test_amending_keeps_the_name(client):
+    placed = client.post(
+        "/orders", json={"lines": LATTE, "channel": "walkup", "customer_name": "Ada"}
+    ).json()
+    amended = client.patch(f"/orders/{placed['order_id']}", json={"lines": WITH_FOOD}).json()
+    assert amended["customer_name"] == "Ada"

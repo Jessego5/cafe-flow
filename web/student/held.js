@@ -35,10 +35,10 @@ const remember = (heldId) => write([...new Set([...read(), heldId])])
 const forget = (heldId) => write(read().filter((id) => id !== heldId))
 
 /** Pay and hold. The server re-derives the timing; it does not take ours. */
-export async function hold(lines, wantedAt) {
+export async function hold(lines, wantedAt, name = null) {
   const row = await request('/held', {
     method: 'POST',
-    body: JSON.stringify({ lines, wanted_at: wantedAt }),
+    body: JSON.stringify({ lines, wanted_at: wantedAt, customer_name: name }),
   })
   remember(row.held_id)
   return row

@@ -95,6 +95,11 @@ class OrderRow(SQLModel, table=True):
     state: str = Field(index=True)
     is_simulated: bool = Field(default=False, index=True)
     customer_id: str | None = None
+    #: What the bar calls out. A display label, not an identity: `customer_id`
+    #: is the seam for that and is still nobody's. It is deliberately absent
+    #: from `/display`, because a public screen showing a wall of first names is
+    #: a different thing from one showing #42.
+    customer_name: str | None = None
     slot_id: str | None = Field(default=None, foreign_key="slots.slot_id", index=True)
     placed_at: datetime                     # UTC
     placed_at_s: float                      # seconds since local midnight
@@ -230,6 +235,7 @@ class HeldOrderRow(SQLModel, table=True):
     quoted_ready_at_s: float
     lines_json: str
     customer_id: str | None = None
+    customer_name: str | None = None
     price_cents: int = 0
     created_at: datetime                    # UTC, like every other timestamp here
     released_at_s: float | None = None
@@ -565,6 +571,7 @@ def persist_order(
     number: int,
     on: date,
     bottleneck_cost_s: float,
+    customer_name: str | None = None,
 ) -> OrderRow:
     row = OrderRow(
         order_id=order.order_id,
@@ -574,6 +581,7 @@ def persist_order(
         state=str(order.state),
         is_simulated=order.is_simulated,
         customer_id=order.customer_id,
+        customer_name=customer_name,
         slot_id=order.slot_id,
         placed_at=at_local_time(params, on, order.placed_at_s),
         placed_at_s=order.placed_at_s,

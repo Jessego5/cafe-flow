@@ -57,6 +57,25 @@ export function App() {
   // rather than a new order, which is the only thing that makes `place` two
   // different verbs.
   const [editing, setEditing] = useState(null)
+  // Remembered on the device, like the order ids: somebody who buys a coffee
+  // every morning should not retype their own name every morning. It is a
+  // label, not an identity -- nothing is looked up by it.
+  const [name, setName] = useState(() => {
+    try {
+      return localStorage.getItem('cafe-flow.name.v1') || ''
+    } catch {
+      return ''
+    }
+  })
+
+  const rename = (value) => {
+    setName(value)
+    try {
+      localStorage.setItem('cafe-flow.name.v1', value)
+    } catch {
+      /* private browsing: it lasts the session */
+    }
+  }
   const [error, setError] = useState(null)
 
   const pane = useRef(null)
@@ -105,7 +124,7 @@ export function App() {
   // means something.
   const placeHold = (quote) => {
     setError(null)
-    hold(cart, quote.wanted_at)
+    hold(cart, quote.wanted_at, name.trim() || null)
       .then((row) => {
         setHolds((current) => [...current, row])
         setCart([])
@@ -171,7 +190,7 @@ export function App() {
     setError(null)
     const sent = editing
       ? amendOrder(editing, cart)
-      : placeOrder(cart, { channel: 'walkup', quoted: true })
+      : placeOrder(cart, { channel: 'walkup', quoted: true, name: name.trim() || null })
     sent
       .then((order) => {
         remember(order.order_id)
@@ -214,6 +233,8 @@ export function App() {
             onHold={placeHold}
             editing={editing}
             onStopEditing={stopEditing}
+            name={name}
+            onName={rename}
             placing={placing}
             error={error}
           />

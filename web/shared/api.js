@@ -25,10 +25,13 @@ export const getOrder = (id) => request(`/orders/${id}`)
 // committed, so it records what it promised and `promise_error` can be run over
 // the log afterwards. The student view always shows one: the planner is the
 // screen the order is placed from.
-export const placeOrder = (lines, { channel = 'walkup', slotId = null, quoted = false } = {}) =>
+export const placeOrder = (
+  lines,
+  { channel = 'walkup', slotId = null, quoted = false, name = null } = {},
+) =>
   request('/orders', {
     method: 'POST',
-    body: JSON.stringify({ lines, channel, slot_id: slotId, quoted }),
+    body: JSON.stringify({ lines, channel, slot_id: slotId, quoted, customer_name: name }),
   })
 
 // When it will be ready, or when to order for a time you have in mind. The
