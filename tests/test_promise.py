@@ -144,3 +144,29 @@ def test_a_forecast_must_say_which_quantile_it_quotes(tmp_path):
     )
     with pytest.raises(ConfigError, match="not a forecast"):
         load_forecast(bad)
+
+
+def test_a_time_less_than_one_bin_away_is_not_refused_out_of_hand():
+    """The walk back from the wanted time steps in the forecast's own bins, so
+    the grid rarely lands on now. It used to step straight past `earliest` and
+    report the earliest-we-can-do answer while holding a quote that was in time:
+    "I want it in five minutes" refused, with a drink ready in three.
+    """
+    from core.menu import Line
+    from core.params import load_params
+    from core.promise import load_forecast, plan_for
+
+    params = load_params(*CONFIG)
+    forecast = load_forecast("params/forecast.yaml")
+    lines = [Line("latte", "oat", "hot")]
+    now_s = 11 * 3600.0
+
+    soon = plan_for(forecast, params, lines, now_s + 5 * 60, now_s)
+    assert soon.achievable, "ready before it was wanted, so it is achievable"
+    assert soon.ready_at_s <= now_s + 5 * 60
+    assert soon.order_at_s == now_s, "the latest start that lands in time is now"
+
+    # and one that genuinely cannot be made still says so
+    immediate = plan_for(forecast, params, lines, now_s + 30, now_s)
+    assert not immediate.achievable
+    assert immediate.ready_at_s > now_s + 30

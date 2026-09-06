@@ -162,6 +162,13 @@ def plan_for(
     in time. Latest rather than earliest, because ordering sooner than necessary
     only means the drink sits on the shelf getting cold — and because the whole
     point is to move the order into the trough, not out of the day.
+
+    The walk always ends on `earliest` rather than stepping past it. Stepping in
+    the forecast's own bins from the time wanted means the grid rarely lands on
+    now, so a request less than one bin ahead used to be refused with a quote
+    that was in time: "I want it in five minutes" got the earliest-we-can-do
+    answer while the drink would have been ready in three. Ordering this instant
+    is always the earliest a start can be, so it is always the last candidate.
     """
     basket = basket_seconds(params, lines)
     typical = typical_basket_seconds(params)
@@ -170,8 +177,8 @@ def plan_for(
     earliest = max(now_s, forecast.opens_at_s)
 
     best: Promise | None = None
-    at = wanted_at_s
-    while at >= earliest:
+    at = max(wanted_at_s, earliest)
+    while True:
         wait = _wait_for(forecast, params, at, basket, typical)
         if at + wait <= wanted_at_s:
             best = Promise(
@@ -183,7 +190,9 @@ def plan_for(
                 wanted_at_s=wanted_at_s,
             )
             break
-        at -= step_s
+        if at <= earliest:
+            break
+        at = max(earliest, at - step_s)
 
     if best is not None:
         return best

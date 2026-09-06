@@ -43,8 +43,28 @@ VIEWS = {
 }
 
 
+def _log_to_the_console() -> None:
+    """Make the app's own logs visible under uvicorn.
+
+    uvicorn configures its own loggers and leaves the root one alone, so
+    everything this app says -- which configuration it booted on, whether the
+    release loop is running, when a held order fires -- went nowhere in a
+    container while appearing fine in a test. A deployment whose logs cannot
+    say what it came up as is one you have to guess about.
+    """
+    logger = logging.getLogger("cafe")
+    if logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _log_to_the_console()
     params = get_params()
     init_db(get_engine())
     with session_scope() as session:
