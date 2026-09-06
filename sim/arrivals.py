@@ -12,7 +12,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from core.params import SECONDS_PER_MINUTE, Params, format_hhmm
+from core.params import ConfigError, SECONDS_PER_MINUTE, Params, format_hhmm
+from core.promise import Forecast, load_forecast
 from core.types import Channel, Line
 from sim.balking import draw_channel, preorder_lead_s, sample_minutes
 
@@ -169,6 +170,49 @@ def _from_profile(params: Params, rng: np.random.Generator) -> list[tuple[float,
     return times
 
 
+def _forecast_for(params: Params) -> "Forecast | None":
+    """The wait-by-time-of-day the app would be showing, or None.
+
+    Only loaded when somebody is going to act on it. A cafe not offering
+    arrive-by has no forecast in front of anyone, and a missing file is then not
+    an error -- it is a cafe that has not run `python -m sim.forecast`.
+    """
+    if params.customers.retime_fraction <= 0:
+        return None
+    try:
+        return load_forecast("params/forecast.yaml")
+    except ConfigError:
+        return None
+
+
+def _retimed(
+    wanted_at_s: float, forecast: "Forecast", params: Params
+) -> float:
+    """The slot this customer picks once they can see what each one costs.
+
+    The planner shows the wait at every time of day. Somebody who wanted 12:15,
+    sees eleven minutes there and three at 12:45, and is not in a hurry, takes
+    12:45 -- which is the whole economic argument for arrive-by, and the only
+    lever in this project that moves demand rather than rearranging it.
+
+    Scans forward in the forecast's own bins and takes the first under the
+    threshold. Returns the original time when nothing inside the window is
+    better, because somebody who cannot find a quieter slot does not invent one.
+    """
+    threshold_s = params.customers.retime_threshold_min * SECONDS_PER_MINUTE
+    window_s = params.customers.retime_window_min * SECONDS_PER_MINUTE
+    step_s = forecast.bin_minutes * SECONDS_PER_MINUTE
+
+    if forecast.wait_at(wanted_at_s) <= threshold_s:
+        return wanted_at_s
+    at = wanted_at_s + step_s
+    while at <= min(wanted_at_s + window_s, params.meta.end_s):
+        if forecast.wait_at(at) <= threshold_s:
+            return at
+        at += step_s
+    return wanted_at_s
+
+
 def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]:
     """The whole day's demand, sorted by arrival time.
 
@@ -194,6 +238,7 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
 
     times.sort(key=lambda pair: pair[0])
     lead_s = preorder_lead_s(params)
+    forecast = _forecast_for(params)
 
     drawn: list[Arrival] = []
     for wanted_at_s, source in times:
@@ -209,6 +254,17 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
         budget_s = sample_minutes(params.customers.time_budget_min, rng) * SECONDS_PER_MINUTE
         no_show = rng.random() < params.customers.no_show_rate
         defer_roll = float(rng.random())
+
+        # Somebody ordering ahead is choosing a time, not accepting one. Where
+        # the app shows them what each costs, a share of them move off the peak
+        # -- deferred demand rather than lost demand, and the only thing here
+        # that changes *when* people come rather than how they are served.
+        if (
+            forecast is not None
+            and channel is Channel.PREORDER
+            and defer_roll < params.customers.retime_fraction
+        ):
+            wanted_at_s = _retimed(wanted_at_s, forecast, params)
 
         placed_at_s = (
             max(opens, wanted_at_s - lead_s)

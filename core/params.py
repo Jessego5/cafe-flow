@@ -562,6 +562,19 @@ class CustomersParams(_Strict):
     release_poll_s: float | None = Field(default=None, gt=0)
     release_margin_s: float | None = Field(default=None, ge=0)
 
+    #: Someone using the planner sees what every time of day costs, so a share
+    #: of them pick a quieter one. This is the arrive-by feature's economic
+    #: argument and it is a different thing from `shown_wait`: that is a
+    #: walk-up looking at a line and coming back, this is somebody choosing a
+    #: slot before they set out.
+    #:
+    #: Assumed, and it has to be. Nobody has ever shown these customers a
+    #: forecast, so there is no way to know how many would move -- which is why
+    #: it lives in an arm and is swept rather than set.
+    retime_fraction: float = Field(default=0.0, ge=0, le=1)
+    retime_threshold_min: float | None = Field(default=None, gt=0)
+    retime_window_min: float | None = Field(default=None, gt=0)
+
     shown_wait: bool = False
     shift_fraction: float = Field(default=0.0, ge=0, le=1)
     # No defaults: a threshold and a delay are durations, and durations live in
@@ -570,6 +583,17 @@ class CustomersParams(_Strict):
     shift_threshold_min: float | None = Field(default=None, gt=0)
     shift_delay_min: float | None = Field(default=None, gt=0)
     source: Source | None = None
+
+    @model_validator(mode="after")
+    def _retiming_has_its_clocks(self) -> "CustomersParams":
+        if self.retime_fraction > 0 and (
+            self.retime_threshold_min is None or self.retime_window_min is None
+        ):
+            raise ValueError(
+                "customers.retime_fraction is set but retime_threshold_min "
+                "and retime_window_min are not both given"
+            )
+        return self
 
     @model_validator(mode="after")
     def _adaptive_release_has_its_clocks(self) -> "CustomersParams":

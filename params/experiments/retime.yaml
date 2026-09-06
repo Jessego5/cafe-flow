@@ -1,0 +1,24 @@
+# Arm: the planner moves demand, rather than rearranging how it is served.
+#
+# Everything else in this project makes the same customers wait less. This is
+# the only lever that changes *when* they come. Somebody using arrive-by sees
+# what every slot costs, and a share of those looking at a busy one take a
+# quieter one instead -- deferred demand, not lost demand.
+#
+# The fraction is assumed and has to be: nobody has ever shown these customers
+# a forecast, so there is no way to know how many would move. It is swept rather
+# than set, and the number to argue about is the sweep, not this file.
+
+meta:
+  scenario: retime
+  source: assumed
+
+customers:
+  preorder_adoption: 0.5
+  preorder_release: adaptive
+  # Look for something quieter when the slot you wanted is over five minutes,
+  # and look up to three quarters of an hour ahead for it.
+  retime_fraction: 0.4
+  retime_threshold_min: 5.0
+  retime_window_min: 45.0
+  source: assumed

@@ -151,6 +151,11 @@ ARMS: dict[str, Arm] = {
         HYBRID + ("params/experiments/fixed_release.yaml",),
         "half order ahead, a class block early, whatever the line is doing",
     ),
+    "retime": Arm(
+        "retime",
+        HYBRID + ("params/experiments/retime.yaml",),
+        "the planner shows what each slot costs, so some demand moves off the peak",
+    ),
     "adaptive_release": Arm(
         "adaptive_release",
         HYBRID + ("params/experiments/adaptive_release.yaml",),
