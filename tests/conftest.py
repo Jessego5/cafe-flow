@@ -55,6 +55,9 @@ def corrupt(raw_base):
 # app fixtures
 # --------------------------------------------------------------------------
 
+STAFF_USER = "barista"
+STAFF_PASSWORD = "a-password-for-tests"
+
 FROZEN_NOW_S = 8 * 3600.0  # 08:00 local, inside the staffing plan
 
 
@@ -75,6 +78,10 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setattr(config.settings, "web_dist", tmp_path / "no-dist")
     # short heartbeat so a stopping test does not wait out a 15s ping
     monkeypatch.setattr(config.settings, "heartbeat_s", 1.0)
+    # A signing key that does not change between the two apps a test may build.
+    monkeypatch.setenv("CAFE_SECRET_KEY", "tests-do-not-need-a-real-secret")
+    import app.security as security
+    monkeypatch.setattr(security, "_key", None)
     db._engine = None
     get_params.cache_clear()
 
@@ -94,13 +101,71 @@ def app_env(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def client(app_env):
+def client(app_env, staff_account):
+    """A logged-in bar. Most tests here are the cafe operating, not a stranger
+    poking at it, so the default client is staff. `anon` is the one that is
+    not, and it is what the guard is tested with."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    with TestClient(create_app()) as test_client:
+        response = test_client.post(
+            "/login", json={"username": STAFF_USER, "password": STAFF_PASSWORD}
+        )
+        assert response.status_code == 200, response.text
+        yield test_client
+
+
+def ensure_staff():
+    """One account, made the way `tools/create_staff.py` makes it. Idempotent."""
+    from app.config import now_utc
+    from app.db import StaffRow, get_engine, init_db, session_scope
+    from app.security import hash_password
+
+    init_db(get_engine())
+    with session_scope() as session:
+        if session.get(StaffRow, STAFF_USER) is None:
+            session.add(
+                StaffRow(
+                    username=STAFF_USER,
+                    hashed_password=hash_password(STAFF_PASSWORD),
+                    created_at=now_utc(),
+                )
+            )
+            session.commit()
+    return STAFF_USER
+
+
+def sign_in(test_client):
+    """Log a bespoke TestClient in.
+
+    Tests that build their own app -- a different policy, a different env --
+    still need a session for the staff routes, and this is the one line that
+    gives them one rather than each rediscovering the credentials.
+    """
+    ensure_staff()
+    response = test_client.post(
+        "/login", json={"username": STAFF_USER, "password": STAFF_PASSWORD}
+    )
+    assert response.status_code == 200, response.text
+    return test_client
+
+
+@pytest.fixture
+def anon(app_env):
+    """Nobody. What a stranger with the URL gets."""
     from fastapi.testclient import TestClient
 
     from app.main import create_app
 
     with TestClient(create_app()) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def staff_account(app_env):
+    return ensure_staff()
 
 
 @pytest.fixture

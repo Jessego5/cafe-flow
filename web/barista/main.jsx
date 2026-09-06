@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { getMenu, getQueue, moveOrder, setAvailability, elapsed } from '../shared/api.js'
+import { getMe, getMenu, getQueue, login, logout, moveOrder, setAvailability, elapsed } from '../shared/api.js'
 import { milkLabel, title } from '../student/catalog.js'
 import { useLive, useTicker } from '../shared/useLive.js'
 import '../shared/styles.css'
@@ -176,13 +176,61 @@ function SoldOut({ onError }) {
   )
 }
 
+// The bar is staff-only: the queue lists every order in the shop, with the name
+// each was placed under. Customers need no account and have none.
+function Login({ onIn }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const submit = (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    login(username, password)
+      .then(onIn)
+      .catch(() => setError('Wrong username or password'))
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <main className="login">
+      <form onSubmit={submit}>
+        <h1>Bar queue</h1>
+        <label>
+          <span>Username</span>
+          <input value={username} autoFocus autoComplete="username"
+                 onChange={(e) => setUsername(e.target.value)} />
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" value={password} autoComplete="current-password"
+                 onChange={(e) => setPassword(e.target.value)} />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button disabled={busy || !username || !password}>
+          {busy ? 'Signing in…' : 'Sign in'}
+        </button>
+        <p className="hint">Accounts are made with <code>tools/create_staff.py</code>.</p>
+      </form>
+    </main>
+  )
+}
+
 function App() {
+  const [who, setWho] = useState(undefined)   // undefined = not asked yet
+  useEffect(() => { getMe().then((r) => setWho(r.username)).catch(() => setWho(null)) }, [])
+
   const { data, connected, error, fetchedAt, refresh } = useLive(getQueue)
   const now = useTicker()
   const [busy, setBusy] = useState(null)
   const [actionError, setActionError] = useState(null)
 
   const since = (now - fetchedAt) / 1000
+
+  if (who === undefined) return null
+  if (who === null) return <Login onIn={(r) => setWho(r.username)} />
 
   const move = (orderId, to) => {
     setBusy(orderId)
@@ -215,6 +263,9 @@ function App() {
           <span className={connected ? 'pill live' : 'pill down'}>
             {connected ? 'live' : 'not connected'}
           </span>
+          <button className="pill out-btn" onClick={() => logout().then(() => setWho(null))}>
+            {who} · sign out
+          </button>
         </div>
       </header>
       <main>

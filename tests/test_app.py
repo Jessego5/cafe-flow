@@ -29,7 +29,7 @@ from app.db import (
 from core.menu import make_item, service_seconds
 from core.states import State
 
-from tests.conftest import FROZEN_NOW_S, BASE_YAML as BASE_YAML_PATH
+from tests.conftest import FROZEN_NOW_S, sign_in, BASE_YAML as BASE_YAML_PATH
 
 LATTE = {"drink": "latte", "milk_type": "oat"}
 DRIP = {"drink": "drip_coffee"}
@@ -239,7 +239,11 @@ def test_pilot_rejects_simulated_orders_at_the_api(app_env, monkeypatch):
     from app.main import create_app
 
     monkeypatch.setattr(app_env, "env", Env.PILOT)
-    with TestClient(create_app()) as pilot:
+    # https, because in pilot the session cookie is marked Secure and a browser
+    # will not send it back over plain http. That is the point of the flag; it
+    # just means the test has to look like the deployment.
+    with TestClient(create_app(), base_url="https://testserver") as pilot:
+        sign_in(pilot)
         response = pilot.post(
             "/orders", json={"lines": [DRIP]}, headers={"X-Simulated-Order": "1"}
         )
@@ -498,6 +502,7 @@ def test_the_bar_is_told_what_to_run_together(app_env, tmp_path, monkeypatch):
     fresh.cache_clear()
 
     with TestClient(create_app()) as batching:
+        sign_in(batching)
         for lines in (
             [{"drink": "bacon_egg_cheese_bagel"}],
             [{"drink": "latte", "milk_type": "oat", "variant": "hot"}],
@@ -542,6 +547,7 @@ def test_a_finished_order_drops_out_of_the_suggestions(app_env, tmp_path, monkey
     fresh.cache_clear()
 
     with TestClient(create_app()) as batching:
+        sign_in(batching)
         first = batching.post(
             "/orders", json={"lines": [{"drink": "bacon_egg_cheese_bagel"}]}
         ).json()

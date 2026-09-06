@@ -12,11 +12,12 @@ of bagels today would make history depend on the present.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.db import MenuItemRow, session_scope
+from app.routes.auth import require_staff
 
 __all__ = ["router", "unavailable"]
 
@@ -41,7 +42,9 @@ def unavailable(session: Session, names: list[str]) -> list[str]:
 
 
 @router.patch("/menu/{name}")
-async def set_availability(name: str, body: AvailabilityIn) -> dict:
+async def set_availability(
+    name: str, body: AvailabilityIn, staff: str = Depends(require_staff)
+) -> dict:
     """Mark an item sold out, or back on.
 
     A PATCH rather than a PUT: everything else about a menu item is projected

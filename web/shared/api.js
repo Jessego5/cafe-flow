@@ -16,6 +16,10 @@ export async function request(path, options = {}) {
 export const getConfig = () => request('/config')
 export const getMenu = () => request('/menu')
 export const getQueue = () => request('/queue')
+export const getMe = () => request('/me')
+export const login = (username, password) =>
+  request('/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+export const logout = () => request('/logout', { method: 'POST' }).catch(() => null)
 export const getDisplay = () => request('/display')
 export const getOrder = (id) => request(`/orders/${id}`)
 

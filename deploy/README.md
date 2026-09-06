@@ -12,6 +12,21 @@ long-lived connections and SQLite needs a real filesystem.
 
 Then check the three views: `/` student, `/bar` barista, `/pickup` display.
 
+## Staff
+
+`/bar` and every write route need a login. Customers need none and have none.
+
+    fly secrets set CAFE_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(32))")
+    fly ssh console -C "python -m tools.create_staff <name>"
+
+**Set the key before anyone logs in.** Without it the app generates one at boot,
+says so in the log, and every session ends when the process does -- survivable
+for a demo, useless for a shift. Changing it later logs everybody out, which is
+the correct behaviour and still a surprise if you did not mean it.
+
+There is no registration endpoint and no password reset. Accounts are made by
+somebody with a shell, which for one bar is the right amount of ceremony.
+
 ## Backups
 
 Litestream replicates `/data/cafe.db` continuously. Set the credentials as

@@ -92,6 +92,57 @@ class DriftReport:
         return "\n".join(lines)
 
 
+REPLAY_USER = "replay"
+
+
+def ensure_replay_account() -> str:
+    """A staff account for the harness, and the password it was just given.
+
+    Advancing an order is a staff route now, and the replay advances several
+    hundred of them. It makes its own account rather than being handed a
+    standing one: the password exists for the length of this run and is never
+    written down anywhere a person would find it.
+
+    Refused in `pilot`, which rejects simulated orders anyway. Anything holding
+    the database can do this, so it is a convenience and not a hole -- but it
+    should still not be reachable from the environment that serves customers.
+    """
+    import secrets
+
+    from app.config import now_utc, settings
+    from app.db import StaffRow, get_engine, init_db, session_scope
+    from app.security import hash_password
+
+    if not settings.env.allows_simulated_orders:
+        raise SystemExit(
+            f"{settings.env} does not take simulated orders; the replay has "
+            "nothing to do here"
+        )
+
+    password = secrets.token_urlsafe(24)
+    init_db(get_engine())
+    with session_scope() as session:
+        row = session.get(StaffRow, REPLAY_USER)
+        if row is None:
+            row = StaffRow(
+                username=REPLAY_USER, hashed_password="", created_at=now_utc()
+            )
+        row.hashed_password = hash_password(password)
+        session.add(row)
+        session.commit()
+    return password
+
+
+async def sign_in(client: httpx.AsyncClient) -> None:
+    """Log the harness in, so its cookie rides every later request."""
+    password = ensure_replay_account()
+    response = await client.post(
+        "/login", json={"username": REPLAY_USER, "password": password}
+    )
+    if response.status_code != 200:
+        raise SystemExit(f"the replay could not log in: {response.status_code}")
+
+
 class Replay:
     """Drives one simulated day at the app over HTTP."""
 
@@ -131,6 +182,7 @@ class Replay:
         failures = 0
 
         async with httpx.AsyncClient(base_url=self.base_url, timeout=30.0) as client:
+            await sign_in(client)
             for virtual_s, order_id, to_state in moves:
                 if self.speed > 0:
                     due = (virtual_s - opened_at) / self.speed

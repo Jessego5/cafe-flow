@@ -37,6 +37,7 @@ __all__ = [
     "OrderEventRow",
     "SlotRow",
     "HeldOrderRow",
+    "StaffRow",
     "HealthRow",
     "DbEventLog",
     "get_engine",
@@ -207,6 +208,22 @@ class SlotRow(SQLModel, table=True):
     preorder_capacity_s: float              # capacity_s minus the walk-up reserve
     used_s: float = 0.0
     is_open: bool = True
+
+
+class StaffRow(SQLModel, table=True):
+    """Somebody who works here.
+
+    One row per person, created by `create_staff.py`. No registration, no
+    password reset, no email: the cafe has one bar and the people behind it are
+    known to each other. What this exists for is that `/bar` and every write
+    route were reachable by anybody who found the URL.
+    """
+
+    __tablename__ = "staff"
+
+    username: str = Field(primary_key=True)
+    hashed_password: str
+    created_at: datetime
 
 
 class HeldOrderRow(SQLModel, table=True):

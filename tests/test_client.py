@@ -83,7 +83,17 @@ def test_a_replayed_order_is_flagged_simulated(live):
 
     import httpx
 
-    queue = httpx.get(f"{live}/queue", timeout=30.0).json()
+    # /queue is a staff route: it lists every order in the shop, with the name
+    # each was placed under. The replay makes its own account to advance orders
+    # with, so reading it back logs in the same way.
+    from sim.client import REPLAY_USER, ensure_replay_account
+
+    password = ensure_replay_account()
+    with httpx.Client(base_url=live, timeout=30.0) as client:
+        assert client.post(
+            "/login", json={"username": REPLAY_USER, "password": password}
+        ).status_code == 200
+        queue = client.get("/queue").json()
     assert all(order["is_simulated"] for order in queue["orders"])
 
 

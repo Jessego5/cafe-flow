@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import delete, select
@@ -29,6 +29,7 @@ from app.db import (
     OrderRow,
     SlotRow,
 )
+from app.routes.auth import current_staff
 from app.routes.catalog import unavailable
 from app.routes.common import event_payload, order_payload
 from app.stream import broadcaster
@@ -422,12 +423,25 @@ async def amend_order(order_id: str, body: AmendIn) -> dict:
 
 
 @router.post("/orders/{order_id}/transition")
-async def move_order(order_id: str, body: TransitionIn) -> dict:
+async def move_order(
+    order_id: str,
+    body: TransitionIn,
+    staff: str | None = Depends(current_staff),
+) -> dict:
     """Advance one order. Idempotent by (order, target state).
 
     A barista on a laggy connection taps twice; the second tap must not skip a
     state or write a second event.
+
+    Staff only, with one exception: a customer may cancel their own order. That
+    is the same trust model as the rest of the customer side -- the order id is
+    an unguessable uuid and holding it is what proves the order is yours -- and
+    refusing it would leave somebody who changed their mind with no way out but
+    asking at the counter.
     """
+    cancelling = body.to is State.CANCELLED
+    if staff is None and not cancelling:
+        raise HTTPException(401, "staff login required")
     params = get_params()
     now_s = day_seconds(params)
 

@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlmodel import select
 
 from app.config import day_seconds, get_params, service_date, settings
 from app.db import OrderItemRow, OrderRow, hydrate, open_orders, session_scope
+from app.routes.auth import require_staff
 from app.routes.common import order_payload
 from core.capacity import StationCapacityModel
 from core.params import Params
 from core.policies import make_policy, plan_batches
 from core.states import State
 from core.types import Item
+from core.params import ConfigError
 from core.waiting import estimate_wait_s, nominal_seconds_per_order, observable_queue_depth
 
 router = APIRouter(tags=["barista"])
@@ -100,9 +102,13 @@ def suggested_batches(rows, params: Params, now_s: float) -> list[dict]:
 
 
 @router.get("/queue")
-async def get_queue() -> dict:
+async def get_queue(staff: str = Depends(require_staff)) -> dict:
     """Full queue state. The client calls this on every (re)connect, so a
-    dropped stream can never leave the bar looking at a stale queue."""
+    dropped stream can never leave the bar looking at a stale queue.
+
+    Staff only: it lists every order in the shop, with the name each was placed
+    under. `/display` is the public view and shows numbers.
+    """
     params = get_params()
     now_s = day_seconds(params)
     include_simulated = settings.env.allows_simulated_orders
@@ -118,7 +124,15 @@ async def get_queue() -> dict:
     # disagreed, the cafe would be telling people one thing while the model
     # assumed another.
     depth = observable_queue_depth(order["state"] for order in orders)
-    per_order = nominal_seconds_per_order(params, params.baristas_at(now_s))
+
+    # Outside the staffing plan there is nobody on the bar, so there is no wait
+    # to quote — and the bar screen still has to render. Same reasoning as
+    # `/menu`: a closed cafe reports no estimate rather than raising, because
+    # the queue itself is worth showing whether or not anyone is on shift.
+    try:
+        per_order = nominal_seconds_per_order(params, params.baristas_at(now_s))
+    except ConfigError:
+        per_order = None
 
     return {
         "now_s": now_s,
@@ -128,8 +142,8 @@ async def get_queue() -> dict:
         "orders": orders,
         "batches": batches,
         "queue_depth": depth,
-        "wait_estimate_s": round(estimate_wait_s(depth, per_order), 1),
-        "seconds_per_order": round(per_order, 1),
+        "wait_estimate_s": None if per_order is None else round(estimate_wait_s(depth, per_order), 1),
+        "seconds_per_order": None if per_order is None else round(per_order, 1),
     }
 
 

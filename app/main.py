@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_params, service_date, settings
 from app.db import ensure_slots, get_engine, init_db, seed_menu, session_scope
+from app.routes.auth import router as auth_router
 from app.routes.catalog import router as catalog_router
 from app.routes.held import release_loop, router as held_router
 from app.routes import (
@@ -97,6 +98,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
+    app.include_router(auth_router)
     app.include_router(menu_router)
     app.include_router(catalog_router)
     app.include_router(orders_router)

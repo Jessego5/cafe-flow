@@ -28,7 +28,21 @@ def _free_port() -> int:
 
 
 @pytest.fixture
-def live_server(app_env):
+def bar_session(live_server, staff_account):
+    """A logged-in bar, over real HTTP. Advancing an order is a staff route, so
+    the taps in these tests need a session the way a barista's browser does."""
+    from tests.conftest import STAFF_PASSWORD, STAFF_USER
+
+    response = httpx.post(
+        f"{live_server}/login",
+        json={"username": STAFF_USER, "password": STAFF_PASSWORD},
+    )
+    assert response.status_code == 200, response.text
+    return dict(response.cookies)
+
+
+@pytest.fixture
+def live_server(app_env, staff_account):
     from app.main import create_app
 
     port = _free_port()
@@ -112,7 +126,7 @@ def test_an_order_reaches_the_bar_within_a_second(live_server):
         assert event["to_state"] == "placed"
 
 
-def test_every_tap_is_broadcast_in_order(live_server):
+def test_every_tap_is_broadcast_in_order(live_server, bar_session):
     with Listener(live_server) as bar:
         time.sleep(0.1)
         order_id = httpx.post(
@@ -120,20 +134,26 @@ def test_every_tap_is_broadcast_in_order(live_server):
         ).json()["order_id"]
 
         for state in ("accepted", "in_progress", "ready", "picked_up"):
-            httpx.post(f"{live_server}/orders/{order_id}/transition", json={"to": state})
+            httpx.post(
+                f"{live_server}/orders/{order_id}/transition",
+                json={"to": state},
+                cookies=bar_session,
+            )
 
         assert bar.wait_for(lambda event: event["to_state"] == "picked_up") is not None
         states = [event["to_state"] for _, _, event in bar.events if event["order_id"] == order_id]
         assert states == ["placed", "accepted", "in_progress", "ready", "picked_up"]
 
 
-def test_a_reconnecting_client_can_resume_from_last_event_id(live_server):
+def test_a_reconnecting_client_can_resume_from_last_event_id(live_server, bar_session):
     """Cafe wifi drops. A client that reconnects with Last-Event-ID gets what it
     missed; it still refetches whole queue state, which `/queue` provides."""
     order_id = httpx.post(
         f"{live_server}/orders", json={"lines": [{"drink": "drip_coffee"}]}
     ).json()["order_id"]
-    httpx.post(f"{live_server}/orders/{order_id}/transition", json={"to": "accepted"})
+    httpx.post(
+        f"{live_server}/orders/{order_id}/transition", json={"to": "accepted"}, cookies=bar_session
+    )
 
     with Listener(live_server, headers={"Last-Event-ID": "dev:0000000"}) as reconnected:
         replayed = reconnected.wait_for(lambda event: event["to_state"] == "accepted")
@@ -141,11 +161,11 @@ def test_a_reconnecting_client_can_resume_from_last_event_id(live_server):
         seqs = [event["seq"] for _, _, event in reconnected.events]
         assert seqs == [1, 2]
 
-    queue = httpx.get(f"{live_server}/queue").json()
+    queue = httpx.get(f"{live_server}/queue", cookies=bar_session).json()
     assert [order["order_id"] for order in queue["orders"]] == [order_id]
 
 
-def test_an_illegal_tap_broadcasts_nothing(live_server):
+def test_an_illegal_tap_broadcasts_nothing(live_server, bar_session):
     with Listener(live_server) as bar:
         time.sleep(0.1)
         order_id = httpx.post(
@@ -154,7 +174,9 @@ def test_an_illegal_tap_broadcasts_nothing(live_server):
         assert bar.wait_for(lambda event: event["order_id"] == order_id) is not None
 
         assert httpx.post(
-            f"{live_server}/orders/{order_id}/transition", json={"to": "picked_up"}
+            f"{live_server}/orders/{order_id}/transition",
+            json={"to": "picked_up"},
+            cookies=bar_session,
         ).status_code == 409
 
         time.sleep(0.2)
