@@ -28,6 +28,9 @@
   --tabbar: 3.6rem;
 
   --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* One face for the whole app, at different sizes and weights, the way the
+     buttons already read. The serif is kept for exactly one thing: the cafe's
+     name on the home screen. */
   --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif;
 }
 
@@ -39,7 +42,7 @@
  *
  * These are the only rules that reach outside the app, and they are behind
  * `.student-page`, which `main.jsx` sets when the app owns the browser tab.
- * Rendered inside something else — the phone frame — the app claims nothing
+ * Rendered inside something else, the phone frame, the app claims nothing
  * beyond its own box. */
 html.student-page,
 body.student-page { height: 100%; }
@@ -165,7 +168,7 @@ button:disabled { cursor: default; }
 }
 .badge.warm { border-color: #e3cdb4; color: #a8672c; }
 
-.price { font-family: var(--display); font-variant-numeric: tabular-nums; }
+.price { font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -0.01em; }
 .price .cur { font-size: 0.72em; margin-right: 0.05em; }
 
 /* thin rectangular outline button: the reference's two front doors */
@@ -224,7 +227,7 @@ button:disabled { cursor: default; }
 .hero .hint { display: block; margin-top: 0.55rem; }
 .feature { display: grid; gap: 0.6rem; padding: 1.2rem var(--pad) 0; }
 .feature .line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.feature .line .name { font-family: var(--display); font-size: 1.15rem; }
+.feature .line .name { font-size: 1.02rem; font-weight: 500; }
 
 .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; padding: 1.7rem var(--pad) 0; }
 .doors .door { display: grid; gap: 0.35rem; }
@@ -238,9 +241,10 @@ button:disabled { cursor: default; }
   border: 1px solid var(--hair);
 }
 .wait-card .big {
-  font-family: var(--display);
-  font-size: 2rem;
+  font-size: 1.85rem;
+  font-weight: 600;
   line-height: 1.1;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 .wait-card .spread { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
@@ -270,12 +274,78 @@ button:disabled { cursor: default; }
 .shop-head .sub { color: rgba(243, 240, 234, 0.55); font-size: 0.76rem; margin-top: 0.1rem; }
 .shop-head .strip {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-  font-size: 0.8rem;
-  color: rgba(243, 240, 234, 0.8);
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.45rem;
+  margin-top: 0.8rem;
+  font-size: 0.82rem;
+  color: rgba(243, 240, 234, 0.62);
 }
+.shop-head .strip strong { font-size: 1.05rem; font-weight: 600; color: #fff; }
+.shop-head .plan-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* ------------------------------------------------------------- the planner */
+
+.planner { margin-top: 0.4rem; }
+.planner .choices select {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  background: var(--card);
+  color: var(--ink-soft);
+}
+.planner .choices select.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+
+.planner .quote {
+  margin-top: 1.1rem;
+  padding: 0.9rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--hair);
+}
+.planner .quote .line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.28rem 0;
+}
+.planner .quote .line .k { color: var(--muted); font-size: 0.85rem; }
+.planner .quote .line .v { font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.planner .saving {
+  margin: 0.7rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--hair);
+  color: var(--new);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.planner .amber { color: var(--back); }
+.planner .provenance-note { margin: 0.6rem 0 0; }
+
+.planner .later-note {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1.1rem;
+  padding: 0.9rem 1rem;
+  background: var(--paper);
+  border: 1px dashed var(--line);
+}
+.planner .later-note strong { font-size: 1.02rem; }
+.planner .later-note .slab { margin-top: 0.4rem; }
+.planner > .slab.wide { margin-top: 1.1rem; }
+
+/* when the line is long the second door leads, so it gets the width */
+.doors.promote { grid-template-columns: 1fr 1.25fr; }
+.stack { display: grid; gap: 0.7rem; padding: 1.4rem var(--pad) 0; }
 
 .board { display: grid; grid-template-columns: 5.9rem 1fr; align-items: start; }
 
@@ -544,15 +614,101 @@ button:disabled { cursor: default; }
 .lines .line .opts { color: var(--muted); font-size: 0.78rem; }
 .lines .line .drop { border: 0; background: none; color: var(--faint); font-size: 0.78rem; padding: 0; }
 
+/* ------------------------------------------------------------ a held order */
+
+.held {
+  padding: 1rem 1.05rem;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-left: 2px solid var(--back);      /* gold: promised, not yet working */
+}
+.held .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.held .when { font-size: 1.7rem; font-weight: 600; line-height: 1.1; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+.held ul { margin: 0.5rem 0 0; padding-left: 1.05rem; color: var(--ink-soft); font-size: 0.88rem; }
+.held ul li { margin: 0.08rem 0; }
+.held .hint { display: block; margin-top: 0.6rem; }
+.held .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--hair);
+}
+.held .drop { border: 0; background: none; color: var(--muted); font-size: 0.82rem; padding: 0; }
+.held .state {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--back);
+  color: var(--back);
+}
+
+/* The picker leads the screen, so it is sized like a decision and scrolled
+   like one: the whole rest of the day is in there, five rows at a time, with
+   the choice in the middle band. */
+.picker { position: relative; }
+.picker::before,
+.picker::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+  z-index: 1;
+}
+.picker::before { top: calc(50% - 1.35rem); }
+.picker::after { top: calc(50% + 1.35rem); }
+
+.timescroll {
+  height: 12.2rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: y mandatory;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  /* fade the ends so the band in the middle reads as the choice */
+  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+}
+.timescroll .pad { height: 4.75rem; }
+.timescroll button {
+  display: block;
+  width: 100%;
+  height: 2.44rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--faint);
+  scroll-snap-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.12s ease, font-size 0.12s ease;
+}
+.timescroll button.on {
+  color: var(--ink);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .timescroll button { transition: none; }
+}
+.planner .quote .lead { margin: 0 0 0.5rem; font-size: 1rem; }
+
 /* ----------------------------------------------------------- my orders tab */
 
 .mine { padding: 1.1rem var(--pad) 2rem; }
 .mine .who { display: flex; align-items: baseline; gap: 0.4rem; }
 .mine .who h1 {
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: 2rem;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
   margin: 0.6rem 0 0;
 }
 .mine .since { color: var(--muted); font-size: 0.8rem; margin-top: 0.15rem; }
@@ -564,9 +720,9 @@ button:disabled { cursor: default; }
   color: #4a4133;
 }
 .member .title {
-  font-family: var(--display);
-  font-size: 1.35rem;
-  letter-spacing: 0.32em;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
 }
 .member .perks { margin-top: 2.2rem; font-size: 0.76rem; color: #6a5f4c; }
@@ -579,7 +735,7 @@ button:disabled { cursor: default; }
   border-bottom: 1px solid var(--ink);
   text-align: center;
 }
-.stats .n { font-family: var(--display); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.stats .n { font-size: 1.32rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .stats .k { color: var(--muted); font-size: 0.72rem; margin-top: 0.1rem; }
 
 .mine h2 { font-size: 0.95rem; margin: 1.7rem 0 0.2rem; }
@@ -591,7 +747,7 @@ button:disabled { cursor: default; }
   border-bottom: 1px solid var(--hair);
 }
 .receipt .head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem; }
-.receipt .no { font-family: var(--display); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.receipt .no { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .receipt .when { color: var(--faint); font-size: 0.76rem; }
 .receipt ul { margin: 0; padding-left: 1.05rem; color: var(--ink-soft); font-size: 0.88rem; }
 .receipt ul li { margin: 0.08rem 0; }
@@ -617,7 +773,7 @@ button:disabled { cursor: default; }
   border-left: 2px solid var(--ink);
 }
 .ticket .head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.ticket .no { font-family: var(--display); font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.ticket .no { font-size: 2.3rem; font-weight: 600; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .ticket .track { display: flex; gap: 0.25rem; margin: 0.9rem 0 0.6rem; }
 .ticket .track span { flex: 1; height: 2px; background: var(--line); }
 .ticket .track span.done { background: var(--ink); }
@@ -631,4 +787,23 @@ button:disabled { cursor: default; }
   line-height: 1.5;
   padding: 1.8rem var(--pad) 0;
   text-align: center;
+}
+
+/* ----------------------------------------------------------- sold out */
+/* Shown rather than hidden. Somebody who came in for a bagel needs to know the
+   cafe is out of them, not to wonder whether they misremembered the board. */
+.pane .item.out {
+  opacity: 0.45;
+  cursor: default;
+}
+.pane .item.out .thumb {
+  filter: grayscale(1);
+}
+.pane .item.out .add {
+  display: none;
+}
+.badge.out {
+  background: var(--warn-bg, #f3e4e0);
+  color: var(--warn-fg, #8a3520);
+  border-color: transparent;
 }

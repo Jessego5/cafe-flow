@@ -40,6 +40,20 @@ export const plan = (lines, wantedAt = null) =>
     body: JSON.stringify(wantedAt ? { lines, wanted_at: wantedAt } : { lines }),
   })
 
+// What the cafe has run out of. Operational, not a menu change: the item is
+// still on the board, there just isn't one.
+export const setAvailability = (name, available) =>
+  request(`/menu/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ available }),
+  })
+
+// Change a basket before anyone starts making it. The server refuses once the
+// order leaves `placed`, which is a 409 rather than a silent no-op because the
+// customer has to know their change did not take.
+export const amendOrder = (id, lines) =>
+  request(`/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ lines }) })
+
 export const moveOrder = (id, to, actor = 'barista') =>
   request(`/orders/${id}/transition`, { method: 'POST', body: JSON.stringify({ to, actor }) })
 

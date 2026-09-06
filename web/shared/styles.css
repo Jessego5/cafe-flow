@@ -1,15 +1,31 @@
-:root {
-  --ink: #1c1a17;
-  --muted: #6b6560;
-  --line: #e2ddd6;
-  --paper: #faf8f5;
-  --card: #ffffff;
+/* The two staff screens.
+ *
+ * Same materials as the customer app: the paper, the ink, the display serif
+ * on every number, so the three surfaces read as one cafe. What does not
+ * carry over is the shape: this is an iPad propped on a counter and a screen
+ * on a wall, watched at a glance mid-rush, so the type is bigger, the targets
+ * are wider, and nothing is hidden behind a tap.
+ */
 
-  --accent: #7a4d2b;
-  --ok: #2f6f4f;
-  --warn: #a8541c;
+:root {
+  --ink: #1a1917;
+  --ink-soft: #4a453f;
+  --muted: #8d867e;
+  --faint: #b3ada4;
+  --line: #e7e2da;
+  --hair: #f0ece5;
+  --paper: #f7f5f1;
+  --card: #ffffff;
+  --charcoal: #2b2926;
+
+  --ok: #3f7d52;
+  --warn: #a98a4b;
   --bad: #9a3232;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif;
+
+  font-family: var(--sans);
 }
 
 * { box-sizing: border-box; }
@@ -19,115 +35,197 @@ body {
   background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.45;
 }
+
+/* ------------------------------------------------------------------ header */
 
 header.bar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--card);
+  padding: 0.9rem 1.25rem;
+  background: var(--charcoal);
+  color: #f3f0ea;
   position: sticky;
   top: 0;
   z-index: 2;
 }
 
-h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.01em; }
-h2 { font-size: 0.95rem; margin: 1.5rem 0 0.5rem; color: var(--muted); font-weight: 600; }
+h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+h2 {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 1.6rem 0 0.5rem;
+}
 
-main { padding: 1.25rem; max-width: 60rem; margin: 0 auto; }
+main { padding: 1.1rem 1.25rem 3rem; max-width: 78rem; margin: 0 auto; }
 
 .muted { color: var(--muted); font-size: 0.82rem; }
 .row { display: flex; gap: 0.5rem; align-items: center; }
+.row.wrap { flex-wrap: wrap; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-  gap: 0.75rem;
-}
+/* -------------------------------------------------------------------- card */
 
 .card {
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 0.6rem;
-  padding: 0.85rem;
+  border: 1px solid var(--hair);
+  padding: 0.95rem 1.05rem;
 }
+
+/* Advisory, not an instruction. The scheduler's suggestion wears the cafe's
+   gold rather than the ink of something you must act on. */
+.card.run-together {
+  border-left: 2px solid var(--warn);
+  background: #fffdf8;
+}
+/* A promise with little time left on it, while there is still time to act. */
+.card.at-risk { border-left: 2px solid var(--bad); background: #fffaf9; }
+
+/* ----------------------------------------------------------------- buttons */
 
 button {
   font: inherit;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--ink);
-  border-radius: 0.5rem;
-  padding: 0.55rem 0.85rem;
+  border-radius: 0;
+  padding: 0.6rem 0.95rem;
   cursor: pointer;
   touch-action: manipulation;
+  letter-spacing: 0.02em;
 }
 button:hover:not(:disabled) { border-color: var(--ink); }
-button:disabled { opacity: 0.45; cursor: default; }
+button:disabled { opacity: 0.4; cursor: default; }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--charcoal); border-color: var(--charcoal); color: #fff; }
+button.primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); }
+button.big { padding: 0.85rem 1.5rem; font-size: 1.02rem; font-weight: 600; }
 button.wide { width: 100%; }
-button.big { padding: 0.9rem 1rem; font-size: 1.05rem; font-weight: 600; }
-button.ghost { background: transparent; color: var(--muted); }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+button.ghost:hover:not(:disabled) { border-color: var(--line); color: var(--ink); }
 
 select, input {
   font: inherit;
-  padding: 0.4rem 0.5rem;
+  padding: 0.45rem 0.55rem;
   border: 1px solid var(--line);
-  border-radius: 0.4rem;
+  border-radius: 0;
   background: var(--card);
   color: var(--ink);
 }
 
+/* ------------------------------------------------------------------- pills */
+
 .pill {
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.13em;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.15rem 0.55rem;
+  padding: 0.18rem 0.5rem;
   color: var(--muted);
+  white-space: nowrap;
 }
 .pill.live { color: var(--ok); border-color: var(--ok); }
 .pill.down { color: var(--bad); border-color: var(--bad); }
 .pill.sim { color: var(--warn); border-color: var(--warn); }
+.pill.bad { color: var(--bad); border-color: var(--bad); }
 
-.number { font-variant-numeric: tabular-nums; font-weight: 700; }
+/* on the dark header the pills sit on ink, not paper */
+header.bar .pill { color: rgba(243, 240, 234, 0.65); border-color: rgba(243, 240, 234, 0.28); }
+header.bar .pill.live { color: #8fce9f; border-color: rgba(143, 206, 159, 0.6); }
+header.bar .pill.down { color: #e08b8b; border-color: rgba(224, 139, 139, 0.6); }
+header.bar .pill.sim { color: #d9b872; border-color: rgba(217, 184, 114, 0.6); }
 
-.together { display: grid; gap: 0.5rem; margin-bottom: 1.25rem; }
-.card.run-together { border-left: 3px solid var(--accent); background: #fffdf9; }
-.row.wrap { flex-wrap: wrap; }
+.number { font-family: var(--display); font-variant-numeric: tabular-nums; font-weight: 400; }
+
+/* --------------------------------------------------------- run together */
+
+.together { display: grid; gap: 0.5rem; margin-bottom: 1.4rem; }
 .chip {
   border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.9rem;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.88rem;
   background: var(--paper);
 }
-.chip .number { margin-right: 0.25rem; }
+.chip .number { margin-right: 0.3rem; font-size: 1.02rem; }
 
-.queue { display: grid; gap: 0.6rem; }
-.queue .card { display: grid; gap: 0.6rem; }
-.queue .head { display: flex; align-items: baseline; gap: 0.6rem; }
-.queue .head .number { font-size: 1.6rem; }
-.queue .items { margin: 0; padding-left: 1.1rem; }
-.queue .items li { margin: 0.1rem 0; }
-.waiting.warn { color: var(--warn); font-weight: 600; }
-.variant { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.06em; color: var(--warn); }
+/* --------------------------------------------------------------- the queue */
+
+/* A counter screen is wide; one column down the middle wastes it. */
+.queue {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 0.7rem;
+  align-items: start;
+}
+.queue .card { display: grid; gap: 0.55rem; }
+.queue .head { display: flex; align-items: baseline; gap: 0.55rem; flex-wrap: wrap; }
+.queue .head .number { font-size: 2.1rem; line-height: 1; }
+.queue .items { margin: 0; padding-left: 1.05rem; color: var(--ink-soft); }
+.queue .items li { margin: 0.12rem 0; }
+
+.waiting { font-family: var(--display); font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.waiting.warn { color: var(--bad); }
+.variant {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--warn);
+}
+
+/* ------------------------------------------------------------ the shelf */
 
 .display-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
   gap: 1rem;
   padding: 1.5rem;
+  max-width: 78rem;
+  margin: 0 auto;
 }
-.display-grid .number { font-size: 3.5rem; text-align: center; }
-.display-grid .card { padding: 1.2rem 0.5rem; }
+.display-grid .card { padding: 1.4rem 0.6rem 1.1rem; text-align: center; }
+.display-grid .number { font-size: 4rem; line-height: 1; display: block; }
+.display-grid .muted { margin-top: 0.4rem; }
 
-.empty { color: var(--muted); padding: 2.5rem 1rem; text-align: center; }
+.empty { color: var(--faint); padding: 3rem 1rem; text-align: center; }
 .error { color: var(--bad); font-size: 0.85rem; }
-footer { padding: 1.5rem 1.25rem; color: var(--muted); font-size: 0.78rem; text-align: center; }
+footer { padding: 1.5rem 1.25rem; color: var(--faint); font-size: 0.78rem; text-align: center; }
+
+/* ------------------------------------------------------------- sold out */
+/* The bar is the only surface that knows the bagels have gone. Collapsed it
+   still shows what is off, because that is what somebody needs at a glance
+   mid-rush; open it lists the board so anything can be toggled. */
+.sold-out { margin: 0 0 0.9rem; }
+.sold-out .head {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: none; border: 0; padding: 0.15rem 0; cursor: pointer;
+  color: inherit; font: inherit;
+}
+.sold-out .row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.sold-out .grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.35rem; margin-top: 0.5rem;
+}
+.sold-out .chip {
+  padding: 0.35rem 0.5rem; border-radius: 0.4rem; cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.14); background: transparent;
+  color: inherit; font: inherit; text-align: left;
+}
+.sold-out .chip.out, .sold-out .pill.out {
+  background: #f3e4e0; color: #8a3520; border-color: transparent;
+}
+.sold-out .pill.out { cursor: pointer; }
+.sold-out .chip[disabled], .sold-out .pill[disabled] { opacity: 0.5; cursor: wait; }

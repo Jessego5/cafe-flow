@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { badges, blurb, milkLabel, milkOrder, sections, title } from './catalog.js'
+import { Planner } from './Planner.jsx'
 import { Price } from './Price.jsx'
 import { ItemMark } from './marks.jsx'
 
 const minutes = (seconds) => Math.max(1, Math.round(seconds / 60))
+
+// Where the wait is worth planning around rather than just reading.
+const BUSY_MIN = 12
 
 /* ------------------------------------------------------------------ options */
 
@@ -83,7 +87,7 @@ function ItemSheet({ item, onClose, onAdd, milks: offered }) {
 
           {item.calories != null && (
             <p className="hint" style={{ marginTop: '1.2rem' }}>
-              {item.calories} cal, medium — the board's figure
+              The board's figure: {item.calories} cal, medium
               {item.requires_milk ? ', calculated with 2% milk' : ''}
             </p>
           )}
@@ -136,7 +140,7 @@ function grouped(cart) {
   return [...rows.values()]
 }
 
-function CartSheet({ cart, menu, total, channel, onChannel, onClose, onRemove, onPlace, placing, error, slotsEnabled }) {
+function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRemove, onPlace, onHold, placing, error }) {
   const byName = new Map(menu.items.map((item) => [item.name, item]))
   return (
     <>
@@ -168,37 +172,39 @@ function CartSheet({ cart, menu, total, channel, onChannel, onClose, onRemove, o
             })}
           </div>
 
-          <div className="field">
-            <span className="eyebrow">How you are collecting</span>
-            <div className="choices">
-              <button className={channel === 'walkup' ? 'on' : ''} onClick={() => onChannel('walkup')}>
-                Order Now
+          {mode === 'ahead' ? (
+            <Planner
+              lines={cart}
+              config={config}
+              nowMinutes={nowMinutes}
+              onHold={onHold}
+              onOrderNow={onPlace}
+              placing={placing}
+              error={error}
+            />
+          ) : (
+            <>
+              {error && <p className="strike">{error}</p>}
+              <button
+                className="slab filled wide"
+                style={{ marginTop: '1.2rem' }}
+                disabled={placing}
+                onClick={onPlace}
+              >
+                {placing ? 'Placing…' : 'Place order'}
               </button>
-              <button className={channel === 'preorder' ? 'on' : ''} onClick={() => onChannel('preorder')}>
-                Order Ahead
-              </button>
-            </div>
-            <p className="hint" style={{ marginTop: '0.5rem' }}>
-              {channel === 'preorder'
-                ? slotsEnabled
-                  ? 'Ordered ahead for a pickup window.'
-                  : 'Ordered ahead. Pickup windows are off today, so it joins the same queue — you just skip the register.'
-                : 'Placed at the counter and made in turn.'}
-            </p>
-          </div>
+            </>
+          )}
 
           <p className="hint" style={{ marginTop: '1.2rem' }}>
-            Payment is stubbed in this demo — pay at the register. The board price is shown here;
-            what the bar records is whatever the server prices the order at.
+            Payment is stubbed in this demo. The board price is shown here; what the bar records
+            is whatever the server prices the order at.
           </p>
-          {error && <p className="strike">{error}</p>}
         </div>
 
         <div className="foot">
           <Price cents={total} />
-          <button className="slab filled" disabled={placing} onClick={onPlace}>
-            {placing ? 'Placing…' : 'Place order'}
-          </button>
+          <span className="hint">{cart.length} item{cart.length === 1 ? '' : 's'}</span>
         </div>
       </div>
     </>
@@ -212,8 +218,9 @@ export function OrderTab({
   menu,
   hours,
   cart,
-  channel,
-  onChannel,
+  mode,
+  onMode,
+  onHold,
   onAdd,
   onRemove,
   onPlace,
@@ -279,12 +286,12 @@ export function OrderTab({
     <>
       <div className="shop-head">
         <div className="modes">
-          <button className={channel === 'walkup' ? 'on' : ''} onClick={() => onChannel('walkup')}>
-            Order Now
+          <button className={mode === 'now' ? 'on' : ''} onClick={() => onMode('now')}>
+            Order now
           </button>
           <span className="rule" />
-          <button className={channel === 'preorder' ? 'on' : ''} onClick={() => onChannel('preorder')}>
-            Order Ahead
+          <button className={mode === 'ahead' ? 'on' : ''} onClick={() => onMode('ahead')}>
+            Order ahead
           </button>
         </div>
         <div className="store">
@@ -292,6 +299,32 @@ export function OrderTab({
           <span className="chev">›</span>
         </div>
         <div className="sub">{hours ? `Today ${hours.label}` : ''}</div>
+
+        {/* The live wait, at the top of the menu and before anything is in the
+            cart. It is the one number that lets someone choose a cheaper moment. An
+            empty queue still has a drink to make, so it quotes one order
+            rather than claiming no wait at all. */}
+        {menu && (
+          <div className="strip">
+            {menu.wait_estimate_s == null ? (
+              <span>Closed. The board is still here</span>
+            ) : (
+              <>
+                <strong>About {minutes(menu.wait_estimate_s || menu.seconds_per_order)} min</strong>
+                <span>
+                  {menu.queue_depth === 0
+                    ? 'nobody waiting'
+                    : `${menu.queue_depth} ahead of you`}
+                </span>
+                {menu.wait_estimate_s / 60 >= BUSY_MIN && cart.length > 0 && (
+                  <button className="plan-link" onClick={() => setShowCart(true)}>
+                    plan a time →
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {!menu ? (
@@ -319,14 +352,23 @@ export function OrderTab({
                 </h2>
                 {group.note && <p className="note">{group.note}</p>}
                 {group.items.map((item) => (
-                  <button className="item" key={`${group.key}-${item.name}`} onClick={() => setOpened(item)}>
+                  /* Sold out is shown, not hidden. Somebody who came for a
+                     bagel needs to know the cafe is out of them, not to wonder
+                     whether they misremembered the menu. */
+                  <button
+                    className={item.available === false ? 'item out' : 'item'}
+                    key={`${group.key}-${item.name}`}
+                    disabled={item.available === false}
+                    onClick={() => setOpened(item)}
+                  >
                     <div className="thumb">
                       <ItemMark item={item} />
                     </div>
                     <div>
                       <div className="name">{title(item.name)}</div>
                       <div className="badges">
-                        {badges(item).slice(0, 2).map((badge) => (
+                        {item.available === false && <span className="badge out">Sold out</span>}
+                        {badges(item).slice(0, item.available === false ? 1 : 2).map((badge) => (
                           <span key={badge} className="badge">{badge}</span>
                         ))}
                       </div>
@@ -352,38 +394,18 @@ export function OrderTab({
               <span className="total">
                 <Price cents={total} />
                 <span className="hint" style={{ display: 'block' }}>
-                  {channel === 'preorder' ? 'ordering ahead' : 'ordering now'}
+                  {mode === 'ahead' ? 'pick a time next' : `${cart.length} item${cart.length === 1 ? '' : 's'}`}
                 </span>
               </span>
               <span className="go">Review</span>
             </button>
-            {/* the wait is stated once on this screen, and it stays stated
-                while there is a cart — that is the moment it bears on */}
-            {menu?.wait_estimate_s != null && (
-              <div className="wait-strip">
-                {menu.queue_depth === 0
-                  ? 'Nothing in the queue right now'
-                  : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min to pickup`}
-              </div>
-            )}
           </>
         ) : hours && !hours.open ? (
           <div className="closed">
             <span>{hours.notice}</span>
             <span className="chev">˄</span>
           </div>
-        ) : (
-          menu &&
-          menu.wait_estimate_s != null && (
-            <div className="closed">
-              <span>
-                {menu.queue_depth === 0
-                  ? 'Nothing in the queue right now — no wait'
-                  : `${menu.queue_depth} ahead · about ${minutes(menu.wait_estimate_s)} min to pickup`}
-              </span>
-            </div>
-          )
-        )}
+        ) : null}
       </div>
 
       {opened && (
@@ -400,12 +422,13 @@ export function OrderTab({
           cart={cart}
           menu={menu}
           total={total}
-          channel={channel}
-          slotsEnabled={config?.slots_enabled}
-          onChannel={onChannel}
+          config={config}
+          nowMinutes={hours?.now ?? 0}
+          mode={mode}
           onClose={() => setShowCart(false)}
           onRemove={onRemove}
           onPlace={() => onPlace(() => setShowCart(false))}
+          onHold={(quote) => { setShowCart(false); onHold(quote) }}
           placing={placing}
           error={error}
         />
