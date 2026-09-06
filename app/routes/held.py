@@ -161,6 +161,9 @@ async def hold_order(body: HeldIn) -> dict:
         "held_id": row.held_id,
         "wanted_at": format_hhmm(row.wanted_at_s),
         "wanted_at_s": row.wanted_at_s,
+        # The card shows what was bought; there is nowhere else to read it from
+        # until the hold becomes an order.
+        "lines": json.loads(row.lines_json),
         # What we expect right now. It moves -- that is the feature -- so the
         # screen is told to say "usually around" rather than count down to it.
         "expected_order_at": format_hhmm(row.quoted_order_at_s),
@@ -181,6 +184,8 @@ async def get_held(held_id: str) -> dict:
             "held_id": row.held_id,
             "state": row.state,
             "wanted_at": format_hhmm(row.wanted_at_s),
+            "wanted_at_s": row.wanted_at_s,
+            "lines": json.loads(row.lines_json),
             "expected_order_at": format_hhmm(row.quoted_order_at_s),
             "released_at": None if row.released_at_s is None else format_hhmm(row.released_at_s),
             "order_id": row.order_id,

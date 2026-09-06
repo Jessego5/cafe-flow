@@ -166,6 +166,17 @@ def test_the_release_rule_is_the_one_the_simulator_runs(client, at):
     )
 
 
+def test_both_shapes_carry_what_the_card_renders(client, at):
+    """The held card has nowhere else to read the basket from: until the hold
+    becomes an order there is no order to look it up on."""
+    posted = hold(client, "09:00")
+    fetched = client.get(f"/held/{posted['held_id']}").json()
+    needed = {"held_id", "state", "wanted_at", "expected_order_at", "price_cents", "lines"}
+    assert needed <= set(posted)
+    assert needed <= set(fetched)
+    assert fetched["lines"] == LINES
+
+
 def test_holding_needs_its_clocks_configured(client, at, monkeypatch):
     """Durations live in config. A cafe that has not said how much slack to
     leave has not decided whether it wants this, so refuse rather than invent
