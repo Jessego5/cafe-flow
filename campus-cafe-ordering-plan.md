@@ -1,6 +1,12 @@
 # Campus Cafe Order-Ahead — Implementation Spec
 
 > **Audience: a coding agent.** Build in milestone order. Each milestone has explicit interfaces and a definition of done. Later milestones assume earlier invariants hold.
+>
+> **This spec was written before anyone had watched the cafe.** It has been
+> built, calibrated against observation, and in places contradicted by it. The
+> plan below is left as written — an addendum at the end records what survived,
+> what did not, and why. Read [What actually happened](#what-actually-happened)
+> before treating any number in the body as current.
 
 ## What this is
 
@@ -478,3 +484,165 @@ Be prepared for the gains to be modest, to vanish below ~25% adoption, or for th
 ## Start here
 
 M1. Build `core/` and the config validator before anything else — both the app and the simulator inherit from it, and it is far cheaper to correct at 200 lines than at 2,000.
+
+---
+
+# What actually happened
+
+*Addendum, written after M1–M11 were built and the cafe was observed. The plan
+above is unedited: the interesting part of a spec is where reality departs from
+it, and rewriting it away would hide exactly that.*
+
+## The research question, answered
+
+> *how much additional peak throughput is available at fixed prices, and which
+> mechanism delivers it — register decoupling, milk batching, queue reordering,
+> or shifting demand into the trough.*
+
+**Register decoupling. The other three deliver nothing at this cafe.**
+
+Ordering ahead takes the 90th-percentile walk-up wait from 6.4 to 3.1 minutes
+and the peak register from 60% busy to 27%. Batching, reordering and demand
+shifting were each built, each measured, and each found not to matter here —
+the stations they optimise run at a tenth of the register's load.
+
+The plan's own closing section called this:
+
+> *Be prepared for the gains to be modest, to vanish below ~25% adoption, or for
+> the register to turn out not to be the bottleneck. A negative result honestly
+> measured is a better outcome than a positive one assumed.*
+
+Three for three.
+
+## Two headline findings, both overturned by observation
+
+Before anyone watched, the model said the **panini press was the constraint at
+73%** and that **batching it halved the wait**. It also said **a third of peak
+demand walked out**.
+
+- The press is a **high-speed oven** that holds three and runs in 45 seconds. It
+  sits at about 4%. The batching recommendation evaporated — you cannot optimise
+  a station that is idle.
+- **One person balked in a full day.** People wait. The 33% loss was an artifact
+  of a bug (below), not a property of the cafe.
+
+Both were going to be the centrepiece. Both were wrong. Neither could have been
+found without standing in the cafe.
+
+## What observation cost, and what it bought
+
+| measured | found |
+|---|---|
+| 49 queue readings, one day | the fitted arrival curve; the register as constraint |
+| a spot count on a later day | the logged day was quiet; the queue really does reach twenty |
+| 20 orders, 09:15–09:35 | **excluded an arrival model out of sample** |
+| 70 till laps with item counts | a parameter the model did not have |
+| 8 shelf orders | a generative rule nobody would have defended |
+
+The 09:15 count is the strongest result in the project. The arrival model built
+from the registrar's room schedule predicted **20.1 orders** in a window nothing
+had ever been fitted to; twenty were counted. The free-rate fit it replaced
+predicted 7.3 and never once reached twenty in twenty simulated days. Every
+earlier agreement in this project was arithmetic — a curve matching the numbers
+it was bent to fit. That one was a prediction.
+
+The till laps found that ringing up **food costs 13 seconds beyond being one
+more item**, which no station parameter could express. Fitting without that term
+blames the item count for both, because food nearly always comes with a drink.
+
+## Bugs the calibration exposed
+
+Each was found because a number moved the wrong way, and none would have
+surfaced against invented data — a model fed guesses agrees with itself.
+
+1. **Patience was spent after the register.** A walk-up whose drink took too long
+   was recorded as having abandoned an order they had already paid for. It cost
+   ~77 customers a day where observation found one. Fixed by spending the budget
+   in the line, before the till; the number itself was never touched.
+2. **Pre-orders paid full register time** — queueing at a counter they had
+   already paid at. The one thing ordering ahead definitionally avoids.
+3. **The arms never loaded the fitted arrival curve.** Every experiment ran on
+   the invented class timetable while the app quoted promises from the fitted
+   one: the analysis and the product disagreeing about what day it was.
+4. **The bar built drinks in series.** A latte cost `steam + shot + pour` rather
+   than `max(steam, shot) + pour`, which made drinks slower than food — backwards
+   from what the cafe does.
+5. **A test had been red for weeks** on every run after 10am, because the
+   fixture froze the clock for four route modules and missed the fifth.
+6. **A fresh deploy served the uncalibrated model** — the entrypoint seeded only
+   `base.yaml` onto the volume, so a new machine came up on the invented
+   timetable and the wrong opening hours.
+
+## Built beyond the plan: adaptive release
+
+The plan has no equivalent of this, and it is the feature the project is now
+about.
+
+A customer picks a time, pays, and the **server holds the order** and puts it in
+the queue at the last moment the *live* queue says it will be ready on time. Not
+a notification saying "time to order": once somebody has been told to order they
+cannot be re-timed when the queue moves, so a reminder has to commit to the
+forecast that sold them the slot.
+
+    fixed one-hour lead    median drink ready 59 minutes early, 99% over five
+    adaptive release       median within a minute, 91% on time
+
+It also deleted the hardest part of the build. There is no reminder push, so no
+web push, no VAPID keys, no service worker, and no iOS home-screen install
+between a customer and their coffee.
+
+## Where the plan is now wrong
+
+- **`bottleneck_station: steam_wand`** in the body. It is the register. The
+  config comment anticipated this — *"If this turns out to be `register`, swap
+  the name — no code changes"* — and it was right that no code changes were
+  needed.
+- **M5 and M7 treat batching as the core throughput mechanism.** It is not, at
+  this cafe. The code stays because the question was worth costing.
+- **M6's balking parameters carry almost no weight now.** With patience spent in
+  the line, `balk_tolerance_min` and `time_budget_min` move the p90 wait by under
+  half a minute between their extremes. They are effectively dead parameters.
+- **The notification design in the original M10 is withdrawn**, replaced by the
+  server-side release loop above.
+
+## What the money question turned into
+
+Not "the app generates revenue". Measured across the full adoption range,
+**revenue is flat** — nobody is being lost, so there is nothing to recover, and
+you cannot rescue customers you never had. The two mappings that survive:
+
+- **Payroll.** At 60% adoption the peak runs on three baristas instead of five
+  and still beats today's service (p90 3.9 min against 6.4). Roughly six
+  barista-hours a day. Without the app the same cut gives 9.0.
+- **The ceiling.** The cafe is *at* its service limit today: 40% more demand
+  takes the p90 wait from 6.5 to 12.7 minutes. With order-ahead it absorbs 140%
+  more inside the same limit — a daily ceiling of about $4,100 against $2,900.
+  Whether that demand exists is not something this project measured, and the
+  claim is "raises the serviceable ceiling", never "generates".
+
+## Still open
+
+- **Only Thursday is wired.** Five weekday schedules exist; the arms load one.
+  Friday runs 48 section-meetings against Thursday's 117 and closes an hour
+  earlier.
+- **A dedicated cashier needs an engine change.** `serve()` always takes a
+  barista for the register phase, so the till person who never makes drinks is
+  one body more than the model can represent. Every staffing floor here is
+  therefore pessimistic.
+- **Service times below the till are unmeasured.** Drink build times remain
+  published trade figures, and `changeover_s` is a guess — though both sit on
+  stations running at a tenth of the register's load, so precision there buys
+  little.
+- **The modelled peak now tops out below what was counted.** Measured register
+  times made the till faster than the config had it; a queue of twenty was
+  observed and the model reaches fifteen. One more spot count settles whether
+  that reading was unusual or the model now understates the peak.
+
+## What did not change
+
+Every ground rule in the body held. Durations stayed in config, the event log
+stayed the only source of truth, the two runtimes never diverged — the HTTP
+replay still asserts it on every run — and no parameter was ever tuned to bury a
+discrepancy. When the model shed 77 customers a day it would have been one line
+to widen the patience distribution. The clock was started in the wrong place
+instead, and fixing that is what made the number right.
