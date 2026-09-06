@@ -148,4 +148,18 @@ menu:
 # why the modelled basket mean lands at 1.33 against the 1.386 counted.
 # ---------------------------------------------------------------------------
 mix:
+  # Kept because the schema requires it; `basket` below supersedes it.
   attach: { rate: 0.354, alone: 0.071, source: observed }
+
+  # Straight off the 70 laps. The attach model could not produce two drinks or
+  # three items -- 7% of what was counted -- and had one food rate for every
+  # basket, where the counted ones say bigger baskets are bigger because of the
+  # food.
+  #
+  #     size 1   44 orders  62.9%   of which 11.4% had food
+  #     size 2   25 orders  35.7%                88.0%
+  #     size 3    1 order    1.4%               100.0%
+  basket:
+    size: [0.629, 0.357, 0.014]
+    food: [0.114, 0.880, 1.000]
+    source: observed

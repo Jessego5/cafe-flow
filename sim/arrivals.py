@@ -72,42 +72,60 @@ def line_of(params: Params, name: str, milk: str, serve: str) -> Line:
 
 
 def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
-    """One basket: a drink, its milk, how it is served, and maybe food with it.
+    """One basket: how many things, whether one of them is food, and what.
 
-    Food is an attachment. Drawing the first item from the whole menu made a
-    quarter of every day's orders a sandwich with nobody buying a coffee, which
-    is not what this shop sells -- of the food orders counted at the shelf,
-    every one came with a drink. So the first line is a drink, food arrives by
-    `mix.attach.rate`, and `mix.attach.alone` is the small remainder who really
-    did just come in for the sandwich.
+    Food is an attachment rather than a first choice -- drawing every basket's
+    first item from the whole menu made a quarter of all orders a sandwich with
+    nobody buying a coffee. But it is an attachment that makes the basket
+    bigger: of the orders counted at the till, 11% of single items were food
+    against 88% of pairs. So the size comes first and the food follows from it.
 
-    Six draws, always in this order and always all six, even when the answer is
-    discarded -- a conditional draw would make the seed mean different things
-    for different baskets.
+    `mix.basket` says both. Without it the older `mix.attach` still works, which
+    is what the example configurations use; that form can only ever add food to
+    one drink, so it cannot produce two drinks or three items.
+
+    A fixed number of draws, always in the same order and always all of them,
+    even where the answer is discarded -- a conditional draw would make the seed
+    mean different things for different baskets.
     """
     drinks, foods = params.split_mix()
-    drink = _pick(list(drinks), drinks, rng)
+    basket = params.mix.basket
+    most = basket.largest if basket is not None else 2
+
     milk = _pick(list(params.mix.milk), params.mix.milk, rng)
     serve = _pick(list(params.mix.serve), params.mix.serve, rng)
-    attaches = rng.random() < params.mix.attach.rate
-    alone = rng.random() < params.mix.attach.alone
-    # Drawn even when there is nothing to draw, so a menu without a kitchen
-    # still consumes the same number of numbers and a seed keeps its meaning.
-    picked = _pick(list(foods), foods, rng) if foods else None
+    picked_drinks = [_pick(list(drinks), drinks, rng) for _ in range(most)]
+    picked_food = _pick(list(foods), foods, rng) if foods else None
+    size_roll = float(rng.random())
+    food_roll = float(rng.random())
+    alone_roll = float(rng.random())
 
-    food = params.mix.attach.item or picked
-    if food is None:
-        return (line_of(params, drink, milk, serve),)
+    food = params.mix.attach.item or picked_food
 
-    def line(name: str) -> Line:
-        return line_of(params, name, milk, serve)
+    if basket is None:
+        # The older form: one drink, and maybe food beside it.
+        if food is None:
+            return (line_of(params, picked_drinks[0], milk, serve),)
+        if alone_roll < params.mix.attach.alone:
+            return (line_of(params, food, milk, serve),)
+        lines = [line_of(params, picked_drinks[0], milk, serve)]
+        if food_roll < params.mix.attach.rate and food != picked_drinks[0]:
+            lines.append(line_of(params, food, milk, serve))
+        return tuple(lines)
 
-    if alone:
-        return (line(food),)
-    lines = [line(drink)]
-    if attaches and food != drink:
-        lines.append(line(food))
-    return tuple(lines)
+    size = 1
+    running = 0.0
+    for index, share in enumerate(basket.size):
+        running += share
+        if size_roll < running:
+            size = index + 1
+            break
+    else:
+        size = basket.largest
+
+    has_food = food is not None and food_roll < basket.food[size - 1]
+    names = picked_drinks[: size - 1] + [food] if has_food else picked_drinks[:size]
+    return tuple(line_of(params, name, milk, serve) for name in names)
 
 
 def _from_class_blocks(params: Params, rng: np.random.Generator) -> list[tuple[float, str]]:

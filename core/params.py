@@ -387,11 +387,62 @@ class AttachParams(_Strict):
     source: Source | None = None
 
 
+class BasketParams(_Strict):
+    """How many things people buy at once, and whether food is among them.
+
+    The `attach` model this supersedes could only ever add food to a drink, so
+    it could not produce two drinks or three items -- 7% of the orders counted
+    at the till. It also had one attach rate for every basket, where the counted
+    ones say the opposite: bigger baskets are bigger *because* of the food.
+
+        size 1   44 orders   11% had food
+        size 2   25 orders   88% had food
+        size 3    1 order   100% had food
+
+    `size[n-1]` is the share of orders with n items; `food[n-1]` the share of
+    those that include something to eat. Exactly one item is food when any is,
+    which is what "food is an attachment" means once the basket can be bigger
+    than two.
+    """
+
+    size: list[float]
+    food: list[float]
+    source: Source | None = None
+
+    @field_validator("size")
+    @classmethod
+    def _sums_to_one(cls, value: list[float]) -> list[float]:
+        if not value:
+            raise ValueError("must not be empty")
+        if any(v < 0 for v in value):
+            raise ValueError("shares must not be negative")
+        if abs(sum(value) - 1.0) > 1e-6:
+            raise ValueError(f"shares must sum to 1.0, got {sum(value):.6f}")
+        return value
+
+    @model_validator(mode="after")
+    def _food_matches_size(self) -> "BasketParams":
+        if len(self.food) != len(self.size):
+            raise ValueError(
+                f"food has {len(self.food)} entries for {len(self.size)} sizes"
+            )
+        if any(not 0.0 <= v <= 1.0 for v in self.food):
+            raise ValueError("food shares must each be between 0 and 1")
+        return self
+
+    @property
+    def largest(self) -> int:
+        return len(self.size)
+
+
 class MixParams(_Strict):
     drink: dict[str, float]
     milk: dict[str, float]
     serve: dict[str, float]          # the board's hot/iced split
     attach: AttachParams
+    #: Supersedes `attach` where given. `attach` remains the simple form, and
+    #: is what the example configurations still use.
+    basket: BasketParams | None = None
     source: Source | None = None
 
     @field_validator("drink", "milk", "serve")
