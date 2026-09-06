@@ -441,6 +441,13 @@ customers:
   # Transact mobile ordering is already deployed here, so this is an
   # observable at the pickup shelf rather than a hypothetical.
   preorder_adoption: 0.0
+  # How often a held pre-order re-checks the line, and how much slack it leaves
+  # when it decides. The app's release loop reads these whatever
+  # `preorder_release` says; the simulator only uses them when it says adaptive.
+  # Swept in params/experiments/adaptive_release.yaml: two minutes is 91% on
+  # time, four is never late and almost always cold.
+  release_poll_s: 30.0
+  release_margin_s: 120.0
   no_show_rate: 0.03
   source: assumed
 

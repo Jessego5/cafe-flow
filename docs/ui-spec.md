@@ -73,7 +73,7 @@ the pickup display shows — not the order id.
 
 ---
 
-## 3 · Order ahead — the planner — **BUILT** (the quote) / **NEEDS BACKEND** (the hold)
+## 3 · Order ahead — the planner — **BUILT**
 
 Same menu and cart. The difference is the screen after the cart.
 
@@ -125,7 +125,7 @@ the till than a drink does, on top of being one more item. `basket_s` and
 | hold | `order_in_s > 0` | **Pay and hold.** This is the new path. |
 | closed | `wanted_at` past `closes_at` | Clamp the picker instead of letting someone ask for 8pm. |
 
-### After paying — **NEEDS BACKEND**
+### After paying — **BUILT**
 
 ```
 ┌────────────────────────────────────┐
@@ -144,8 +144,8 @@ the till than a drink does, on top of being one more item. `basket_s` and
   is not.
 - **Cancel is available until release.** After that it is a live order and the
   existing rules apply.
-- The state changes to a normal order when released — same `order_id`, so the
-  ticket screen can just start working.
+- On release it becomes a normal order and `GET /held/{id}` carries the new
+  `order_id`, so the ticket screen can pick it up from there.
 
 ---
 
@@ -219,14 +219,34 @@ Omit `wanted_at` for the other direction — *if I order now, when is it ready*.
 > days at the `quantile`th percentile, not the mean: a promise kept on average
 > is missed half the time.
 
-### `POST /held` — **NEEDS BACKEND**
+### `POST /held` — **BUILT**
 
-Same body as `/plan` plus payment. Returns a `held_id`, the `order_at` the
-server currently expects, and the `wanted_at` it is holding to. The server
-re-derives the timing itself — never accept an `order_at` from the client, for
-the same reason `POST /orders` does not accept a quoted time.
+```json
+{ "lines": [{ "drink": "latte", "milk_type": "oat", "variant": "hot" }],
+  "wanted_at": "12:00" }
+```
 
-### `DELETE /held/{id}` — **NEEDS BACKEND**
+```json
+{ "held_id": "ea93f4ecf3b8", "state": "held",
+  "wanted_at": "12:00",          "wanted_at_s": 43200.0,
+  "expected_order_at": "11:45",  "expected_order_at_s": 42300.0,
+  "ready_at": "11:48",           "price_cents": 575 }
+```
+
+`expected_order_at` is what the forecast says **now**, and it moves — in a live
+run holding for 12:00, the forecast said 11:45 and the empty bar released it at
+11:58. That is thirteen minutes the drink did not spend on a shelf, and the
+reason the screen says "usually around" instead of counting down.
+
+The server re-derives the timing itself. An `order_at` in the body is ignored,
+for the same reason `POST /orders` does not accept a quoted ready time: this is
+a time the cafe will act on and a client must not be able to name it.
+
+`GET /held/{id}` returns the same shape plus `released_at` and `order_id`.
+`409` if the wanted time is not achievable, `400` if it is past or after
+closing, `503` if the cafe has not configured `release_margin_s`.
+
+### `DELETE /held/{id}` — **BUILT**
 
 Idempotent. Cancelling an already-released or unknown hold is a 204.
 

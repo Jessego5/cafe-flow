@@ -84,7 +84,7 @@ def app_env(tmp_path, monkeypatch):
     # to run inside the 07:30-10:00 staffing block, and fail the rest of the day
     # on numbers that were both correct.
     for module in ("app.routes.orders", "app.routes.slots", "app.routes.barista",
-                   "app.routes.common", "app.routes.menu"):
+                   "app.routes.common", "app.routes.menu", "app.routes.held"):
         monkeypatch.setattr(f"{module}.day_seconds", lambda params, moment=None: FROZEN_NOW_S)
 
     yield config.settings

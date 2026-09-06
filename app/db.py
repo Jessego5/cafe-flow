@@ -32,6 +32,7 @@ __all__ = [
     "OrderItemRow",
     "OrderEventRow",
     "SlotRow",
+    "HeldOrderRow",
     "HealthRow",
     "DbEventLog",
     "get_engine",
@@ -190,6 +191,38 @@ class SlotRow(SQLModel, table=True):
     preorder_capacity_s: float              # capacity_s minus the walk-up reserve
     used_s: float = 0.0
     is_open: bool = True
+
+
+class HeldOrderRow(SQLModel, table=True):
+    """A pre-order that has been paid for but not yet put in the queue.
+
+    The customer chose a time and paid; nothing has reached the bar. The app
+    holds the row and releases it when the *live* queue says ordering now lands
+    by the time they asked for -- which is what a pushed reminder could never
+    do, because once somebody has been told to order they cannot be re-timed.
+
+    It lives in the database rather than in memory because a hold that vanishes
+    on deploy is worse than one never offered: Litestream replicates this file,
+    so a restart mid-hold still releases.
+    """
+
+    __tablename__ = "held_orders"
+
+    held_id: str = Field(primary_key=True)
+    service_date: str = Field(index=True)
+    state: str = Field(default="held", index=True)   # held | released | cancelled
+    wanted_at_s: float
+    #: What the forecast said when the customer paid. Kept to show them, and to
+    #: compare against when the release actually happened -- the gap between the
+    #: two is the value of deciding late.
+    quoted_order_at_s: float
+    quoted_ready_at_s: float
+    lines_json: str
+    customer_id: str | None = None
+    price_cents: int = 0
+    created_at: datetime                    # UTC, like every other timestamp here
+    released_at_s: float | None = None
+    order_id: str | None = Field(default=None, index=True)
 
 
 # --------------------------------------------------------------------------

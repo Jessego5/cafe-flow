@@ -11,6 +11,7 @@ and `/pickup`.
 from __future__ import annotations
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_params, service_date, settings
 from app.db import ensure_slots, get_engine, init_db, seed_menu, session_scope
+from app.routes.held import release_loop, router as held_router
 from app.routes import (
     barista_router,
     health_router,
@@ -55,7 +57,13 @@ async def lifespan(app: FastAPI):
         "on" if params.slots.enabled else "off",
         params.provenance_report().caption(),
     )
-    yield
+    # Held pre-orders release themselves against the live queue. Off unless the
+    # cafe has said how much slack to leave; the loop logs which.
+    releaser = asyncio.create_task(release_loop())
+    try:
+        yield
+    finally:
+        releaser.cancel()
 
 
 def create_app() -> FastAPI:
@@ -71,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(menu_router)
     app.include_router(orders_router)
     app.include_router(slots_router)
+    app.include_router(held_router)
     app.include_router(barista_router)
     app.include_router(stream_router)
 

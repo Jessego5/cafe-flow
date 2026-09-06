@@ -17,9 +17,9 @@ meta:
 customers:
   preorder_adoption: 0.5
   preorder_release: adaptive
-  # Re-check every half minute, and leave two minutes of slack when deciding.
-  # The margin is the whole dial between a cold drink and a waiting customer,
-  # swept over twelve days at half adoption:
+  # The clocks themselves are in base.yaml, because the app's release loop needs
+  # them whatever the simulator is doing. The margin is the whole dial between a
+  # cold drink and a waiting customer, swept over twelve days at half adoption:
   #
   #       margin   p50 gap   p90 gap   late  >2min early  shelf p50
   #           0s      1.1m      2.0m    88%           0%       0.3m
@@ -31,6 +31,4 @@ customers:
   # Two minutes is 91% on time with the p90 landing exactly on target and the
   # median drink under a minute on the shelf. Past it you buy punctuality with
   # cold coffee: four minutes is never late and almost always early.
-  release_poll_s: 30.0
-  release_margin_s: 120.0
   source: assumed
