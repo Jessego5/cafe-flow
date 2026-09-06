@@ -140,7 +140,7 @@ function grouped(cart) {
   return [...rows.values()]
 }
 
-function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRemove, onPlace, onHold, placing, error }) {
+function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRemove, onPlace, onHold, placing, error, editing }) {
   const byName = new Map(menu.items.map((item) => [item.name, item]))
   return (
     <>
@@ -191,7 +191,9 @@ function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRem
                 disabled={placing}
                 onClick={onPlace}
               >
-                {placing ? 'Placing…' : 'Place order'}
+                {placing
+                  ? editing ? 'Saving…' : 'Placing…'
+                  : editing ? 'Save changes' : 'Place order'}
               </button>
             </>
           )}
@@ -226,6 +228,8 @@ export function OrderTab({
   onPlace,
   placing,
   error,
+  editing,
+  onStopEditing,
 }) {
   const groups = useMemo(() => (menu ? sections(menu.items) : []), [menu])
   const [active, setActive] = useState(null)
@@ -285,15 +289,26 @@ export function OrderTab({
   return (
     <>
       <div className="shop-head">
-        <div className="modes">
-          <button className={mode === 'now' ? 'on' : ''} onClick={() => onMode('now')}>
-            Order now
-          </button>
-          <span className="rule" />
-          <button className={mode === 'ahead' ? 'on' : ''} onClick={() => onMode('ahead')}>
-            Order ahead
-          </button>
-        </div>
+        {/* Changing an order is not a third mode. It is the same cart with a
+            different verb behind it, so the modes give way rather than growing
+            a tab nobody would find twice. */}
+        {editing ? (
+          <div className="modes editing">
+            <span className="on">Changing your order</span>
+            <span className="rule" />
+            <button onClick={onStopEditing}>Leave it as it was</button>
+          </div>
+        ) : (
+          <div className="modes">
+            <button className={mode === 'now' ? 'on' : ''} onClick={() => onMode('now')}>
+              Order now
+            </button>
+            <span className="rule" />
+            <button className={mode === 'ahead' ? 'on' : ''} onClick={() => onMode('ahead')}>
+              Order ahead
+            </button>
+          </div>
+        )}
         <div className="store">
           <span className="name">{config ? config.cafe.name : 'Cafe'}</span>
           <span className="chev">›</span>
@@ -424,7 +439,8 @@ export function OrderTab({
           total={total}
           config={config}
           nowMinutes={hours?.now ?? 0}
-          mode={mode}
+          mode={editing ? 'now' : mode}
+          editing={editing}
           onClose={() => setShowCart(false)}
           onRemove={onRemove}
           onPlace={() => onPlace(() => setShowCart(false))}

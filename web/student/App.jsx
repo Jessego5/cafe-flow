@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { getConfig, getMenu, placeOrder } from '../shared/api.js'
+import { amendOrder, getConfig, getMenu, placeOrder } from '../shared/api.js'
 import { useTicker } from '../shared/useLive.js'
 import { title } from './catalog.js'
 import { Home } from './Home.jsx'
@@ -53,6 +53,10 @@ export function App() {
   const [mode, setMode] = useState('now')
   const [holds, setHolds] = useState([])
   const [placing, setPlacing] = useState(false)
+  // The order being changed, if any. A cart with this set is an amendment
+  // rather than a new order, which is the only thing that makes `place` two
+  // different verbs.
+  const [editing, setEditing] = useState(null)
   const [error, setError] = useState(null)
 
   const pane = useRef(null)
@@ -139,13 +143,40 @@ export function App() {
     }
   }, [remember])
 
+  // Load a placed order back into the cart. The server refuses an amendment
+  // once the order leaves `placed`, so the button that got here is already gone
+  // by then -- but the request can still lose the race, and says so.
+  const startEditing = (order) => {
+    setEditing(order.order_id)
+    setCart(
+      order.items.map((item) => ({
+        drink: item.drink,
+        milk_type: item.milk_type ?? null,
+        variant: item.variant ?? null,
+      })),
+    )
+    setMode('now')
+    setError(null)
+    setTab('order')
+  }
+
+  const stopEditing = () => {
+    setEditing(null)
+    setCart([])
+    setTab('mine')
+  }
+
   const place = (close) => {
     setPlacing(true)
     setError(null)
-    placeOrder(cart, { channel: 'walkup', quoted: true })
+    const sent = editing
+      ? amendOrder(editing, cart)
+      : placeOrder(cart, { channel: 'walkup', quoted: true })
+    sent
       .then((order) => {
         remember(order.order_id)
         setCart([])
+        setEditing(null)
         close?.()
         setTab('mine')
       })
@@ -166,6 +197,7 @@ export function App() {
             since={since}
             onOrder={openOrdering}
             onCancelHold={dropHold}
+            onChange={startEditing}
           />
         )}
         {tab === 'order' && (
@@ -180,6 +212,8 @@ export function App() {
             onRemove={(key) => setCart((current) => current.filter((line) => lineKey(line) !== key))}
             onPlace={place}
             onHold={placeHold}
+            editing={editing}
+            onStopEditing={stopEditing}
             placing={placing}
             error={error}
           />
@@ -194,6 +228,7 @@ export function App() {
             since={since}
             onOrder={() => setTab('order')}
             onCancelHold={dropHold}
+            onChange={startEditing}
           />
         )}
 

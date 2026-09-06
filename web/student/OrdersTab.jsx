@@ -1,6 +1,7 @@
 import React from 'react'
 import { STATE_LABEL, elapsed, money, parseUtc } from '../shared/api.js'
 import { Price } from './Price.jsx'
+import { Held } from './Held.jsx'
 import { Ticket, lineText, stateClass } from './Ticket.jsx'
 import { isLive } from './useMyOrders.js'
 
@@ -56,7 +57,7 @@ function Receipt({ order }) {
   )
 }
 
-export function OrdersTab({ config, menu, hours, orders, since, onOrder }) {
+export function OrdersTab({ config, menu, hours, orders, holds = [], since, onOrder, onCancelHold, onChange }) {
   const done = (orders || []).filter((order) => !isLive(order))
   const live = (orders || []).filter(isLive)
   const items = (orders || []).reduce((sum, order) => sum + order.items.length, 0)
@@ -76,7 +77,7 @@ export function OrdersTab({ config, menu, hours, orders, since, onOrder }) {
       {/* Accounts are stubbed, so there is nobody to greet. Saying so beats
           inventing a loyalty tier. */}
       <div className="since">
-        No account — this phone remembers the orders it placed
+        No account. This phone remembers the orders it placed
       </div>
 
       <div className="member">
@@ -100,17 +101,28 @@ export function OrdersTab({ config, menu, hours, orders, since, onOrder }) {
           <div className="k">Spent</div>
         </div>
         <div>
-          <div className="n">{typical != null ? elapsed(typical) : '—'}</div>
+          <div className="n">{typical != null ? elapsed(typical) : '-'}</div>
           <div className="k">Typical wait</div>
         </div>
       </div>
+
+      {holds.length > 0 && (
+        <>
+          <h2>Held for later</h2>
+          <div style={{ display: 'grid', gap: '0.7rem', marginTop: '0.6rem' }}>
+            {holds.map((row) => (
+              <Held key={row.held_id} held={row} onCancel={onCancelHold} />
+            ))}
+          </div>
+        </>
+      )}
 
       {live.length > 0 && (
         <>
           <h2>Right now</h2>
           <div style={{ display: 'grid', gap: '0.7rem', marginTop: '0.6rem' }}>
             {live.map((order) => (
-              <Ticket key={order.order_id} order={order} since={since} />
+              <Ticket key={order.order_id} order={order} since={since} onChange={onChange} />
             ))}
           </div>
         </>

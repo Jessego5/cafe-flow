@@ -19,7 +19,7 @@ export function stateClass(state) {
   return 'state gone'
 }
 
-export function Ticket({ order, since }) {
+export function Ticket({ order, since, onChange }) {
   const reached = TRACK.indexOf(order.state)
   // `waiting_s` is what the server measured when it answered; `since` is how
   // long ago that was. Same arithmetic the bar view does, and it never has to
@@ -55,8 +55,17 @@ export function Ticket({ order, since }) {
       </ul>
 
       <div className="hint" style={{ marginTop: '0.5rem' }}>
-        {money(order.price_cents)} · payment {order.payment.status} — pay at the register
+        {money(order.price_cents)} · payment {order.payment.status}. Pay at the register
       </div>
+
+      {/* Only while it is still `placed`. Once a barista has accepted it they
+          are holding the cup, and the server refuses -- so the button goes
+          rather than failing when tapped. */}
+      {onChange && order.state === 'placed' && (
+        <button className="drop" onClick={() => onChange(order)}>
+          Change this order
+        </button>
+      )}
     </div>
   )
 }

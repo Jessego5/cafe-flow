@@ -2,6 +2,7 @@ import React from 'react'
 import { FEATURE, nameLines, title } from './catalog.js'
 import { Price } from './Price.jsx'
 import cafe from './cafe.webp'
+import { Held } from './Held.jsx'
 import { Ticket } from './Ticket.jsx'
 
 const minutes = (seconds) => Math.max(1, Math.round(seconds / 60))
@@ -22,13 +23,13 @@ function Wait({ menu, hours }) {
       <div className="spread" style={{ marginTop: '0.35rem' }}>
         <div>
           <div className="big">
-            {wait == null ? '—' : depth === 0 ? 'No wait' : `${minutes(wait)} min`}
+            {wait == null ? '-' : `${minutes(wait || menu.seconds_per_order)} min`}
           </div>
           <div className="hint">
             {wait == null
               ? hours?.notice || 'Closed'
               : depth === 0
-                ? 'Nobody ahead of you'
+                ? 'Nobody waiting, one drink to make'
                 : `${depth} ${depth === 1 ? 'order' : 'orders'} ahead of you`}
           </div>
         </div>
@@ -40,10 +41,14 @@ function Wait({ menu, hours }) {
   )
 }
 
-export function Home({ config, menu, hours, live, since, onOrder }) {
+// Above this, ordering ahead is the better answer and the screen should say so.
+const PROMOTE_MIN = 8
+
+export function Home({ config, menu, hours, live, holds = [], since, onOrder, onCancelHold, onChange }) {
   const byName = new Map((menu?.items || []).map((item) => [item.name, item]))
   const featured = FEATURE.items.map((name) => byName.get(name)).filter(Boolean)
   const [head, tail] = nameLines(config ? config.cafe.name : '')
+  const busy = menu?.wait_estimate_s != null && menu.wait_estimate_s / 60 >= PROMOTE_MIN
 
   return (
     <div className="home">
@@ -70,31 +75,29 @@ export function Home({ config, menu, hours, live, since, onOrder }) {
       </div>
 
       {/* The wait comes before the two doors, not after them. It is the whole
-          reason this screen exists — someone who reads twelve minutes at noon
-          and comes back at twenty past has moved themselves out of the peak —
+          reason this screen exists. Someone who reads twelve minutes at noon
+          and comes back at twenty past has moved themselves out of the peak,
           and a number placed below the buttons is read after the decision it
           was meant to inform. */}
       <Wait menu={menu} hours={hours} />
 
-      {/* The two front doors. Ordering ahead is the thing this cafe is trying
-          to find out about, so it gets equal weight, not a link in a menu. */}
-      <div className="doors">
+      {/* Two doors. Ordering ahead is what the project is trying to find out
+          about, so it gets equal weight, and above a busy line it gets more,
+          because that is the moment it is worth the most. */}
+      <div className={`doors${busy ? ' promote' : ''}`}>
         <div className="door">
-          <button className="slab" onClick={() => onOrder('walkup')}>
-            Order Now
+          <button className="slab" onClick={() => onOrder('now')}>
+            Order now
           </button>
           <span className="under">join the line</span>
         </div>
         <div className="door">
-          <button className="slab" onClick={() => onOrder('preorder')}>
-            Order Ahead
+          <button className={`slab${busy ? ' filled' : ''}`} onClick={() => onOrder('ahead')}>
+            Order ahead
           </button>
-          <span className="under">
-            {config?.slots_enabled ? 'pick a window' : 'skip the register'}
-          </span>
+          <span className="under">pick a time, we'll queue it</span>
         </div>
       </div>
-
 
       {/* The four the bar makes most, by the drink shares in params. Nothing
           here is billed as new or returning: the boards say no such thing, and
@@ -109,11 +112,20 @@ export function Home({ config, menu, hours, live, since, onOrder }) {
         ))}
       </div>
 
+      {holds.length > 0 && (
+        <div className="stack">
+          <span className="eyebrow">Held for later</span>
+          {holds.map((row) => (
+            <Held key={row.held_id} held={row} onCancel={onCancelHold} />
+          ))}
+        </div>
+      )}
+
       {live.length > 0 && (
-        <div style={{ padding: '1.4rem var(--pad) 0', display: 'grid', gap: '0.7rem' }}>
+        <div className="stack">
           <span className="eyebrow">In progress</span>
           {live.map((order) => (
-            <Ticket key={order.order_id} order={order} since={since} />
+            <Ticket key={order.order_id} order={order} since={since} onChange={onChange} />
           ))}
         </div>
       )}

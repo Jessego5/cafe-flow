@@ -807,3 +807,13 @@ button:disabled { cursor: default; }
   color: var(--warn-fg, #8a3520);
   border-color: transparent;
 }
+
+/* Changing an order is the same cart with a different verb behind it, so the
+   mode row gives way rather than growing a tab nobody would find twice. */
+.modes.editing { color: var(--ink, inherit); }
+.modes.editing .on { font-weight: 600; }
+.modes.editing button {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; opacity: 0.7; text-decoration: underline;
+}
+.ticket .drop { margin-top: 0.6rem; }
