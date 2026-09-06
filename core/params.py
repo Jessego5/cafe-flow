@@ -71,6 +71,7 @@ SHAPE_KEYS: tuple[str, ...] = ("dist",)
 PER_ORDER = "order"
 PER_BATCH = "batch"
 PER_ITEM = "item"
+PER_FOOD_ITEM = "food_item"   # per item, but only where the item is food
 
 SECONDS_PER_MINUTE = 60
 OUNCES_PER_STEAM_UNIT = 6.0  # `per_6oz_s` is quoted per this many ounces
@@ -194,7 +195,13 @@ class StationParams(_Strict):
     setup_s: float | None = Field(default=None, ge=0)     # per batch
     per_6oz_s: float | None = Field(default=None, ge=0)   # per item, x oz/6
     shot_s: float | None = Field(default=None, ge=0)      # per item, x shots
-    per_item_s: float | None = Field(default=None, ge=0)  # per item, flat
+    per_item_s: float | None = Field(default=None, ge=0)
+    #: Extra seconds an item of food costs here, on top of `per_item_s`.
+    #: Measured at the till: 70 laps separate a 13-second food premium from the
+    #: 8.5 seconds any second item costs, and fitting without it blames the item
+    #: count for both -- the two are collinear because food nearly always comes
+    #: with a drink.
+    food_s: float | None = Field(default=None, ge=0)  # per item, flat
     run_s: float | None = Field(default=None, ge=0)       # per batch if batch_size, else per item
     pour_s: float | None = Field(default=None, ge=0)      # per item
     batch_key: str | None = None
@@ -228,7 +235,7 @@ class StationParams(_Strict):
             raise ValueError(
                 "station declares no cost term "
                 "(expected one of base_s, setup_s, per_6oz_s, shot_s, "
-                "per_item_s, run_s, pour_s)"
+                "per_item_s, food_s, run_s, pour_s)"
             )
         if self.max_batch_oz is not None and self.per_6oz_s is None:
             raise ValueError("max_batch_oz is meaningless without per_6oz_s")
@@ -246,6 +253,7 @@ class StationParams(_Strict):
             "per_6oz_s": (self.per_6oz_s, PER_ITEM, "oz"),
             "shot_s": (self.shot_s, PER_ITEM, "shots"),
             "per_item_s": (self.per_item_s, PER_ITEM, None),
+            "food_s": (self.food_s, PER_FOOD_ITEM, None),
             "run_s": (self.run_s, run_per, None),
             "pour_s": (self.pour_s, PER_ITEM, None),
         }

@@ -15,6 +15,7 @@ from typing import Iterable, Protocol, Sequence, runtime_checkable
 from core.params import (
     OUNCES_PER_STEAM_UNIT,
     PER_BATCH,
+    PER_FOOD_ITEM,
     PER_ITEM,
     PER_ORDER,
     ConfigError,
@@ -48,6 +49,7 @@ def task_seconds(
     shots: int | None = None,
     include_batch_terms: bool = True,
     include_order_terms: bool = False,
+    is_food: bool = False,
 ) -> float:
     """Service time for one task run on its own.
 
@@ -59,6 +61,8 @@ def task_seconds(
     for seconds, per, attr in station.cost_terms.values():
         if per == PER_ITEM:
             total += seconds * _scale(attr, oz, shots)
+        elif per == PER_FOOD_ITEM and is_food:
+            total += seconds
         elif per == PER_BATCH and include_batch_terms:
             total += seconds
         elif per == PER_ORDER and include_order_terms:
@@ -219,14 +223,18 @@ class StationCapacityModel:
         are charged once for the item itself: the register's few seconds an item
         are paid whether or not the item involves any work there.
         """
+        food = self.params.is_food(item.drink)
         tasks = item.tasks_at(self.station_name)
         if not tasks:
             if not self.order_scoped:
                 return 0.0
+            # A sandwich costs longer to ring up than a coffee does, over and
+            # above being one more item -- measured at 13 seconds against 8.5.
             return sum(
                 seconds
                 for seconds, per, attr in self.station.cost_terms.values()
-                if per == PER_ITEM and attr is None
+                if (per == PER_ITEM and attr is None)
+                or (per == PER_FOOD_ITEM and food)
             )
         return sum(
             task_seconds(
@@ -234,6 +242,7 @@ class StationCapacityModel:
                 oz=task.oz,
                 shots=task.shots,
                 include_batch_terms=False,
+                is_food=food,
             )
             for task in tasks
         )

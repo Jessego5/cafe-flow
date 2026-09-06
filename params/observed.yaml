@@ -39,18 +39,26 @@ stations:
     source_of: { run_s: published, batch_size: observed }
   register:
     capacity: 1
-    # Watched rather than timed: an order of one item runs 30-40s, and each
-    # further item adds about eight. Taken as 35 + 8 per extra, which is
-    # base_s + per_item_s * items = 27 + 8n.
+    # 70 laps at the till, one per customer leaving it, with the item count and
+    # whether there was food. Fitted as base + per_item*items + food*is_food:
     #
-    # This is recall to about +/-5s, not a stopwatch, and it is doing more work
-    # than any other number here: the published 40 + 3n it replaces put the
-    # register at 74% and the p90 wait at 12.5 minutes, and 88% of baskets are
-    # a single item, so base_s alone decides whether the till is a constraint
-    # at all. It wants twenty laps behind it before anything is quoted off it.
-    base_s: 27
-    per_item_s: 8
-    source_of: { capacity: observed, base_s: observed, per_item_s: observed }
+    #     base_s        17.3  +/- 3.6
+    #     per_item_s     8.5  +/- 3.1
+    #     food_s        13.2  +/- 3.2      R^2 0.84, residual sd 4.5s
+    #
+    # Fitting without the food term blames the item count for both and returns
+    # per_item_s = 17.8, because food nearly always comes with a drink and the
+    # two are collinear. Separating them recovers exactly the eight seconds an
+    # extra item was recalled to cost, and finds a thirteen-second premium on
+    # ringing up a sandwich that nothing in the model had a place for.
+    #
+    # The published figure this replaces was 40 + 3n: a large fixed cost and
+    # almost no sensitivity to basket size. The till is the other way round.
+    base_s: 17.3
+    per_item_s: 8.5
+    food_s: 13.2
+    source_of: { capacity: observed, base_s: observed, per_item_s: observed,
+                 food_s: observed }
 
 staffing:
   - { from: "07:30", to: "10:00", baristas: 3, source: observed }
@@ -121,3 +129,23 @@ menu:
   cocoa:            { calories: 530, source_of: { calories: observed } }
 
   caesar_salad:     { price_cents: 1100, source_of: { price_cents: observed } }
+
+# ---------------------------------------------------------------------------
+# what people buy, from the same 70 laps
+#
+#     drink only   42/70  60.0%      (base.yaml's fitted guess: 64.5%)
+#     food + drink 23/70  32.9%      (26.0%)
+#     food alone    5/70   7.1%      ( 9.5%)
+#     basket mean          1.386     (1.26)
+#
+# alone is read straight off; rate is what makes the rest come out, since a
+# food-and-drink order is one that did not go alone and then attached:
+# 0.329 = (1 - 0.071) * rate.
+#
+# One known gap. Four of the seventy were two drinks and no food, and one was
+# three items; the attachment model can only add food, so it cannot produce
+# either. That is 7% of orders whose second item the model will miss, and it is
+# why the modelled basket mean lands at 1.33 against the 1.386 counted.
+# ---------------------------------------------------------------------------
+mix:
+  attach: { rate: 0.354, alone: 0.071, source: observed }
