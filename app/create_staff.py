@@ -1,6 +1,6 @@
 """Make a staff account.
 
-    python -m tools.create_staff jess
+    python -m app.create_staff jess
 
 Prompts for the password rather than taking it as an argument, because an
 argument lands in the shell history and in the process list. There is no

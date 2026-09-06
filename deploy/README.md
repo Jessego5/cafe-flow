@@ -17,7 +17,7 @@ Then check the three views: `/` student, `/bar` barista, `/pickup` display.
 `/bar` and every write route need a login. Customers need none and have none.
 
     fly secrets set CAFE_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(32))")
-    fly ssh console -C "python -m tools.create_staff <name>"
+    fly ssh console -C "python -m app.create_staff <name>"
 
 **Set the key before anyone logs in.** Without it the app generates one at boot,
 says so in the log, and every session ends when the process does -- survivable

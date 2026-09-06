@@ -212,7 +212,7 @@ function Login({ onIn }) {
         <button disabled={busy || !username || !password}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="hint">Accounts are made with <code>tools/create_staff.py</code>.</p>
+        <p className="hint">Accounts are made with <code>app/create_staff.py</code>.</p>
       </form>
     </main>
   )

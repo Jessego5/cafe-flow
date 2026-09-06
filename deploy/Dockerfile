@@ -57,6 +57,14 @@ COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY deploy/verify-restore.sh /usr/local/bin/verify-restore.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/verify-restore.sh
 
+# Set here rather than only exported by the entrypoint, so a shell that never
+# ran it sees the same database. `fly ssh console -C "python -m app.create_staff
+# jess"` used to make the account in the image's default path and report
+# success, leaving somebody locked out of an app that had just told them the
+# account existed. The entrypoint still honours an override.
+ENV DATA_DIR=/data \
+    CAFE_DB=/data/cafe.db
+
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4).status == 200 else 1)"
