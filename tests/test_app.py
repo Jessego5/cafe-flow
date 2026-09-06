@@ -29,7 +29,7 @@ from app.db import (
 from core.menu import make_item, service_seconds
 from core.states import State
 
-from tests.conftest import BASE_YAML as BASE_YAML_PATH
+from tests.conftest import FROZEN_NOW_S, BASE_YAML as BASE_YAML_PATH
 
 LATTE = {"drink": "latte", "milk_type": "oat"}
 DRIP = {"drink": "drip_coffee"}
@@ -571,7 +571,7 @@ def test_the_app_shows_the_wait_the_model_would_assume(client):
     assert menu["queue_depth"] == queue["queue_depth"] == 4
 
     params = get_params()
-    per_order = nominal_seconds_per_order(params, params.baristas_at(8 * 3600))
+    per_order = nominal_seconds_per_order(params, params.baristas_at(FROZEN_NOW_S))
     assert menu["wait_estimate_s"] == pytest.approx(estimate_wait_s(4, per_order), abs=0.1)
     assert menu["wait_estimate_s"] == queue["wait_estimate_s"]
 

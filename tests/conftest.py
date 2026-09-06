@@ -78,8 +78,13 @@ def app_env(tmp_path, monkeypatch):
     db._engine = None
     get_params.cache_clear()
 
+    # Every route module that reads the clock. `app.routes.menu` was missing,
+    # so /menu alone ran on the real wall clock while /queue ran at 08:00 --
+    # which made the one test comparing them pass only when the suite happened
+    # to run inside the 07:30-10:00 staffing block, and fail the rest of the day
+    # on numbers that were both correct.
     for module in ("app.routes.orders", "app.routes.slots", "app.routes.barista",
-                   "app.routes.common"):
+                   "app.routes.common", "app.routes.menu"):
         monkeypatch.setattr(f"{module}.day_seconds", lambda params, moment=None: FROZEN_NOW_S)
 
     yield config.settings
