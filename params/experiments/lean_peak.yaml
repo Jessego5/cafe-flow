@@ -1,0 +1,27 @@
+# Arm: order-ahead spent on payroll instead of on speed.
+#
+# The register is the constraint and pre-orders bypass it, so the crew has
+# slack it did not have. This takes the slack out rather than banking it: three
+# on the bar at lunch instead of five.
+#
+# It still beats the cafe as observed -- p90 walk-up 3.9 minutes against the
+# 6.4 that five people currently deliver -- which is the point. Two of the two
+# people are not paying for the same service, they are paying for better.
+#
+# Two is too far: p90 goes to 9.2. The engine always takes a barista for the
+# register phase, so a cafe that really does run a dedicated cashier has one
+# more body than this can represent, and the floor here is pessimistic.
+
+meta:
+  scenario: lean_peak
+  source: assumed
+
+customers:
+  preorder_adoption: 0.6
+  preorder_release: adaptive
+  source: assumed
+
+staffing:
+  - { from: "07:30", to: "10:00", baristas: 3, source: observed }
+  - { from: "10:00", to: "13:00", baristas: 3, source: assumed }
+  - { from: "13:00", to: "16:30", baristas: 4, source: observed }

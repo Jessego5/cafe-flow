@@ -151,6 +151,11 @@ ARMS: dict[str, Arm] = {
         HYBRID + ("params/experiments/fixed_release.yaml",),
         "half order ahead, a class block early, whatever the line is doing",
     ),
+    "lean_peak": Arm(
+        "lean_peak",
+        HYBRID + ("params/experiments/lean_peak.yaml",),
+        "three on the bar at lunch instead of five, and still faster than today",
+    ),
     "retime": Arm(
         "retime",
         HYBRID + ("params/experiments/retime.yaml",),
