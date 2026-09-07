@@ -18,3 +18,10 @@ sim
 *.db-shm
 .DS_Store
 campus-cafe-ordering-plan.md
+docs
+# Not copied into the image, so there is no reason to send them to the daemon.
+# `data` is raw source material and `tools` is the research side; `app` needs
+# neither, and `app/create_staff.py` is in `app` precisely so a deployed machine
+# can reach it.
+data
+tools

@@ -7,7 +7,13 @@ Nothing here is read at runtime. These files are *inputs to* the parameters,
 and the parameters are what gets committed:
 
     data/morgridge_hall_fall2026_classes.xlsx
-        -> arrivals.class_blocks in params/observed.yaml, source: observed
+        -> arrivals.class_blocks in params/schedule/*.yaml, source: observed
+
+    data/product-sheet.png
+        -> web/student/img/*.png, via tools/slice_product_art.py
+
+    data/cafe-sketch.png
+        -> nothing. Reference art, kept because it is the only copy.
 
 That keeps the repo reproducible without redistributing institutional data,
 and keeps the provenance honest: a block marked `observed` can name the file
