@@ -61,6 +61,16 @@ fi
 # Fail at boot, not on the first order of a rush.
 python -m app.migrate
 
+# A command given to the container is run instead of the server, after the
+# restore and the migration above -- so `docker run cafe-flow python -m
+# app.create_staff jess` makes an account rather than silently starting a second
+# web server and sitting there. `fly ssh console -C` and `docker exec` bypass
+# the entrypoint and were always fine; this is the obvious way in, and it used
+# to do the wrong thing quietly.
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 SERVE="uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --no-server-header"
 
 if [ -n "${LITESTREAM_BUCKET:-}" ]; then
