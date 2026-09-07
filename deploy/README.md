@@ -3,11 +3,16 @@
 One always-on process with a persistent disk. Not serverless: SSE needs
 long-lived connections and SQLite needs a real filesystem.
 
+**Every command needs `-c deploy/fly.toml`.** The config does not live at the
+repository root, so without it fly looks for `./fly.toml`, does not find one, and
+reports a missing app name rather than a missing config -- which sends you
+looking in the wrong place. `-a cafe-flow-demo` works too.
+
 ## First deploy
 
     fly launch --no-deploy -c deploy/fly.toml
-    fly volumes create cafe_data --size 1 --region ord
-    fly scale count 1                       # the ceiling; fly.toml sets the floor
+    fly volumes create cafe_data --size 1 --region ord -c deploy/fly.toml
+    fly scale count 1 -c deploy/fly.toml    # the ceiling; fly.toml sets the floor
     fly deploy -c deploy/fly.toml
 
 Then check the three views: `/` student, `/bar` barista, `/pickup` display.
@@ -16,8 +21,9 @@ Then check the three views: `/` student, `/bar` barista, `/pickup` display.
 
 `/bar` and every write route need a login. Customers need none and have none.
 
-    fly secrets set CAFE_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(32))")
-    fly ssh console -C "python -m app.create_staff <name>"
+    fly secrets set -c deploy/fly.toml \
+      CAFE_SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
+    fly ssh console -c deploy/fly.toml -C "python -m app.create_staff <name>"
 
 **Set the key before anyone logs in.** Without it the app generates one at boot,
 says so in the log, and every session ends when the process does -- survivable
@@ -33,7 +39,7 @@ Litestream replicates `/data/cafe.db` continuously. Set the credentials as
 secrets — without `LITESTREAM_BUCKET` the container runs unreplicated and says
 so at boot, which is fine for `dev` and `demo` and not fine for `pilot`.
 
-    fly secrets set \
+    fly secrets set -c deploy/fly.toml \
       LITESTREAM_BUCKET=cafe-flow-backups \
       LITESTREAM_ENDPOINT=https://<account>.r2.cloudflarestorage.com \
       LITESTREAM_ACCESS_KEY_ID=... \
@@ -42,7 +48,7 @@ so at boot, which is fine for `dev` and `demo` and not fine for `pilot`.
 **Verify the restore before the pilot, not after.** A backup nobody has
 restored is not a backup:
 
-    fly volumes create cafe_restore_test --size 1
+    fly volumes create cafe_restore_test --size 1 -c deploy/fly.toml
     # attach it to a one-off machine, then inside it:
     litestream restore -config /etc/litestream.yml /data/restore-check.db
     sqlite3 /data/restore-check.db "select count(*) from order_events"
@@ -75,7 +81,7 @@ Recalibrating afterwards is a file drop and a restart:
 
     fly ssh sftp shell -c deploy/fly.toml
     put params/observed.yaml /data/params/observed.yaml
-    fly apps restart cafe-flow-demo
+    fly apps restart -c deploy/fly.toml
 
 The entrypoint overlays whatever it finds and logs each one, so the boot line
 says which configuration the machine is actually serving. An explicitly set
