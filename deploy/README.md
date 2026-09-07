@@ -63,16 +63,24 @@ bar during a real rush destroys trust in the tool permanently.
 
 ## Parameters
 
-`params/` lives on the volume, not in the image. The image seeds
-`/data/params/base.yaml` on first boot only. Calibration at M8 is a file drop
-and a restart:
+`params/` lives on the volume, not in the image. On first boot the image seeds
+every calibrated layer it ships -- `base.yaml`, `observed.yaml`,
+`hybrid_arrivals.yaml` and `forecast.yaml` -- and never touches them again, so a
+fresh machine comes up on the measured cafe rather than the assumed one. It used
+to seed `base.yaml` alone, which meant a first deploy served the invented class
+timetable and the wrong opening hours while every calibrated file sat in the
+image beside it.
+
+Recalibrating afterwards is a file drop and a restart:
 
     fly ssh sftp shell -c deploy/fly.toml
     put params/observed.yaml /data/params/observed.yaml
     fly apps restart cafe-flow-demo
 
-The entrypoint picks up `observed.yaml` automatically when it exists and logs
-that it did.
+The entrypoint overlays whatever it finds and logs each one, so the boot line
+says which configuration the machine is actually serving. An explicitly set
+`CAFE_PARAMS` wins over all of it, which is how you reproduce a scenario on a
+running machine.
 
 ## SSE, and what will bite
 
