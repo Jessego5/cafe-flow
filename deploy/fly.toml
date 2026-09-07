@@ -1,55 +1,69 @@
-# Fly configuration. Deploy from the repository root so the build context is
-# the whole repo:
+# fly.toml — deploy from the repository root so the build context is the whole
+# repo:
 #
 #   fly deploy -c deploy/fly.toml
 #
-# ONE MACHINE. SQLite in WAL mode is single-writer; two machines writing the
-# same volume silently corrupt state, and the order log is the only source of
-# truth for every metric in the project. `min_machines_running = 1` and
-# `auto_stop_machines = false` keep one machine up; the ceiling is set outside
-# this file with `fly scale count 1` (there is no max_machines_running key) and
-# must be re-checked after any scaling change.
+# `fly launch` rewrites this file and strips comments. Everything below that is
+# not a plain setting is a decision with a reason; if a future launch flattens
+# them again, they are in git.
+#
+# ONE MACHINE. SQLite in WAL mode is single-writer, and the order log is the only
+# source of truth for every metric in the project: two machines writing the same
+# volume corrupt it silently. `min_machines_running = 1` keeps one up; the
+# ceiling is set outside this file with `fly scale count 1` — there is no
+# max_machines_running key — and must be re-checked after any scaling change.
 
-app = "cafe-flow-demo"
-primary_region = "ord"           # near campus; set to your own region
+app = 'cafe-flow-demo'
+primary_region = 'ord'           # near campus; the volume must be here too
 
 [build]
-  dockerfile = "deploy/Dockerfile"
+  # Relative to THIS FILE, not to the working directory. Saying
+  # 'deploy/Dockerfile' here resolves to deploy/deploy/Dockerfile and the deploy
+  # fails with the directory in the path twice. The build *context* is still the
+  # working directory, which is why the note above says to deploy from the root.
+  dockerfile = 'Dockerfile'
 
 [env]
-  CAFE_ENV = "demo"              # dev | demo | pilot — pilot refuses simulated orders
-  DATA_DIR = "/data"
-  PORT = "8080"
-  CAFE_SSE_HEARTBEAT_S = "15"    # must stay below the proxy idle timeout
+  CAFE_ENV = 'demo'              # dev | demo | pilot — pilot refuses simulated orders
+  CAFE_SSE_HEARTBEAT_S = '15'    # must stay below the proxy idle timeout
+  DATA_DIR = '/data'
+  PORT = '8080'
+
+# CAFE_SECRET_KEY is a secret, not an env: `fly secrets set`. Without it the app
+# generates one at boot and every staff session ends when the process does.
 
 [[mounts]]
-  source = "cafe_data"           # fly volumes create cafe_data --size 1
-  destination = "/data"
+  source = 'cafe_data'           # fly volumes create cafe_data --size 1 --region ord
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
   # A stopped machine is a dead SSE stream and a dark bar display.
-  auto_stop_machines = false
+  auto_stop_machines = 'off'
   auto_start_machines = false
   min_machines_running = 1
 
   # SSE holds one connection open per open view for the whole shift, so the
-  # limits count connections rather than requests.
+  # limits count connections rather than requests. This is the first ceiling
+  # this app will actually reach — long before the database, which sees under
+  # one write a second at the simulated peak.
   [http_service.concurrency]
-    type = "connections"
-    soft_limit = 200
+    type = 'connections'
     hard_limit = 250
+    soft_limit = 200
 
-[[http_service.checks]]
-  interval = "30s"
-  timeout = "5s"
-  grace_period = "15s"
-  method = "GET"
-  path = "/healthz"
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '15s'
+    method = 'GET'
+    path = '/healthz'          # queries the database; a check that does not is worse than none
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
-  # Peak is ~40 orders in 10 minutes. The constraint is reliability, not
-  # throughput; do not scale this up to solve a reliability problem.
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpus = 1
+  memory_mb = 512
+  # Peak is ~5 orders a minute. The constraint is reliability, not throughput;
+  # do not scale this up to solve a reliability problem.
