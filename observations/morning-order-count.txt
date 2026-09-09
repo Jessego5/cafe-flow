@@ -10,7 +10,7 @@ counted.
 
 Why this window was chosen, and what the count decides.
 
-Nobody counted anything before 10:20 on 2026-09-03, so the free-rate fit in
+Nobody counted anything before 10:20 in the timed queue log, so the free-rate fit in
 params/fitted_arrivals.yaml has no data for the morning at all: its early bins
 still hold the flat 20/hour that sim/fit_profile.py seeds its search with. The
 room schedule says 520 students leave classes in this building at 09:15. One of
@@ -43,7 +43,7 @@ the free fit on every one of them. It landed on Thursday, which is both the
 closest prediction and the day the model was fitted against, so the comparison
 is like for like.
 
-It also settles an apparent contradiction in the first day of observation,
+It also settles an apparent contradiction in the observation notes,
 which recorded "not a lot of people around 9:00 to 10:40". Twenty orders in
 twenty minutes is sixty an hour, which sounds busy. Both are true: the model
 has a queue of 3.5 people in this window against a rate of one order a minute.
@@ -62,8 +62,9 @@ is the honest one.
 
 ---
 
-Shelf tally, same visit: 8 orders, 2 with food, both of those with a drink too.
-Six were a single drink. So 10 items, 20% of them food, mean basket 1.25.
+Shelf tally, counted alongside: 8 orders, 2 with food, both of those with a
+drink too. Six were a single drink. So 10 items, 20% of them food, mean
+basket 1.25.
 
 Eight orders cannot pin a share -- the 95% interval on 2 of 8 runs from 7% to
 59%, which at roughly $3 of daily margin per point is worth +/-$156 on a figure

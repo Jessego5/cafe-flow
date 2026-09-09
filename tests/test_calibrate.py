@@ -23,7 +23,7 @@ def runner(params, seed):
 
     return run(params, seed).log
 
-RUSH = """Ground Truth, 2026-08-27
+RUSH = """Ground Truth, counted rush
 watched: 15 min
 orders: 23
 iced: 14 of 23
@@ -51,7 +51,6 @@ def seen():
 
 def test_a_counted_rush_reads_back(seen):
     assert seen.where == "Ground Truth"
-    assert seen.on == "2026-08-27"
     assert (seen.orders, seen.minutes) == (23, 15.0)
     assert seen.orders_per_hour == pytest.approx(92.0)
     assert seen.iced_share == pytest.approx(14 / 23)
@@ -61,10 +60,21 @@ def test_a_counted_rush_reads_back(seen):
     assert seen.press_size == 2
 
 
+def test_a_dated_header_keeps_its_date():
+    """A counter who writes the date gets it recorded; one who writes a label
+    instead loses nothing that is used downstream."""
+    dated = read_summary("Elsewhere Coffee, 2024-01-31\nwatched: 10 min\norders: 9\n")
+    assert (dated.where, dated.on) == ("Elsewhere Coffee", "2024-01-31")
+
+    labelled = read_summary("Ground Truth, counted rush\nwatched: 10 min\norders: 9\n")
+    assert labelled.on == ""
+    assert labelled.orders == 9
+
+
 def test_a_half_finished_session_still_reads(params):
     """Someone who only managed the order count should not lose the afternoon
     to a parser."""
-    partial = read_summary("Ground Truth, 2026-08-27\nwatched: 10 min\norders: 14\n")
+    partial = read_summary("Ground Truth, counted rush\nwatched: 10 min\norders: 14\n")
     assert partial.orders == 14
     assert partial.iced_share is None
     assert partial.food_share is None
@@ -152,13 +162,13 @@ def test_the_fit_reproduces_the_volume_that_was_counted(seen, params):
 def test_a_volume_the_class_blocks_cannot_supply_is_refused(params):
     """Fitting has limits, and reaching them means the arrivals model is wrong
     rather than the knob being mis-set."""
-    impossible = read_summary("Ground Truth, 2026-08-27\nwatched: 5 min\norders: 400\n")
+    impossible = read_summary("Ground Truth, counted rush\nwatched: 5 min\norders: 400\n")
     with pytest.raises(ConfigError, match="class_blocks"):
         fit_capture_rate(impossible, [BASE], {}, runner, seeds=[0])
 
 
 def test_the_balk_gap_is_reported_because_nothing_was_fitted_to_it(seen, params):
-    """Volume agreeing proves little — it is what the knob was turned to match.
+    """Volume agreeing proves little: it is what the knob was turned to match.
     Balking is the honest test."""
     overlay = to_overlay(seen, params)
     capture, _ = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
@@ -206,7 +216,7 @@ def test_calibration_needs_no_simulator_to_be_tested(seen, params):
 # the field checklist, which is mostly answers rather than counts
 # --------------------------------------------------------------------------
 
-FIELD = """Ground Truth, 2026-08-27
+FIELD = """Ground Truth, counted rush
 watched: 15 min
 food machine: microwave, holds 1
 walked out: 3 (line was 8, 9, 6)
@@ -241,7 +251,7 @@ def test_what_the_machine_is_decides_how_many_it_holds(params):
     for answer, run_s, holds in [
         ("microwave", 60.0, 1), ("high-speed oven", 45.0, 1), ("panini press", 240.0, 2)
     ]:
-        seen = read_summary(f"Ground Truth, 2026-08-27\nfood machine: {answer}\n")
+        seen = read_summary(f"Ground Truth, counted rush\nfood machine: {answer}\n")
         press = to_overlay(seen, params)["stations"]["panini_press"]
         assert (press["run_s"], press["batch_size"]) == (run_s, holds)
 
@@ -249,7 +259,7 @@ def test_what_the_machine_is_decides_how_many_it_holds(params):
 def test_a_stopwatch_beats_the_conventional_figure(params):
     """Somebody timing it outranks the class average for that machine."""
     seen = read_summary(
-        "Ground Truth, 2026-08-27\n"
+        "Ground Truth, counted rush\n"
         "food machine: panini press\n"
         "press: 95s, 105s (avg 100s, 2 in at a time)\n"
     )
@@ -272,7 +282,7 @@ def test_a_dedicated_cashier_is_raised_rather_than_quietly_modelled(params):
     something the engine cannot do."""
     from analysis.calibrate import open_questions
 
-    seen = read_summary("Ground Truth, 2026-08-27\ntill person makes drinks: never\n")
+    seen = read_summary("Ground Truth, counted rush\ntill person makes drinks: never\n")
     assert "stations" not in to_overlay(seen, params)
     questions = open_questions(seen)
     assert any("engine change" in q for q in questions)
@@ -281,7 +291,7 @@ def test_a_dedicated_cashier_is_raised_rather_than_quietly_modelled(params):
 def test_balks_without_a_depth_are_flagged(params):
     from analysis.calibrate import open_questions
 
-    seen = read_summary("Ground Truth, 2026-08-27\nwatched: 10 min\nwalked out: 4\n")
+    seen = read_summary("Ground Truth, counted rush\nwatched: 10 min\nwalked out: 4\n")
     assert seen.balk_lines == []
     assert any("tolerance cannot be fitted" in q for q in open_questions(seen))
 
@@ -333,7 +343,7 @@ def test_an_order_is_counted_once_while_it_waits():
 
 
 def test_the_fit_falls_back_to_the_queue_when_nobody_counted_orders():
-    """The checklist collects depth, not volume — which is what the original
+    """The checklist collects depth, not volume, which is what the original
     plan fitted against anyway."""
     seen = read_summary(FIELD)
     assert seen.orders == 0
@@ -344,7 +354,7 @@ def test_the_fit_falls_back_to_the_queue_when_nobody_counted_orders():
 
 
 def test_an_observation_with_neither_measure_is_refused():
-    seen = read_summary("Ground Truth, 2026-08-27\nfood machine: microwave\n")
+    seen = read_summary("Ground Truth, counted rush\nfood machine: microwave\n")
     with pytest.raises(ConfigError, match="nothing to fit against"):
         fit_capture_rate(seen, [BASE], {}, runner, seeds=[0])
 
@@ -370,7 +380,7 @@ def test_the_gate_judges_whatever_was_actually_collected(field):
 # clock-stamped observation
 # --------------------------------------------------------------------------
 
-TIMED = """Ground Truth, 2026-08-27
+TIMED = """Ground Truth, counted rush
 watched: 10:46-11:04, 16 min recording (1 pause)
 food machine: microwave, holds 1
 walked out: 3 (10:51 at 5, 10:53 at 7, 10:59 at 9)
@@ -391,7 +401,7 @@ def test_a_timed_observation_keeps_its_clock():
 
 
 def test_the_pause_shows_as_a_gap_not_as_readings():
-    """Nothing between 10:52 and 10:58 — because nobody was watching, which is
+    """Nothing between 10:52 and 10:58, because nobody was watching, which is
     the point of being able to pause."""
     seen = read_summary(TIMED)
     minutes = [
@@ -405,7 +415,7 @@ def test_the_pause_shows_as_a_gap_not_as_readings():
 def test_an_untimed_observation_still_reads():
     """The older format, without clock times, has to keep working."""
     seen = read_summary(
-        "Ground Truth, 2026-08-27\nwatched: 15 min\n"
+        "Ground Truth, counted rush\nwatched: 15 min\n"
         "walked out: 2 (line was 6, 8)\n"
         "line every minute: 3, 4, 6, 8\n"
     )

@@ -1,8 +1,8 @@
 """Read a till's history and turn it into a demand model.
 
 A point-of-sale export says when people bought and what they bought. That is
-enough to replace two of the largest guesses in any configuration — the shape of
-the day and the mix of the order book — with something measured, whoever
+enough to replace the two largest guesses in any configuration (the shape of
+the day and the mix of the order book) with something measured, whoever
 measured it.
 
 Deliberately generic. Column names are passed in, so the same code reads a
@@ -72,7 +72,7 @@ class DemandModel:
         closes = int(self.closes_at_s // SECONDS_PER_HOUR)
         return (
             f"{self.source}"
-            + (f" — {self.location}" if self.location else "")
+            + (f", {self.location}" if self.location else "")
             + f": {self.orders:,} orders over {self.days} days, "
             f"{self.orders_per_day:.0f} a day, peak {self.peak_per_hour:.0f}/h, "
             f"open {opens:02d}:00–{closes:02d}:00"
@@ -120,8 +120,8 @@ def build_demand_model(
     file, so one freak morning cannot become the model. Opening hours are taken
     from the data rather than assumed: a shop is open when it is selling.
 
-    `drop_items` exists because a till sells things a bar does not make —
-    beans, mugs, a t-shirt — and counting a bag of coffee as an order would
+    `drop_items` exists because a till sells things a bar does not make
+    (beans, mugs, a t-shirt) and counting a bag of coffee as an order would
     inflate the very number the whole model turns on.
     """
     import numpy as np

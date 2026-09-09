@@ -1,88 +1,125 @@
-# What to count, in priority order
+# What was observed, and how
 
-> Use the counter: four taps and a stopwatch, fifteen minutes at the 10:50
-> peak. Paste what it gives you into `observations/rush.txt` and run
-> `python -m analysis.calibrate observations/rush.txt`.
+Everything counted in this cafe is in `params/observed.yaml`, marked `observed`,
+with the arithmetic next to it. This is the record of where those numbers came
+from: what instrument produced each one, what it settled, and what it overturned.
 
-Read off the menu boards on 2026-08-27, so already `observed`: item names,
-prices, and which drinks the board offers hot or iced.
+The files here are the counter's own notation, pasted in unedited rather than
+retyped or tidied.
 
-Service times are now `published` — conventional figures from industry and
-vendor sources, cited at each parameter in `params/base.yaml`. They are a far
-better starting point than a guess, but they describe a typical cafe, not this
-one. What no published source can supply is this cafe's own demand: the mix,
-the hot/iced split, the capture rate and the staffing plan.
+What got counted was chosen by sensitivity rather than by convenience. The
+ranking was written down before anyone went, so the model had committed to a
+prediction the counting could contradict. It did, twice, and that is what makes
+the two headline results below findings rather than a story assembled later.
 
-The list below is ordered by how much the answer moves the result, not by how
-easy it is to collect.
+### The instruments
 
-### 1. The hot/iced split
+* A tap counter and a stopwatch on a phone. One tap per completed order, per
+  iced cup, per order with food, per person who left. The counter pauses, so a
+  session is recorded minutes rather than elapsed minutes.
+* `python -m analysis.calibrate observations/queue-log.txt` turns a pasted
+  summary into `params/observed.yaml`. It exits non-zero if the calibrated model
+  cannot reproduce what was seen, because the answer to that is to fix the model
+  rather than to tune the fit.
+* Photographs of the two menu boards and of the espresso machine.
 
-`mix.serve`. Currently assumed at 45/55. An iced latte never touches the steam
-wand, so this fraction decides how much of the menu milk batching — the plan's
-core throughput mechanism — can reach at all. If iced is dominant, batching is
-worth little here no matter how well it is scheduled.
+## 1. The timed queue log
 
-Count cups at the handoff shelf for one peak and one trough. Nothing else on
-this list is worth collecting before this one.
+`queue-log.txt`. Line depth read on a timer, roughly every two minutes: 49
+readings between 10:20 and 15:44. Every reading carries its clock time, so it
+can be compared against the same time of day in the model rather than against
+whenever the model happens to be busiest. Balks were recorded as the depth at
+the moment somebody left, which is a different quantity from the depth on a
+timer and identifies a different parameter.
 
-### 2. Whether the register competes for barista time
+It settled the hours, the crew by band (from the peak count plus a shift change
+noted at 13:00), that the till person never makes drinks, what heats the food,
+and the shape of the queue. The mean of 3.7 people is what `capture_rate` is
+fitted against; `queue_by_bin.json` bins the same readings into half hours as
+the target for the arrival-curve fits.
 
-`stations.register.capacity`. Currently `from_staffing`, which assumes whoever
-takes the order also makes drinks. If there is a dedicated cashier, this becomes
-a fixed capacity and register queueing largely disappears from the model.
+**What it overturned.** The model was losing about a third of peak demand to
+balking, and the revenue case rested on recovering it. One person left, at a
+line of eleven. People wait.
 
-Watch one rush and write down whether the person at the POS ever makes a drink.
+The log also records the counter being left running well past the last real
+reading, and says so in its own notes. That belongs in the file rather than
+being cleaned out of it.
 
-### 3. How many steam wands and group heads
+## 2. Seventy till laps
 
-`stations.steam_wand.capacity`, `stations.group_head.capacity`. Assumed 1 and 2.
-Two wands roughly halves the contention the model currently produces.
+`till-laps.txt`. One stopwatch lap per customer leaving the register, with the
+item count and whether the order carried food. Nothing else, seventy times.
 
-One photograph of the espresso machine settles both.
+Fitted as `base + per_item x items + food x is_food`:
 
-### 4. Panini press time and capacity
+    base_s        17.3  +/- 3.6
+    per_item_s     8.5  +/- 3.1
+    food_s        13.2  +/- 3.2      R^2 0.84, residual sd 4.5s
 
-`stations.panini_press.run_s`, `.batch_size`. Now published: 4 minutes a
-sandwich, one or two at a time, which is the 10-15 sandwiches an hour a single
-14-inch grill is rated for. This station is the busiest thing in the cafe
-during the peak hour on every configuration tried.
+The food term is there because leaving it out makes the item count absorb both
+effects and returns 17.8s an item. Food nearly always comes with a drink, so the
+two are collinear, and separating them recovers a thirteen-second premium on
+ringing up a sandwich that nothing in the model had a place for.
 
-Worth confirming anyway, because it is the constraint and because the published
-figure is for a generic grill: this cafe's press may be a different size, or a
-rapid-cook oven, which would be several times faster.
+**What it overturned.** The published figure was `40 + 3n`: a large fixed cost
+with almost no sensitivity to basket size. The till is the other way round, and
+it is the constraint. The same seventy laps also gave the basket shape, 60%
+drink only against 33% food with a drink and 7% food alone, replacing a model
+that generated a quarter of every day's orders as a sandwich with no coffee.
 
-### 5. Food share of orders
+## 3. Twenty minutes in the morning
 
-`mix.drink`, the ten food items. Assumed 26.5% of orders. Drives item 4.
+`morning-order-count.txt`. One mark per completed order, 09:15 to 09:35, twenty
+orders. The calendar date was deliberately not recorded, only the weekday, which
+is what the model takes.
 
-### 6. Transact adoption
+This is the strongest result in the project, and it is the method that makes it
+so rather than the count. Nothing had ever been fitted to the morning: the queue
+log starts at 10:20, and the arrival curve built from the registrar's room
+schedule was fitted only against the midday queue. So the hybrid model's 20.1
+orders was a prediction out of sample. The free-rate fit it replaced predicted
+7.3 and never once reached twenty in twenty simulated days, which excludes it
+rather than merely disfavouring it.
 
-`customers.preorder_adoption`, currently 0. Order-ahead is already deployed
-here, so this is a count, not a sweep: how many pickups come off the mobile
-shelf versus the register during one peak.
+A shelf tally of eight orders was taken alongside. Eight cannot pin a share, and
+the file says so, but it settled structure rather than level: food came with a
+drink both times it appeared.
 
-It has moved up this list. On the assumed numbers, ordering ahead is worth more
-than any scheduling change: it keeps the customers who would otherwise take one
-look at the line and leave.
+## 4. One spot count
 
-### 6a. Balks, which are now the whole revenue case
+`spot-count.txt`. A single eyeball reading, about twenty people in line at 12:23.
 
-`observations/balks.csv`. The model says roughly a quarter to a third of peak
-demand walks out, and that is where the money is, not in the length of the
-queue. Standing near the door for one rush and counting the people who look and
-leave is the highest-value hour anyone can spend on this project.
+Two readings is not a distribution. What makes this one worth keeping is that
+the timed log had 6 in line at 12:21 and 2 at 12:27. Six against twenty at the
+same minute of the clock is enough to say the logged readings were not typical,
+and the model tops out near fifteen.
 
-### 7. Service times, mix, queue lengths and balks
+## 5. The menu boards
 
-The `observations/*.csv` contract in `campus-cafe-ordering-plan.md`, read by
-`analysis/calibrate.py` at M8. Sample every 30s across at least one peak and one
-trough. The balk count is the entire revenue case; collect it carefully.
+Photographed, then read off: item names, prices, calories at the medium size,
+and which drinks the board offers hot or iced where it says.
 
-### Still unread from the photographs
+## 6. Cup material at the handoff shelf
 
-* Caesar salad price sat at the edge of the frame; recorded as `assumed`.
-* Soup bowl prices were cropped; only the cup price is recorded.
-* Whether matcha and chai are available iced. The board does not say, so they
-  are modelled hot only.
-* Opening hours. `07:00`–`15:00` is a guess.
+The hot/iced split is the one number on the boards that the boards cannot give
+you, and it decides how much of the menu milk batching can reach at all. It does
+not need a tally to read, because the cafe sorts it for you: a hot drink goes
+out in paper and a cold one in plastic. Standing at the handoff shelf, the split
+is legible at a glance without hearing a single order.
+
+Read that way it is roughly 20/80 in warm weather, which is what `mix.serve`
+carries. That is a look rather than a count, so it stays `assumed`, and
+`params/season/*.yaml` interpolates it across the year from Madison's climate
+normals with both anchors assumed too. The method is the useful part: two
+tallies of paper against plastic, one in warm weather and one in cold, would
+replace the whole construction with measured points, and they are cheaper to
+collect than anything else still open.
+
+## 7. Photographs
+
+The espresso machine carries a Schaerer logo, twin hoppers and a touchscreen,
+with no portafilters visible in any frame, which is what
+`params/experiments/superauto.yaml` costs out. Running it says the answer does
+not depend on which machine it is: either reading leaves the register the
+constraint, with the same orders and the same margin.

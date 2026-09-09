@@ -1,6 +1,0 @@
-Ground Truth, 2026-08-27
-watched: 10:00-10:13
-line every 2 min: 10:00 10, 10:13 7
-food machine: microwave, holds 1
-notes: told from memory rather than recorded live. Two eyeball readings of the
-notes: line, and at 10:00 everyone in it appeared to be buying food.

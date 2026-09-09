@@ -1,4 +1,4 @@
-"""Turn an afternoon's counting into parameters, and say how well it fits.
+"""Turn a session's counting into parameters, and say how well it fits.
 
 M8, in the shape the observation actually takes. The plan assumed CSVs sampled
 every thirty seconds; what one person watching one rush can honestly produce is
@@ -132,7 +132,7 @@ def read_summary(text: str) -> Observation:
     """Parse what the counter produces. Missing lines are simply not observed.
 
     Deliberately forgiving: this is read off a phone and pasted into a message,
-    and refusing an afternoon's work over a stray character would be absurd.
+    and refusing an hour's work over a stray character would be absurd.
     """
     seen = Observation()
     for raw in text.splitlines():
@@ -363,7 +363,7 @@ def fit_capture_rate(
     """Search for the capture rate that reproduces what was counted.
 
     Against volume where somebody counted orders, and against queue depth
-    otherwise — which is what the original plan fitted to, and what a person
+    otherwise, which is what the original plan fitted to, and what a person
     watching a rush can actually produce. Either way one number is being
     matched by one knob.
 
@@ -438,7 +438,7 @@ def _queue_over_time(log, window, every_s: float = 60.0) -> list[float]:
     }
     # Ordered by the log's own sequence, not by the state's name. A balk is
     # placed and abandoned at the same instant, and sorting those two by string
-    # puts "balked" before "placed" — removing the order before it was added,
+    # puts "balked" before "placed", removing the order before it was added,
     # so it stayed in the queue for the rest of the day and every balk inflated
     # the measurement.
     moves = sorted(
@@ -623,7 +623,8 @@ def main() -> None:
     seen = read_summary(Path(args.summary).read_text())
     base = load_params(*args.params)
     print(
-        f"{seen.where} {seen.on}: {seen.orders} orders in {seen.minutes:.0f} min "
+        f"{' '.join(filter(None, (seen.where, seen.on)))}: "
+        f"{seen.orders} orders in {seen.minutes:.0f} min "
         f"= {seen.orders_per_hour:.0f}/h at peak"
     )
 
@@ -642,7 +643,8 @@ def main() -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         "# Written by analysis/calibrate.py from a counted rush.\n"
-        f"# {seen.where}, {seen.on}: {seen.orders} orders in {seen.minutes:.0f} minutes.\n"
+        f"# {', '.join(filter(None, (seen.where, seen.on)))}: "
+        f"{seen.orders} orders in {seen.minutes:.0f} minutes.\n"
         "# Direct counts are observed; capture_rate is fitted.\n\n"
         + yaml.safe_dump(overlay, sort_keys=False)
     )
