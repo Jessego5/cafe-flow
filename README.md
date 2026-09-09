@@ -1,5 +1,7 @@
 # cafe-flow
 
+[![ci](https://github.com/Jessego5/cafe-flow/actions/workflows/ci.yml/badge.svg)](https://github.com/Jessego5/cafe-flow/actions/workflows/ci.yml)
+
 A discrete-event simulator of a campus cafe and the ordering app it recommends,
 built on one shared domain core so the model and the product cannot disagree
 about what a latte costs or how long the line is.
@@ -18,6 +20,11 @@ each built, each measured, and each found to do nothing here.
 ---
 
 ## Demo
+
+**Live: [cafe-flow-demo.fly.dev](https://cafe-flow-demo.fly.dev)**, with the
+customer app at `/`, the bar at `/bar` and the pickup display at `/pickup`. It runs in
+`demo`, so the menu, the queue and the promises are real and the payment is
+stubbed. One machine on one volume, so treat it as a demo and not a service.
 
 The customer app: the line as it stands, the board, and the planner that quotes
 *ready by* against *order now*. These are the running app against the running
