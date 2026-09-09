@@ -1,4 +1,9 @@
-"""The two staff-facing reads: the bar queue and the pickup display."""
+"""
+This serves the two staff-facing reads, the bar queue and the pickup display.
+Both are projections of the event log rather than state of their own, so what a
+barista sees and what the metrics later report cannot drift apart. Mounted by
+app/main.py.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +29,8 @@ router = APIRouter(tags=["barista"])
 
 @dataclass(slots=True)
 class QueuedItem:
-    """One item on the bar waiting for a station that can run several at once.
+    """
+    One item on the bar waiting for a station that can run several at once.
 
     This is the app's carrier for `core.policies`: the simulator passes one
     holding a SimPy event, the bar passes one holding a row. The scheduler that
@@ -40,7 +46,8 @@ class QueuedItem:
 
 
 def suggested_batches(rows, params: Params, now_s: float) -> list[dict]:
-    """What the bar could run together right now, and what it would save.
+    """
+    What the bar could run together right now, and what it would save.
 
     Advisory only. The barista decides; this says what the scheduler would do
     and what it is worth, in the same bottleneck-seconds the capacity model and
@@ -103,7 +110,8 @@ def suggested_batches(rows, params: Params, now_s: float) -> list[dict]:
 
 @router.get("/queue")
 async def get_queue(staff: str = Depends(require_staff)) -> dict:
-    """Full queue state. The client calls this on every (re)connect, so a
+    """
+    Full queue state. The client calls this on every (re)connect, so a
     dropped stream can never leave the bar looking at a stale queue.
 
     Staff only: it lists every order in the shop, with the name each was placed

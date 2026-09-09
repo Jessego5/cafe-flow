@@ -1,10 +1,9 @@
-"""M6 acceptance tests.
-
-Done when: balks rise with volume; a very patient crowd never balks; and full
-adoption of ordering ahead leaves no walk-ups at all.
-
-Until this milestone the model assumed infinite patience, so a long queue cost
-nothing. These tests are about the queue finally having a price.
+"""
+These are the tests for balking, and they are done when balks rise with volume,
+a very patient crowd never balks, and full adoption of ordering ahead leaves no
+walk-ups at all. The model assumed infinite patience until this point, so a
+long queue cost nothing; these tests are about the queue finally having a
+price. Run them with pytest.
 """
 
 from __future__ import annotations

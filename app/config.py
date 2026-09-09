@@ -1,11 +1,11 @@
-"""Runtime settings and the wall clock.
-
-The app runs on wall-clock time; the simulator runs on virtual time. Both write
-`t_s` as seconds since local midnight in the cafe's timezone, which is what lets
-`analysis/metrics.py` read either log without knowing where it came from.
-
-Servers run UTC and class schedules are local, so every conversion goes through
-`cafe.timezone` from params. Timestamps are stored UTC and rendered local.
+"""
+This holds the runtime settings and the wall clock. The app runs on
+wall-clock time and the simulator runs on virtual time, but both write t_s as
+seconds since local midnight in the cafe's timezone, which is exactly what lets
+analysis/metrics.py read either log without knowing where it came from. Servers
+run UTC and class schedules are local, so every conversion goes through
+cafe.timezone from params, and timestamps are stored UTC and rendered local.
+Imported by the routes and by app/main.py.
 """
 
 from __future__ import annotations
@@ -32,13 +32,15 @@ class Env(StrEnum):
 
     @property
     def allows_simulated_orders(self) -> bool:
-        """A simulated order on the bar during a real rush destroys trust in
+        """
+        A simulated order on the bar during a real rush destroys trust in
         the tool permanently, so `pilot` refuses them at the API."""
         return self is not Env.PILOT
 
 
 class Settings:
-    """Read once from the environment. Nothing here has a silent default that
+    """
+    Read once from the environment. Nothing here has a silent default that
     could point a pilot at a dev database."""
 
     def __init__(self) -> None:

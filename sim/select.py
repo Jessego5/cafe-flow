@@ -1,24 +1,20 @@
-"""Choose the scheduling policy for whatever cafe the config describes.
-
-This is the piece that makes the project a tool rather than one cafe's answer.
-Feed it a different `base.yaml` with a different menu, different stations and
-different demand, and it works out which of the schedulers in `core.policies`
-that operation should run, on the evidence of many simulated days.
-
-Two rules keep it honest, and they matter more than the search:
-
-**It will not switch on noise.** A challenger has to beat the incumbent by more
-than the two confidence intervals put together. Two of the arms in this project
-are statistically identical; a selector that picked between them by comparing
-means would be inventing a difference and then acting on it.
-
-**It will not select on an unvalidated model.** A model nobody has checked
-against reality will still name a winner, confidently, and be wrong. Selection
-against a mostly-assumed configuration requires saying so out loud.
-
-The selection is written as a parameter overlay, so the app picks it up the way
-it picks up everything else. The app never imports this module, or any part of
-the simulator: it reads config.
+"""
+This chooses the scheduling policy for whatever cafe the config describes, and
+it is the piece that makes the project a tool rather than one cafe's answer:
+feed it a different base.yaml with a different menu, different stations and
+different demand and it works out which of the schedulers in core.policies that
+operation should run, on the evidence of many simulated days. Two rules keep it
+honest and they matter more than the search itself. It will not switch on
+noise, so a challenger has to beat the incumbent by more than the two
+confidence intervals put together, because two of the arms in this project are
+statistically identical and a selector comparing means would invent a
+difference and then act on it. And it will not select on an unvalidated model,
+since a model nobody has checked against reality will still name a winner,
+confidently, and be wrong, so selection against a mostly-assumed configuration
+has to say so out loud. The selection is written out as a parameter overlay, so
+the app picks it up the way it picks up everything else and never imports this
+module or any other part of the simulator. Run it with python -m sim.select
+--objective margin --seeds 40.
 """
 
 from __future__ import annotations
@@ -44,9 +40,9 @@ __all__ = [
     "select_policy",
 ]
 
-#: How much of the configuration may still be guesswork before a selection is
-#: refused. Above this the model is a sketch, and a sketch will still name a
-#: winner.
+# How much of the configuration may still be guesswork before a selection is
+# refused. Above this the model is a sketch, and a sketch will still name a
+# winner.
 MAX_ASSUMED = 0.60
 
 
@@ -66,8 +62,8 @@ class Objective:
         )
 
 
-#: A cafe manager, a barista and a researcher want different things, and the
-#: honest response is to make them say which.
+# A cafe manager, a barista and a researcher want different things, and the
+# honest response is to make them say which.
 OBJECTIVES: dict[str, Objective] = {
     "margin": Objective(
         "margin", "captured_margin_cents", True,
@@ -196,7 +192,8 @@ def _units(metric: str) -> tuple[float, str]:
 def decide(
     candidates: Sequence[Candidate], incumbent: str, goal: Objective
 ) -> tuple[str, bool]:
-    """Which policy to run, and whether the evidence actually says so.
+    """
+    Which policy to run, and whether the evidence actually says so.
 
     Two rules, and both are about not fooling yourself:
 

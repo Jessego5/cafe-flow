@@ -1,11 +1,12 @@
-"""The event schema. Written identically by `app/` and `sim/`.
-
-Ground rule 4: the event log is the only source of truth for metrics. It is
-append-only, one row per transition, and nothing in `analysis/` may read
-mutable state instead.
-
-Ground rule 5: determinism. Event ids are derived from (scenario, seed, seq),
-never from a clock or a uuid, so the same seed produces a byte-identical log.
+"""
+This is the event schema, and app/ and sim/ write it identically. The event log
+is the only source of truth for any metric, so it is append-only with one row
+per transition and nothing in analysis/ is allowed to read mutable state
+instead, which is what lets the same metrics code answer for a simulated day
+and a real one without knowing which it was given. Event ids are derived from
+the scenario, the seed and the sequence number rather than from a clock or a
+uuid, so the same seed replays to a byte-identical log and a diff between two
+runs means a real change. Imported by app/, sim/ and analysis/.
 """
 
 from __future__ import annotations
@@ -29,10 +30,10 @@ class EventType(StrEnum):
     BATCH_FORMED = "batch_formed"      # items grouped for one station run
     PROMISE_SET = "promise_set"        # a ready-by time was quoted
     ARRIVAL = "arrival"                # a customer appeared (may then balk)
-    #: The basket changed before anyone started making it. Carries the deltas
-    #: rather than the new totals, so `analysis.metrics` can add them to what
-    #: the `placed` event already offered without knowing an order's history.
-    #: An edit that is not in the log is an edit the metrics cannot see.
+    # The basket changed before anyone started making it. Carries the deltas
+    # rather than the new totals, so `analysis.metrics` can add them to what
+    # the `placed` event already offered without knowing an order's history.
+    # An edit that is not in the log is an edit the metrics cannot see.
     ORDER_AMENDED = "order_amended"
 
 
@@ -74,7 +75,8 @@ EVENT_COLUMNS: tuple[str, ...] = tuple(Event.model_fields)
 
 
 class EventLog:
-    """Append-only sequence of events.
+    """
+    Append-only sequence of events.
 
     Holds the run identity so callers never have to repeat it, and assigns the
     monotonic `seq` that makes the log hashable.
@@ -128,7 +130,8 @@ class EventLog:
         return event
 
     def append(self, event: Event) -> Event:
-        """Adopt an event built elsewhere (e.g. by `core.states.transition`),
+        """
+        Adopt an event built elsewhere (e.g. by `core.states.transition`),
         stamping it with this log's identity and the next sequence number."""
         seq, event_id = self.next_id()
         stamped = event.model_copy(

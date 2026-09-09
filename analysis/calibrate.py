@@ -1,22 +1,20 @@
-"""Turn a session's counting into parameters, and say how well it fits.
-
-M8, in the shape the observation actually takes. The plan assumed CSVs sampled
-every thirty seconds; what one person watching one rush can honestly produce is
-five numbers. So this reads the summary the counter hands you and does the two
-things that matter: writes down what was counted, and searches for the one
-parameter that cannot be counted directly.
-
-`analysis/` may not depend on either runtime, so the thing that runs a day is
-passed in. That keeps the arithmetic here testable without a simulator, and it
-means a calibration could just as well be driven from a real day's log. Only
-`main()`, which is a composition point rather than a calculation, reaches for
-`sim`.
-
-**The gate matters more than the fit.** If the calibrated model cannot
-reproduce what was seen, the model is wrong, and the answer is to fix the model
-rather than tune the fit. Fitting `capture_rate` to match a volume is
-legitimate; fitting it to paper over a wrong resource model produces a
-confident wrong answer.
+"""
+This turns a session's counting into parameters and says how well the result
+fits. It is calibration in the shape the observation actually takes: the plan
+assumed CSVs sampled every thirty seconds, but what one person watching one
+rush can honestly produce is five numbers, so this reads the summary the
+counter hands you and does the two things that matter, which are writing down
+what was counted and searching for the one parameter that cannot be counted
+directly. Nothing in analysis/ may depend on either runtime, so the thing that
+runs a day is passed in, which keeps the arithmetic here testable without a
+simulator and means a calibration could just as well be driven from a real
+day's log; only main(), a composition point rather than a calculation, reaches
+for sim. The gate matters more than the fit, because if the calibrated model
+cannot reproduce what was seen then the model is wrong and the answer is to fix
+the model rather than tune the fit: fitting capture_rate to match a volume is
+legitimate, and fitting it to paper over a wrong resource model produces a
+confident wrong answer. Run it with python -m analysis.calibrate
+observations/queue-log.txt, which exits non-zero if the fit does not hold.
 """
 
 from __future__ import annotations
@@ -34,14 +32,14 @@ from analysis.metrics import balk_count_and_lost_margin, busiest_window
 from core.events import EventLog, EventType
 from core.params import ConfigError, Params, load_params
 
-#: Runs one day and hands back its log. Injected so `analysis/` stays free of
-#: both runtimes (ground rule 2).
+# Runs one day and hands back its log. Injected so `analysis/` stays free of
+# both runtimes (ground rule 2).
 Runner = Callable[[Params, int], EventLog]
 
 __all__ = ["Observation", "read_summary", "to_overlay", "fit_capture_rate", "validate"]
 
-#: Nothing counted at a counter is exact. A fit that lands inside this of the
-#: observed volume has done its job; chasing further would be fitting noise.
+# Nothing counted at a counter is exact. A fit that lands inside this of the
+# observed volume has done its job; chasing further would be fitting noise.
 VOLUME_TOLERANCE = 0.10
 SEARCH_STEPS = 24
 
@@ -83,7 +81,8 @@ class Observation:
 
     @property
     def typical_line(self) -> float | None:
-        """The queue as it actually was, sampled on a timer.
+        """
+        The queue as it actually was, sampled on a timer.
 
         Unbiased, unlike the depth recorded when somebody balked: that only
         ever reads the queue when it was long enough that someone left.
@@ -96,7 +95,8 @@ class Observation:
 
     @property
     def typical_balk_line(self) -> float | None:
-        """How deep the queue was when people gave up. This is what identifies
+        """
+        How deep the queue was when people gave up. This is what identifies
         the tolerance; the rate alone only says how many left."""
         return mean(self.balk_lines) if self.balk_lines else None
 
@@ -129,7 +129,8 @@ _NUMBER = r"([0-9]+(?:\.[0-9]+)?)"
 
 
 def read_summary(text: str) -> Observation:
-    """Parse what the counter produces. Missing lines are simply not observed.
+    """
+    Parse what the counter produces. Missing lines are simply not observed.
 
     Deliberately forgiving: this is read off a phone and pasted into a message,
     and refusing an hour's work over a stray character would be absurd.
@@ -203,7 +204,8 @@ def read_summary(text: str) -> Observation:
 
 
 def _rescaled_mix(params: Params, food_share: float) -> dict[str, float]:
-    """Move the food/drink split to what was counted, keeping the shape within
+    """
+    Move the food/drink split to what was counted, keeping the shape within
     each group. Nobody counted individual drinks, so their relative shares stay
     as they were."""
     food = {
@@ -234,10 +236,10 @@ def _rescaled_mix(params: Params, food_share: float) -> dict[str, float]:
     return out
 
 
-#: What each answer implies for the station that heats the food. A press holds
-#: two side by side; anything that heats a pre-made item holds one, which is
-#: what removes the batching. Times are conventional for the machine class and
-#: stay `published`; the class itself is what was observed.
+# What each answer implies for the station that heats the food. A press holds
+# two side by side; anything that heats a pre-made item holds one, which is
+# what removes the batching. Times are conventional for the machine class and
+# stay `published`; the class itself is what was observed.
 MACHINES: dict[str, tuple[float, int]] = {
     "microwave": (60.0, 1),
     "high-speed oven": (45.0, 1),
@@ -247,7 +249,8 @@ MACHINES: dict[str, tuple[float, int]] = {
 
 
 def to_overlay(seen: Observation, params: Params) -> dict:
-    """The observed parameters, ready to be written as `params/observed.yaml`.
+    """
+    The observed parameters, ready to be written as `params/observed.yaml`.
 
     Direct counts are `observed`. `capture_rate` is `fitted`, because it is
     searched for rather than seen.
@@ -301,7 +304,8 @@ def to_overlay(seen: Observation, params: Params) -> dict:
 
 
 def open_questions(seen: Observation) -> list[str]:
-    """What the observation raises that a config change cannot answer.
+    """
+    What the observation raises that a config change cannot answer.
 
     A dedicated cashier is not a parameter: `serve()` always takes a barista
     for the register, so the shared assumption is in the code and not only in
@@ -360,7 +364,8 @@ def fit_capture_rate(
     *,
     seeds: list[int] | None = None,
 ) -> tuple[float, float]:
-    """Search for the capture rate that reproduces what was counted.
+    """
+    Search for the capture rate that reproduces what was counted.
 
     Against volume where somebody counted orders, and against queue depth
     otherwise, which is what the original plan fitted to, and what a person
@@ -423,7 +428,8 @@ def fit_capture_rate(
 
 
 def _queue_over_time(log, window, every_s: float = 60.0) -> list[float]:
-    """The simulated queue, read on the same cadence a person reads it.
+    """
+    The simulated queue, read on the same cadence a person reads it.
 
     Membership, not a running tally: an order is in the queue from the moment
     it is placed until it reaches the shelf or the customer gives up. Counting
@@ -494,7 +500,8 @@ class Validation:
 
     @property
     def fitted_against(self) -> str:
-        """Whichever measure the capture rate was matched to. The other checks
+        """
+        Whichever measure the capture rate was matched to. The other checks
         are worth more precisely because nothing was fitted to them."""
         return "volume" if self.observed_per_hour else "queue"
 
@@ -505,7 +512,8 @@ class Validation:
 
     @property
     def balk_ratio(self) -> float | None:
-        """How far out the model's patience is.
+        """
+        How far out the model's patience is.
 
         Volume is what `capture_rate` is fitted to, so it agreeing proves
         little. Balking is not fitted to anything, which makes it the honest

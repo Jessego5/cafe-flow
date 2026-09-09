@@ -1,8 +1,8 @@
-"""Guards on the deployment configuration.
-
-These are the invariants that are cheap to hold and expensive to lose: they
-cannot be caught by the app's own tests because the failure happens on a
-machine, at boot, in front of a cafe.
+"""
+These are the guards on the deployment configuration, the invariants that are
+cheap to hold and expensive to lose. They cannot be caught by the app's own
+tests because the failure happens on a machine, at boot, in front of a cafe.
+Run them with pytest.
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ def deploy(request):
 
 @pytest.fixture(scope="module")
 def fly(deploy):
-    """fly.toml, parsed.
+    """
+    fly.toml, parsed.
 
     These used to match strings, which tied them to whichever quote style the
     `fly` CLI last rewrote the file in and broke on a reformat that changed
@@ -68,7 +69,8 @@ def test_the_heartbeat_stays_under_the_proxy_idle_timeout(fly):
 
 
 def test_the_entrypoint_restores_before_it_migrates(deploy):
-    """Restore, migrate, then start. Migrating first would create an empty
+    """
+    Restore, migrate, then start. Migrating first would create an empty
     database and make the replica unrestorable."""
     script = (deploy / "entrypoint.sh").read_text()
     restore = script.index("litestream restore")

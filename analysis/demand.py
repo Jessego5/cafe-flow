@@ -1,21 +1,18 @@
-"""Read a till's history and turn it into a demand model.
-
-A point-of-sale export says when people bought and what they bought. That is
+"""
+This reads a till's history and turns it into a demand model. A
+point-of-sale export says when people bought and what they bought, which is
 enough to replace the two largest guesses in any configuration (the shape of
-the day and the mix of the order book) with something measured, whoever
-measured it.
-
-Deliberately generic. Column names are passed in, so the same code reads a
-Maven Analytics teaching set, a Transact export, or a Square CSV. `analysis/`
-imports no runtime, so this only ever reads.
-
-**What a sales log cannot tell you**, and no amount of rows will change it:
-
-* Service times. It records when an order was *sold*, never when it was *made*.
-* Balking. It is a list of people who bought something, and is therefore
-  structurally blind to everyone who looked at the queue and left. That is the
-  entire revenue case, and it has to be counted by a person.
-* Staffing, queue depth, and which station did the work.
+the day, and the mix of the order book) with something measured, whoever
+measured it. It is deliberately generic, with column names passed in, so the
+same code reads a Maven Analytics teaching set, a Transact export or a Square
+CSV, and because analysis/ imports no runtime it only ever reads. There are
+things a sales log cannot tell you and no number of rows will change that: it
+records when an order was sold and never when it was made, so service times
+are not in there; it is a list of people who bought something and is therefore
+structurally blind to everyone who looked at the queue and left, which is the
+entire revenue case and has to be counted by a person; and it says nothing
+about staffing, queue depth or which station did the work. Run it with python
+-m analysis.demand "sales.xlsx" --location "Hell's Kitchen".
 """
 
 from __future__ import annotations
@@ -80,7 +77,8 @@ class DemandModel:
 
 
 def read_transactions(path: str | Path, sheet: str | int = 0):
-    """Load a till export. Excel or CSV; pandas is imported here, not at module
+    """
+    Load a till export. Excel or CSV; pandas is imported here, not at module
     scope, so `analysis` stays importable without it."""
     import pandas as pd
 
@@ -114,7 +112,8 @@ def build_demand_model(
     keep_items: Sequence[str] | None = None,
     drop_items: Sequence[str] | None = None,
 ) -> DemandModel:
-    """Turn a till export into an arrival curve and an item mix.
+    """
+    Turn a till export into an arrival curve and an item mix.
 
     The curve is a rate per hour in fixed bins, averaged across every day in the
     file, so one freak morning cannot become the model. Opening hours are taken
@@ -178,7 +177,8 @@ def build_demand_model(
 
 
 def to_params_fragment(model: DemandModel, *, source: str = "synthetic") -> dict:
-    """The half of a configuration a till export can actually supply.
+    """
+    The half of a configuration a till export can actually supply.
 
     Arrivals and the mix, and nothing else. Which station makes which drink is
     a judgement about a bar, not a fact in a sales log, so it is left for a

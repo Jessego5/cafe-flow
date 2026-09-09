@@ -1,15 +1,15 @@
-"""When it will be ready, and when to order for a time you have in mind.
-
-Two directions of one question, the way a maps app answers both "leave now" and
-"arrive by". Forward is a lookup. Backward is a fixed point: the right moment
-to order depends on the queue at that moment, which depends on when you order.
-So it is solved by walking back from the time wanted and taking the latest start
-that still lands in time.
-
-The forecast itself comes from the simulator, written out as a file. The app
-reads it the way it reads params: a promise made at the counter is a prediction
-the model actually made, and `promise_error` can be run over the app's own log
-afterwards to see whether it held.
+"""
+This answers when an order will be ready, and when to place one for a time you
+already have in mind, which are two directions of the same question the way a
+maps app answers both "leave now" and "arrive by". Forward is a lookup.
+Backward is a fixed point, because the right moment to order depends on the
+queue at that moment, which depends on when you order, so it is solved by
+walking back from the time wanted and taking the latest start that still lands
+in time. The forecast itself is not computed here but comes from the simulator
+as a file, and the app reads it the way it reads params, which means a promise
+made at the counter is a prediction the model actually made and promise_error
+can be run over the app's own log afterwards to see whether it held. Imported
+by app/ and by sim/forecast.py, which writes the file this reads.
 """
 
 from __future__ import annotations
@@ -103,7 +103,8 @@ class Promise:
 
 
 def typical_basket_seconds(params: Params) -> float:
-    """What an average order takes, mix-weighted. The forecast is quoted for
+    """
+    What an average order takes, mix-weighted. The forecast is quoted for
     one of these, so a heavier basket is charged the difference."""
     from core.menu import make_item
 
@@ -125,7 +126,8 @@ def basket_seconds(params: Params, lines: Sequence[Line | tuple]) -> float:
 def _wait_for(
     forecast: Forecast, params: Params, at_s: float, basket_s: float, typical_s: float
 ) -> float:
-    """The forecast wait, adjusted for a basket heavier or lighter than average.
+    """
+    The forecast wait, adjusted for a basket heavier or lighter than average.
 
     The forecast is an average over the mix, so an order of three paninis is not
     the order it was quoted for.
@@ -156,7 +158,8 @@ def plan_for(
     wanted_at_s: float,
     now_s: float,
 ) -> Promise:
-    """Want it at a particular time: when to order.
+    """
+    Want it at a particular time: when to order.
 
     Walks back from the time wanted and takes the latest start that still lands
     in time. Latest rather than earliest, because ordering sooner than necessary

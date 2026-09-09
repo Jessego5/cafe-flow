@@ -1,11 +1,11 @@
-"""Storage. Tables, the event store, and slot capacity accounting.
-
-`app/` holds no domain rules (ground rule 2). These tables persist what
-`core/` decides: prices come from the menu resolution, legal moves from the
-state machine, and bottleneck cost from the capacity model.
-
-`order_events` is append-only and is written by `core.states` alone, through
-`DbEventLog` (ground rule 4).
+"""
+This is the storage layer: the tables, the event store and the slot capacity
+accounting. It holds no domain rules of its own, because these tables only
+persist what core/ decides, with prices coming from the menu resolution, legal
+moves from the state machine and bottleneck cost from the capacity model. The
+order_events table is append-only and is written by core.states alone through
+DbEventLog, which is what keeps the log trustworthy as the single source of
+truth for every metric. Imported by the routes and by app/migrate.py.
 """
 
 from __future__ import annotations
@@ -60,7 +60,8 @@ __all__ = [
 
 
 class MenuItemRow(SQLModel, table=True):
-    """A projection of `params.menu` so the API and reports can join on it.
+    """
+    A projection of `params.menu` so the API and reports can join on it.
 
     Reseeded from params at startup; params stays the authority.
     """
@@ -76,11 +77,11 @@ class MenuItemRow(SQLModel, table=True):
     stations: str                          # comma separated, in order
     bottleneck_cost_s: float               # seconds at params.bottleneck_station
     variants: str = ""                     # comma separated, empty if only one
-    #: Sold out, in the operational sense. Lives on the row rather than in
-    #: params because it changes hourly and params changes on a redeploy: the
-    #: bagels run out at eleven and nobody should be rebuilding an image for
-    #: that. `seed_menu` rewrites everything else from params and leaves this
-    #: alone, so it survives a restart.
+    # Sold out, in the operational sense. Lives on the row rather than in
+    # params because it changes hourly and params changes on a redeploy: the
+    # bagels run out at eleven and nobody should be rebuilding an image for
+    # that. `seed_menu` rewrites everything else from params and leaves this
+    # alone, so it survives a restart.
     available: bool = Field(default=True, index=True)
 
 
@@ -96,10 +97,10 @@ class OrderRow(SQLModel, table=True):
     state: str = Field(index=True)
     is_simulated: bool = Field(default=False, index=True)
     customer_id: str | None = None
-    #: What the bar calls out. A display label, not an identity: `customer_id`
-    #: is the seam for that and is still nobody's. It is deliberately absent
-    #: from `/display`, because a public screen showing a wall of first names is
-    #: a different thing from one showing #42.
+    # What the bar calls out. A display label, not an identity: `customer_id`
+    # is the seam for that and is still nobody's. It is deliberately absent
+    # from `/display`, because a public screen showing a wall of first names is
+    # a different thing from one showing #42.
     customer_name: str | None = None
     slot_id: str | None = Field(default=None, foreign_key="slots.slot_id", index=True)
     placed_at: datetime                     # UTC
@@ -126,7 +127,8 @@ class OrderItemRow(SQLModel, table=True):
 
 
 class OrderEventRow(SQLModel, table=True):
-    """Append-only. Never updated, never deleted.
+    """
+    Append-only. Never updated, never deleted.
 
     `seq` is the database's own monotonic counter, which is what makes the
     stream resumable by Last-Event-ID.
@@ -178,7 +180,8 @@ class OrderEventRow(SQLModel, table=True):
 
 
 class HealthRow(SQLModel, table=True):
-    """One row, rewritten by every health check.
+    """
+    One row, rewritten by every health check.
 
     The check needs to prove the database file is writable (a read-only volume
     and a full disk both fail here) without appending to `order_events`, which
@@ -192,7 +195,8 @@ class HealthRow(SQLModel, table=True):
 
 
 class SlotRow(SQLModel, table=True):
-    """A pickup window and its bottleneck-seconds budget.
+    """
+    A pickup window and its bottleneck-seconds budget.
 
     Present from M2 so the capacity plumbing is exercised, but inert while
     `params.slots.enabled` is false: orders go straight to the queue.
@@ -211,7 +215,8 @@ class SlotRow(SQLModel, table=True):
 
 
 class StaffRow(SQLModel, table=True):
-    """Somebody who works here.
+    """
+    Somebody who works here.
 
     One row per person, created by `create_staff.py`. No registration, no
     password reset, no email: the cafe has one bar and the people behind it are
@@ -227,11 +232,12 @@ class StaffRow(SQLModel, table=True):
 
 
 class HeldOrderRow(SQLModel, table=True):
-    """A pre-order that has been paid for but not yet put in the queue.
+    """
+    A pre-order that has been paid for but not yet put in the queue.
 
     The customer chose a time and paid; nothing has reached the bar. The app
     holds the row and releases it when the *live* queue says ordering now lands
-    by the time they asked for -- which is what a pushed reminder could never
+    by the time they asked for, which is what a pushed reminder could never
     do, because once somebody has been told to order they cannot be re-timed.
 
     It lives in the database rather than in memory because a hold that vanishes
@@ -245,9 +251,9 @@ class HeldOrderRow(SQLModel, table=True):
     service_date: str = Field(index=True)
     state: str = Field(default="held", index=True)   # held | released | cancelled
     wanted_at_s: float
-    #: What the forecast said when the customer paid. Kept to show them, and to
-    #: compare against when the release actually happened -- the gap between the
-    #: two is the value of deciding late.
+    # What the forecast said when the customer paid. Kept to show them, and to
+    # compare against when the release actually happened; the gap between the
+    # two is the value of deciding late.
     quoted_order_at_s: float
     quoted_ready_at_s: float
     lines_json: str
@@ -267,7 +273,8 @@ _engine: Engine | None = None
 
 
 def get_engine(url: str | None = None, *, echo: bool = False) -> Engine:
-    """One engine per process. WAL plus a busy timeout, because SSE readers and
+    """
+    One engine per process. WAL plus a busy timeout, because SSE readers and
     the writer share the file."""
     global _engine
     if url is None and _engine is not None:
@@ -304,11 +311,12 @@ def init_db(engine: Engine | None = None) -> Engine:
 
 
 def add_missing_columns(engine: Engine) -> list[str]:
-    """Add columns the models have and the database does not.
+    """
+    Add columns the models have and the database does not.
 
     `create_all` creates missing *tables* and never missing columns, so a schema
     that grew a field boots fine against an empty database and fails on the
-    first query against a real one -- which means tests and a fresh container
+    first query against a real one, which means tests and a fresh container
     both pass while every deployed instance refuses to start.
 
     Deliberately small: ADD COLUMN with a default, nothing else. Renames, drops
@@ -354,7 +362,8 @@ def session_scope(engine: Engine | None = None) -> Session:
 
 
 class DbEventLog(EventLog):
-    """An EventLog that writes through to `order_events`.
+    """
+    An EventLog that writes through to `order_events`.
 
     Events are held in `published` until the caller commits, so the SSE stream
     never announces something a rollback would erase.
@@ -498,7 +507,8 @@ def slot_id_for(on: date, starts_at_s: float) -> str:
 
 
 def ensure_slots(session: Session, params: Params, on: date) -> list[SlotRow]:
-    """Materialise the day's pickup windows and their capacity budgets.
+    """
+    Materialise the day's pickup windows and their capacity budgets.
 
     Capacity is measured in bottleneck-seconds, so if M8 moves
     `bottleneck_station` the budgets follow with no code change.
@@ -538,7 +548,8 @@ def ensure_slots(session: Session, params: Params, on: date) -> list[SlotRow]:
 
 
 def reserve_slot_capacity(session: Session, slot_id: str, cost_s: float) -> bool:
-    """Check and decrement in one statement.
+    """
+    Check and decrement in one statement.
 
     A single conditional UPDATE is atomic, so N concurrent reservations against
     a slot with room for K leave exactly K winners. Splitting this into a read
@@ -631,7 +642,8 @@ def persist_order(
 
 
 def hydrate(row: OrderRow, items: Sequence[OrderItemRow], params: Params) -> Order:
-    """Rebuild the domain object, re-resolving station plans from params.
+    """
+    Rebuild the domain object, re-resolving station plans from params.
 
     Prices come from the stored rows (what the customer was charged), while the
     work plan comes from `core.menu` (what the cafe has to do now).

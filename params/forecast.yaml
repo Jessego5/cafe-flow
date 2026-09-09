@@ -1,6 +1,6 @@
 # Written by sim/forecast.py. The app reads this to answer 'when will
 # it be ready' and 'when should I order', so a promise made at the
-# counter is a prediction the model actually made -- and promise_error
+# counter is a prediction the model actually made, and promise_error
 # can be run over the app's own log afterwards to see whether it held.
 # Quoted off the 80th percentile, not the mean: a promise
 # kept on average is missed half the time.

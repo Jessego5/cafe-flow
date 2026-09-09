@@ -153,7 +153,7 @@ mix:
   attach: { rate: 0.354, alone: 0.071, source: observed }
 
   # Straight off the 70 laps. The attach model could not produce two drinks or
-  # three items -- 7% of what was counted -- and had one food rate for every
+  # three items, which is 7% of what was counted, and had one food rate for every
   # basket, where the counted ones say bigger baskets are bigger because of the
   # food.
   #

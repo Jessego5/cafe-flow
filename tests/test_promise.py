@@ -1,8 +1,8 @@
-"""Quoting a time, in both directions.
-
-The forward one is a lookup. The backward one is the interesting half: the
-right moment to order depends on the queue at that moment, which depends on
-when you order.
+"""
+These are the tests for quoting a time, in both directions. The forward one is
+a lookup, and the backward one is the interesting half, because the right
+moment to order depends on the queue at that moment, which depends on when you
+order. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -86,7 +86,8 @@ def test_it_takes_the_latest_start_that_still_lands_in_time(params, calm):
 
 
 def test_it_orders_around_a_rush_rather_than_into_it(params, spiky):
-    """The whole point: collecting at half twelve is cheaper if you order after
+    """
+    The whole point: collecting at half twelve is cheaper if you order after
     the spike than if you order during it."""
     through = plan_for(spiky, params, [Line("drip_coffee")], 12 * HOUR + 20 * 60, 11 * HOUR)
     after = plan_for(spiky, params, [Line("drip_coffee")], 13 * HOUR, 11 * HOUR)
@@ -147,7 +148,8 @@ def test_a_forecast_must_say_which_quantile_it_quotes(tmp_path):
 
 
 def test_a_time_less_than_one_bin_away_is_not_refused_out_of_hand():
-    """The walk back from the wanted time steps in the forecast's own bins, so
+    """
+    The walk back from the wanted time steps in the forecast's own bins, so
     the grid rarely lands on now. It used to step straight past `earliest` and
     report the earliest-we-can-do answer while holding a quote that was in time:
     "I want it in five minutes" refused, with a drink ready in three.

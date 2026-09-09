@@ -5,7 +5,7 @@ long-lived connections and SQLite needs a real filesystem.
 
 **Every command needs `-c deploy/fly.toml`.** The config does not live at the
 repository root, so without it fly looks for `./fly.toml`, does not find one, and
-reports a missing app name rather than a missing config -- which sends you
+reports a missing app name rather than a missing config, which sends you
 looking in the wrong place. `-a cafe-flow-demo` works too.
 
 ## First deploy
@@ -26,8 +26,8 @@ Then check the three views: `/` student, `/bar` barista, `/pickup` display.
     fly ssh console -c deploy/fly.toml -C "python -m app.create_staff <name>"
 
 **Set the key before anyone logs in.** Without it the app generates one at boot,
-says so in the log, and every session ends when the process does -- survivable
-for a demo, useless for a shift. Changing it later logs everybody out, which is
+says so in the log, and every session ends when the process does, which is
+survivable for a demo and useless for a shift. Changing it later logs everybody out, which is
 the correct behaviour and still a surprise if you did not mean it.
 
 There is no registration endpoint and no password reset. Accounts are made by
@@ -70,8 +70,8 @@ bar during a real rush destroys trust in the tool permanently.
 ## Parameters
 
 `params/` lives on the volume, not in the image. On first boot the image seeds
-every calibrated layer it ships -- `base.yaml`, `observed.yaml`,
-`hybrid_arrivals.yaml` and `forecast.yaml` -- and never touches them again, so a
+every calibrated layer it ships (`base.yaml`, `observed.yaml`,
+`hybrid_arrivals.yaml` and `forecast.yaml`) and never touches them again, so a
 fresh machine comes up on the measured cafe rather than the assumed one. It used
 to seed `base.yaml` alone, which meant a first deploy served the invented class
 timetable and the wrong opening hours while every calibrated file sat in the

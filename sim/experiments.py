@@ -1,12 +1,13 @@
-"""Sweep and comparison runner. In-process only.
-
-The experiments cannot go through HTTP: an arm is hundreds of orders and a
-sweep is hundreds of arms, and the DES runs a simulated day in milliseconds
-because virtual time jumps event to event.
-
-Today this runs named arms (a set of parameter overlays) across seeds and
-reports the difference with a confidence interval. M7 adds the parameter sweeps
-on top of the same machinery.
+"""
+This is the sweep and comparison runner, and it works in process only, because
+an arm is hundreds of orders and a sweep is hundreds of arms and the engine
+runs a simulated day in milliseconds only so long as nothing goes over a
+network. It runs named arms, each a set of parameter overlays, across many
+seeds and reports the difference between them with a confidence interval, so a
+result comes with enough information to say whether it is a difference at all;
+the same machinery carries the parameter sweeps. Run it with python -m
+sim.experiments, or python -m sim.experiments --sweep customers.preorder_adoption
+--values 0,0.6 --seeds 4 to vary one parameter across arms.
 """
 
 from __future__ import annotations
@@ -48,43 +49,43 @@ class Arm:
         return load_params(base, *self.overlays, overlay=overlay)
 
 
-#: The cafe as it was actually measured, and the base of every arm below.
-#:
-#: The second file is the one that was missing. `observed.yaml` fits a single
-#: `capture_rate` on top of the *invented* class timetable in `base.yaml`;
-#: `fitted_arrivals.yaml` replaces that timetable with a curve fitted to the
-#: queue counted in the cafe. Without it every experiment here ran on a
-#: fabricated demand shape while `sim/forecast.py` -- and therefore every
-#: promise the app quotes a customer -- ran on the fitted one. The analysis and
-#: the product disagreed about what day it was.
+# The cafe as it was actually measured, and the base of every arm below.
+#
+# The second file is the one that was missing. `observed.yaml` fits a single
+# `capture_rate` on top of the *invented* class timetable in `base.yaml`;
+# `fitted_arrivals.yaml` replaces that timetable with a curve fitted to the
+# queue counted in the cafe. Without it every experiment here ran on a
+# fabricated demand shape while `sim/forecast.py` (and therefore every
+# promise the app quotes a customer) ran on the fitted one. The analysis and
+# the product disagreed about what day it was.
 OBSERVED: tuple[str, ...] = (
     "params/observed.yaml",
     "params/fitted_arrivals.yaml",
 )
 
-#: The other route to the same curve: the registrar's room schedule rather than
-#: a fit to the counted queue. Its own arm rather than a replacement, because
-#: the two routes agreeing is evidence and disagreeing is a finding -- and
-#: because only this one has content the queue counts did not put there.
-#:
-#: Thursday: it is the weekday both logged observations fall on. The other four
-#: are written out beside it and none of them is loaded by anything yet.
+# The other route to the same curve: the registrar's room schedule rather than
+# a fit to the counted queue. Its own arm rather than a replacement, because
+# the two routes agreeing is evidence and disagreeing is a finding, and
+# because only this one has content the queue counts did not put there.
+#
+# Thursday: it is the weekday both logged observations fall on. The other four
+# are written out beside it and none of them is loaded by anything yet.
 TIMETABLE: tuple[str, ...] = (
     "params/observed.yaml",
     "params/schedule/thursday.yaml",
 )
 
-#: Both at once, which is what the disagreement between them turned out to be
-#: asking for: the schedule supplies the shape, and three fitted numbers supply
-#: the level the schedule cannot know. See `sim/fit_hybrid.py`.
+# Both at once, which is what the disagreement between them turned out to be
+# asking for: the schedule supplies the shape, and three fitted numbers supply
+# the level the schedule cannot know. See `sim/fit_hybrid.py`.
 HYBRID: tuple[str, ...] = (
     "params/observed.yaml",
     "params/hybrid_arrivals.yaml",
 )
 
 
-#: The two readings of the espresso bar. Both are assumed until the machine is
-#: identified; running them side by side costs the question before answering it.
+# The two readings of the espresso bar. Both are assumed until the machine is
+# identified; running them side by side costs the question before answering it.
 ARMS: dict[str, Arm] = {
     "manual_bar": Arm(
         "manual_bar",
@@ -273,7 +274,8 @@ def sweep(
     *,
     base: str = BASE,
 ) -> list[SweepPoint]:
-    """Run every arm at every value of one parameter.
+    """
+    Run every arm at every value of one parameter.
 
     The point of a sweep here is not to find an optimum. Almost every input is
     still assumed, so an optimum would be an artefact of a guess. What a sweep

@@ -1,11 +1,11 @@
-"""Figures. Every one states how much of what it shows is still guessed.
-
-Ground rule 3 asks reports to say what fraction of their inputs are assumed.
-A figure is a report, arguably the most-quoted kind, so the provenance line
-is part of the drawing, not part of the caption someone might crop off.
-
-Imports `core` and `analysis` only; like the rest of `analysis/`, it must not
-reach into `app/` or `sim/`. Results arrive as plain rows.
+"""
+This draws the figures, and every one of them states how much of what it shows
+is still guessed. Reports are asked to say what fraction of their inputs are
+assumed, and a figure is a report, arguably the most-quoted kind, so the
+provenance line is part of the drawing rather than part of a caption somebody
+might crop off. It imports core and analysis only and, like the rest of
+analysis/, must not reach into app/ or sim/, so results arrive as plain rows.
+Imported by the analysis entry points.
 """
 
 from __future__ import annotations
@@ -69,7 +69,8 @@ def _series(rows: Iterable[dict], key: str) -> list[float]:
 
 
 def sweep_figure(points, out_dir: str | Path = "out", key: str = "wait_p90_walkup_s") -> Path:
-    """One line per arm across the swept parameter, with its interval shaded.
+    """
+    One line per arm across the swept parameter, with its interval shaded.
 
     The interval is the point of the picture. A sweep over assumed inputs whose
     arms sit inside each other's bands has not found a difference, however
@@ -111,7 +112,8 @@ def sweep_figure(points, out_dir: str | Path = "out", key: str = "wait_p90_walku
 
 
 def arm_figures(results, out_dir: str | Path = "out") -> list[Path]:
-    """The two comparisons the plan asks for: what the queue costs people, and
+    """
+    The two comparisons the plan asks for: what the queue costs people, and
     what it costs the till."""
     out = Path(out_dir)
     names = [result.arm.name for result in results]
@@ -163,7 +165,8 @@ def utilisation_figure(
     utilisation: dict[str, float], provenance: str, out_dir: str | Path = "out",
     title: str = "Station load at the peak hour",
 ) -> Path:
-    """Horizontal bars, sorted, because the question is only ever which one is
+    """
+    Horizontal bars, sorted, because the question is only ever which one is
     at the top."""
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
     _style(ax)

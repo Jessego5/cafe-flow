@@ -1,8 +1,10 @@
-"""Menu -> station plan resolution.
-
-The only place a drink name becomes work. `app/` shows prices from here and
-`sim/` times drinks from here, so the two cannot disagree about what a latte is
-(ground rule 2).
+"""
+This resolves a menu item into the work it implies, and it is the only place a
+drink name becomes a station plan. app/ prices orders from here and sim/ times
+them from here, so the two cannot end up disagreeing about what a latte is or
+what it costs, which is the whole reason this sits in core/ rather than in
+either runtime. Imported by app/ and sim/, and by core.capacity to price a
+plan in bottleneck-seconds.
 """
 
 from __future__ import annotations
@@ -24,7 +26,8 @@ __all__ = [
 
 
 def resolve_tasks(item: Item, params: Params) -> list[Task]:
-    """The station plan for one item, with service times already resolved.
+    """
+    The station plan for one item, with service times already resolved.
 
     Prep tasks in menu order, then the barista-only assembly task. Durations
     include per-batch setup, because an item made on its own pays setup; batching
@@ -119,7 +122,8 @@ def make_order(
     customer_id: str | None = None,
     is_simulated: bool = False,
 ) -> Order:
-    """Build an order from `(drink, milk_type)` lines.
+    """
+    Build an order from `(drink, milk_type)` lines.
 
     Item ids are derived from the order id so a replayed scenario names its
     items identically every run (ground rule 5).

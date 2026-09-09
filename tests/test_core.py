@@ -1,8 +1,9 @@
-"""M1 acceptance tests.
-
-Done when: illegal transitions raise; batch_cost of 4 same-milk lattes is
-strictly less than 4x cost; core imports nothing from app/ or sim/; a corrupted
-base.yaml raises a validation error naming the bad field.
+"""
+These are the acceptance tests for the domain core, and they are done when
+illegal transitions raise, the batch cost of four same-milk lattes is strictly
+less than four times the single cost, core imports nothing from app/ or sim/,
+and a corrupted base.yaml raises a validation error that names the bad field.
+Run them with pytest.
 """
 
 from __future__ import annotations
@@ -48,7 +49,8 @@ def test_every_parameter_carries_provenance(params):
 
 
 def test_source_of_marks_single_parameters(params):
-    """A price read off the board is observed; the cost of goods sitting beside
+    """
+    A price read off the board is observed; the cost of goods sitting beside
     it in the same block is still a guess."""
     assert params.source_of("menu.latte.price_cents") == "observed"
     assert params.source_of("menu.latte.cogs_cents") == "assumed"
@@ -265,7 +267,8 @@ def test_entered_at_reads_the_event_trail(params):
 
 
 def test_a_lone_hot_latte_costs_exactly_the_formula(params):
-    """Stated as the formula rather than a number, so it still means something
+    """
+    Stated as the formula rather than a number, so it still means something
     after the service times are revised."""
     wand = params.station("steam_wand")
     head = params.station("group_head")
@@ -286,7 +289,8 @@ def test_a_lone_hot_latte_costs_exactly_the_formula(params):
 
 
 def test_an_iced_latte_never_touches_the_steam_wand(params):
-    """The board offers most milk drinks hot or iced, and the iced build skips
+    """
+    The board offers most milk drinks hot or iced, and the iced build skips
     the wand. This is what decides how much of the menu milk batching can
     touch at all."""
     model = StationCapacityModel(params)
@@ -568,7 +572,8 @@ def test_a_live_log_does_not_unflag_a_simulated_order(params):
 
 
 def test_an_overlay_can_remove_a_station(root, tmp_path):
-    """An experiment that replaces the espresso bar has to be able to say the
+    """
+    An experiment that replaces the espresso bar has to be able to say the
     old stations are gone, not leave them defined and unused."""
     overlay = tmp_path / "drop.yaml"
     overlay.write_text(
@@ -592,7 +597,8 @@ def test_removing_a_station_a_menu_item_needs_fails_loudly(root, tmp_path):
 
 
 def test_a_zero_dimension_costs_nothing(params, tmp_path, root):
-    """A cycle that charges per shot and per ounce still has to price a drink
+    """
+    A cycle that charges per shot and per ounce still has to price a drink
     that uses one and not the other."""
     overlay = tmp_path / "combined.yaml"
     overlay.write_text(
@@ -614,7 +620,8 @@ def test_a_zero_dimension_costs_nothing(params, tmp_path, root):
 
 
 def test_a_marked_parameter_keeps_its_mark_through_a_merge(root, tmp_path):
-    """`source_of` is part of the config, so it merges like everything else.
+    """
+    `source_of` is part of the config, so it merges like everything else.
 
     An overlay that supersedes a marked parameter has to restate the mark, or
     clear the block's marks with `source_of: null`. Silently inheriting
@@ -652,7 +659,8 @@ def test_the_report_breaks_down_every_source(params):
 
 
 def test_swapping_a_distribution_does_not_leave_the_old_one_behind(root, tmp_path):
-    """An overlay that changes a mapping's shape is describing a different
+    """
+    An overlay that changes a mapping's shape is describing a different
     thing, not amending this one."""
     overlay = tmp_path / "constant.yaml"
     overlay.write_text(

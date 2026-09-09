@@ -1,20 +1,19 @@
-"""Replay a simulated day against the running app, over real HTTP.
-
-Not for sweeps. A sweep is hundreds of arms and the DES runs a day in
-milliseconds because virtual time jumps event to event; pushing that through
-HTTP would take days and prove nothing extra. This exists for two other jobs.
-
-**Validation.** Both runtimes share `core/`, so in principle they cannot
-disagree about what a latte costs, what work it implies, or which state moves
-are legal. The drift check makes that a fact rather than a hope: it replays a
-scenario over HTTP and compares the app's own event log, through the same
-`analysis.metrics`, against the in-process run. If they diverge, the app has
-grown a rule of its own, and that is a bug in `app/` rather than a tolerance to
-widen.
-
-**Demo.** `--speed 60` compresses a morning into a minute against the live UIs,
-which is the only way to show someone what a rush looks like on the bar display
-without waiting for one.
+"""
+This replays a simulated day against the running app over real HTTP, and it is
+not for sweeps: a sweep is hundreds of arms and the engine runs a day in
+milliseconds because virtual time jumps event to event, so pushing that through
+HTTP would take days and prove nothing extra. It exists for two other jobs. The
+first is validation, because both runtimes share core/ and so in principle
+cannot disagree about what a latte costs, what work it implies or which state
+moves are legal; the drift check makes that a fact rather than a hope by
+replaying a scenario over HTTP and comparing the app's own event log, through
+the same analysis.metrics, against the in-process run, and a divergence means
+the app has grown a rule of its own, which is a bug in app/ and not a tolerance
+to widen. The second is demonstration, where --speed 60 compresses a morning
+into a minute against the live UIs, the only way to show somebody what a rush
+looks like on the bar display without waiting for one. Run it with python -m
+sim.client --drift-check, or --concurrency to prove a slot cannot be
+overbooked, against a server you have already started.
 """
 
 from __future__ import annotations
@@ -46,10 +45,10 @@ __all__ = ["Replay", "DriftReport", "drift_check", "check_slot_concurrency", "se
 SIMULATED = {"X-Simulated-Order": "1"}
 DEFAULT_SPEED = 60.0
 
-#: Replayed waits are wall-clock and rescaled, so they carry scheduling jitter
-#: the in-process run does not. Prices, costs and counts are compared exactly;
-#: only the timings get a tolerance, and it is deliberately loose because
-#: tightening it would only ever produce flakes, never catch drift.
+# Replayed waits are wall-clock and rescaled, so they carry scheduling jitter
+# the in-process run does not. Prices, costs and counts are compared exactly;
+# only the timings get a tolerance, and it is deliberately loose because
+# tightening it would only ever produce flakes, never catch drift.
 WAIT_TOLERANCE = 0.25
 
 
@@ -96,7 +95,8 @@ REPLAY_USER = "replay"
 
 
 def ensure_replay_account() -> str:
-    """A staff account for the harness, and the password it was just given.
+    """
+    A staff account for the harness, and the password it was just given.
 
     Advancing an order is a staff route now, and the replay advances several
     hundred of them. It makes its own account rather than being handed a
@@ -104,7 +104,7 @@ def ensure_replay_account() -> str:
     written down anywhere a person would find it.
 
     Refused in `pilot`, which rejects simulated orders anyway. Anything holding
-    the database can do this, so it is a convenience and not a hole -- but it
+    the database can do this, so it is a convenience and not a hole, but it
     should still not be reachable from the environment that serves customers.
     """
     import secrets
@@ -147,7 +147,8 @@ class Replay:
     """Drives one simulated day at the app over HTTP."""
 
     def __init__(self, base_url: str, params: Params, *, speed: float = DEFAULT_SPEED):
-        """`speed` compresses the day; 0 means as fast as the app will take it.
+        """
+        `speed` compresses the day; 0 means as fast as the app will take it.
 
         A paced replay is what a demo needs and what makes the timing
         comparison meaningful. An unpaced one is what a check wants: the rules
@@ -363,7 +364,8 @@ def drift_check(
     speed: float = 0.0,
     compare_waits: bool = False,
 ) -> DriftReport:
-    """Replay a day at the app and compare it against the in-process run.
+    """
+    Replay a day at the app and compare it against the in-process run.
 
     Unpaced and structural by default: prices, bottleneck costs, item lists,
     state paths, state counts and lost margin have to agree exactly, and none
@@ -380,7 +382,8 @@ def drift_check(
 
 
 def check_slot_concurrency(base_url: str, *, attempts: int = 50) -> dict:
-    """Fire many reservations at one slot at once and count the winners.
+    """
+    Fire many reservations at one slot at once and count the winners.
 
     The capacity check and the decrement have to be one transaction. Split into
     a read and a write they interleave, and a slot with room for ten takes

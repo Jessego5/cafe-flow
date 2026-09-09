@@ -1,4 +1,8 @@
-"""The menu, served from params by way of the projection table."""
+"""
+This serves the menu, read from params by way of the projection table, so the
+board a customer sees is the same configuration the simulator was run against.
+Mounted by app/main.py.
+"""
 
 from __future__ import annotations
 

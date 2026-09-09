@@ -1,13 +1,13 @@
-"""Staff login. One cookie, one dependency, no roles.
-
-Customers need no account and have none: a phone remembers its own receipts and
-the name on an order is a label the bar calls out, not an identity. Staff are
-different, because `/queue` lists every order in the shop and the write routes
-move other people's coffee around.
-
-Deliberately plain. A four-role permission model that is designed and never
-wired to a route protects nothing; one login that actually guards the writes
-protects everything that needed guarding.
+"""
+This is the staff login: one cookie, one dependency and no roles. Customers
+need no account and have none, because a phone remembers its own receipts and
+the name on an order is a label the bar calls out rather than an identity.
+Staff are different, since /queue lists every order in the shop and the write
+routes move other people's coffee around. It is deliberately plain, because a
+four-role permission model that is designed and never wired to a route
+protects nothing, while one login that actually guards the writes protects
+everything that needed guarding. Imported by the routes that require staff,
+through the current_staff dependency.
 """
 
 from __future__ import annotations
@@ -53,7 +53,8 @@ def require_staff(cafe_session: str | None = Cookie(default=None)) -> str:
 
 @router.post("/login")
 async def login(body: LoginIn, response: Response) -> dict:
-    """One message for every failure.
+    """
+    One message for every failure.
 
     A missing user and a wrong password answer identically, so the endpoint
     cannot be used to find out who works here. The hash is verified even when

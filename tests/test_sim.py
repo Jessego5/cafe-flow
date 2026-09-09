@@ -1,13 +1,11 @@
-"""M3 acceptance tests.
-
-Done when: the day conserves customers; the same seed reproduces the same log;
-a lone latte takes exactly its make time; and the arrival pattern shows five
-distinct bursts.
-
-The tests about who holds what (a barista never parallel with themselves, a
-station never over capacity) guard the modelling decision that would otherwise
-silently invalidate every result: stations are seized by baristas, not run as
-independent parallel servers.
+"""
+These are the acceptance tests for the simulator, and they are done when the
+day conserves customers, the same seed reproduces the same log, a lone latte
+takes exactly its make time, and the arrival pattern shows five distinct
+bursts. The tests about who holds what, that a barista is never parallel with
+themselves and a station is never over capacity, guard the modelling decision
+that would otherwise silently invalidate every result: stations are seized by
+baristas rather than run as independent parallel servers. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -40,7 +38,8 @@ def day(params):
 
 
 def intervals(log, *, by: str = "actor", attended_only: bool | None = None):
-    """Reconstruct busy periods from the station_start/station_end pairs.
+    """
+    Reconstruct busy periods from the station_start/station_end pairs.
 
     Grouping by actor answers "was this person busy", which counts attended
     work only; grouping by station answers "was this machine busy", which counts
@@ -119,7 +118,8 @@ def test_the_day_conserves_customers(params, seed):
 
 
 def test_stopping_mid_rush_leaves_orders_in_flight(params):
-    """Closing the doors mid-rush must leave work in flight, not quietly drop
+    """
+    Closing the doors mid-rush must leave work in flight, not quietly drop
     it: that term is what makes the identity worth checking."""
     busiest = max(
         params.arrivals.class_blocks, key=lambda block: block.sections * block.avg_enrollment
@@ -196,11 +196,12 @@ def _solo(params, drink="latte", milk="oat", variant="hot", at_s=None):
 
 
 def test_a_lone_latte_takes_exactly_the_make_time(params):
-    """Stated as the formula, so it still means something after the service
+    """
+    Stated as the formula, so it still means something after the service
     times are revised.
 
-    The shot pulls while the milk steams -- the group head is unattended, so it
-    needs a slot and not a person -- and the pour waits for whichever finishes
+    The shot pulls while the milk steams, the group head is unattended, so it
+    needs a slot and not a person, and the pour waits for whichever finishes
     last. `max`, not `+`. Summing them priced a latte at 112 seconds against a
     sandwich's 90 and made drinks the slower half of the menu, which is the
     wrong way round from what the cafe does.
@@ -248,7 +249,8 @@ def test_a_lone_customer_waits_only_for_the_register_and_the_drink(params):
 
 
 def test_the_register_is_worked_by_a_barista(params):
-    """The register competes for barista time even when it is not the
+    """
+    The register competes for barista time even when it is not the
     bottleneck, so it appears in the log as station work like anything else."""
     result = _solo(params, drink="drip_coffee", milk=None, variant=None)
     stations = [
@@ -273,7 +275,8 @@ def test_a_barista_is_never_parallel_with_themself(day):
 
 
 def test_the_coffee_gets_made_while_the_panini_presses(params):
-    """A press occupies the press, not a person. Two customers arrive together,
+    """
+    A press occupies the press, not a person. Two customers arrive together,
     one wanting a sandwich and one a latte: the latte must not wait out the
     press cycle."""
     at_s = params.meta.start_s + 3600
@@ -305,7 +308,8 @@ def test_the_coffee_gets_made_while_the_panini_presses(params):
 
 
 def test_a_finished_sandwich_still_blocks_the_press(params):
-    """Unattended does not mean free: the press stays seized until someone
+    """
+    Unattended does not mean free: the press stays seized until someone
     comes back for it, which is exactly why collection matters."""
     assert params.station("panini_press").attended is False
     assert params.station("steam_wand").attended is True
@@ -320,7 +324,8 @@ def test_no_station_exceeds_its_capacity(day, params):
 
 
 def test_one_wand_serialises_two_simultaneous_lattes(params):
-    """Two baristas, one steam wand: the wand contends and a barista blocks.
+    """
+    Two baristas, one steam wand: the wand contends and a barista blocks.
 
     If stations were modelled as independent parallel servers this would pass
     with the two steams overlapping, and every throughput number in the project
@@ -341,7 +346,7 @@ def test_one_wand_serialises_two_simultaneous_lattes(params):
     assert overlaps(wand_spans) == []
     assert max_concurrent(wand_spans) == 1
 
-    # Both shots pull at once -- two group heads -- so the second latte is late
+    # Both shots pull at once (two group heads), so the second latte is late
     # by the wand alone, and only by however much its second steam outruns the
     # extraction it was already overlapping.
     ready = sorted(result.orders[o].entered_at(State.READY) for o in result.orders)
@@ -358,7 +363,8 @@ def test_one_wand_serialises_two_simultaneous_lattes(params):
 
 
 def test_the_crew_follows_the_staffing_plan(day, params):
-    """Concurrency never exceeds the plan, and the extra barista does appear
+    """
+    Concurrency never exceeds the plan, and the extra barista does appear
     when the plan says so. Attended work only: a running machine is not a
     person on shift."""
     spans = [span for actor_spans in intervals(day.log).values() for span in actor_spans]
@@ -450,7 +456,8 @@ def test_baskets_respect_the_menu(params, day):
 
 
 def test_the_hot_iced_split_follows_the_mix(params):
-    """The single most important thing to count during observation: it decides
+    """
+    The single most important thing to count during observation: it decides
     how much of the menu milk batching can reach."""
     from collections import Counter
 
@@ -501,7 +508,8 @@ def _profile_params(root, tmp_path, rate_per_hour, capture=1.0, bin_minutes=60):
 
 
 def test_a_measured_curve_reproduces_its_own_rate(root, tmp_path):
-    """A shop on a commuter street has no bell to model. The curve is the
+    """
+    A shop on a commuter street has no bell to model. The curve is the
     model, and what comes out has to match what went in."""
     params = _profile_params(root, tmp_path, [30.0, 30.0, 30.0])
     counts = [
@@ -522,7 +530,8 @@ def test_the_curve_puts_the_rush_where_the_rush_was(root, tmp_path):
 
 
 def test_capture_rate_still_scales_a_measured_curve(root, tmp_path):
-    """The same knob calibrates either arrivals model, which is what lets a
+    """
+    The same knob calibrates either arrivals model, which is what lets a
     measured shape and a fitted volume live together."""
     full = _profile_params(root, tmp_path, [40.0, 40.0], capture=1.0)
     half = _profile_params(root, tmp_path, [40.0, 40.0], capture=0.5)
@@ -555,7 +564,8 @@ def test_a_day_drawn_from_a_curve_is_still_deterministic(root, tmp_path):
 
 
 def test_every_distribution_consumes_exactly_one_draw(params, root, tmp_path):
-    """Swapping a lognormal for a constant must not re-shuffle every later
+    """
+    Swapping a lognormal for a constant must not re-shuffle every later
     random number in the run, or no two configurations stay comparable."""
     import numpy as np
 

@@ -1,7 +1,9 @@
-"""Metrics tested against hand-built logs with known answers.
-
-Every function here reads the event log and nothing else (ground rule 4), so
-each test states the log in full and then states the arithmetic it implies.
+"""
+These are the tests for the metrics, run against hand-built logs with known
+answers. Every function under test reads the event log and nothing else, so
+each test states the log in full and then states the arithmetic it implies,
+which means a failure points at the calculation rather than at the fixture. Run
+them with pytest.
 """
 
 from __future__ import annotations
@@ -92,7 +94,8 @@ def test_waits_split_by_channel():
 
 
 def test_the_window_selects_on_when_the_order_was_placed():
-    """A rush is measured by the people who joined it, not by when their drink
+    """
+    A rush is measured by the people who joined it, not by when their drink
     happened to land."""
     log = EventLog("hand", 1)
     _order(log, "early", placed=100.0, ready=140.0)
@@ -218,7 +221,8 @@ def test_state_counts_include_what_never_finished():
 
 
 def test_analysis_imports_neither_runtime(request):
-    """Ground rule: a metric is computed from the log and nothing else.
+    """
+    Ground rule: a metric is computed from the log and nothing else.
 
     `calibrate.py` is the one module that has to *drive* a runtime rather than
     read its output, and it takes that as an injected argument, so the only
@@ -310,7 +314,8 @@ def test_promise_error_is_signed_and_counts_the_misses():
 
 
 def test_a_preorder_lead_time_is_not_counted_as_waiting():
-    """Someone who ordered ahead for eleven and collected at eleven waited no
+    """
+    Someone who ordered ahead for eleven and collected at eleven waited no
     time at all."""
     from analysis.metrics import experienced_waits
 
@@ -372,7 +377,8 @@ def test_fairness_gap_is_none_when_only_one_channel_showed_up():
 
 
 def test_a_balk_leaves_the_queue_it_never_really_joined():
-    """Placed and balked land at the same instant. Ordered by state name,
+    """
+    Placed and balked land at the same instant. Ordered by state name,
     "balked" sorts before "placed", the removal happens before the addition,
     and the order sits in the queue for the rest of the day."""
     from analysis.calibrate import _queue_over_time

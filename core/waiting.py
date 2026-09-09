@@ -1,14 +1,13 @@
-"""How long the queue looks, to someone standing in front of it.
-
-In `core/` because both halves need the same answer. The simulator asks it to
-decide who gives up; the app asks it to put a number on a screen. If those two
-ever disagreed, the cafe would be telling customers one thing and the model
-would be assuming another (ground rule 2).
-
-It is deliberately the estimate a *person* could make: people ahead, times how
-long each looks like taking. Not the best forecast available from the state of
-every station. Nobody standing at a counter computes anything better, and the
-number is only useful if it is the one a customer would arrive at themselves.
+"""
+This says how long the queue looks to somebody standing in front of it. It is
+in core/ because both halves need the same answer: the simulator asks it to
+decide who gives up, and the app asks it to put a number on a screen, and if
+those two ever disagreed the cafe would be telling customers one thing while
+the model assumed another. It is deliberately the estimate a *person* could
+make, people ahead times how long each looks like taking, rather than the best
+forecast available from the state of every station, because nobody standing at
+a counter computes anything better and the number is only useful if it is the
+one a customer would arrive at themselves. Imported by app/ and sim/.
 """
 
 from __future__ import annotations
@@ -26,13 +25,14 @@ __all__ = [
     "estimate_wait_s",
 ]
 
-#: An order is part of the line a customer sees themselves joining until it
-#: reaches the shelf. What is already made is not something to wait behind.
+# An order is part of the line a customer sees themselves joining until it
+# reaches the shelf. What is already made is not something to wait behind.
 WAITING_STATES = frozenset({State.PLACED, State.ACCEPTED, State.IN_PROGRESS})
 
 
 def nominal_seconds_per_order(params: Params, baristas: int) -> float:
-    """What one person in the line is worth, roughly.
+    """
+    What one person in the line is worth, roughly.
 
     Derived rather than configured: the mix-weighted hands-on time of an order
     plus the register, divided by the people working. A first-order estimate,

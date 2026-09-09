@@ -1,14 +1,16 @@
-"""Config loading, validation, merging and provenance.
-
-Ground rules enforced here:
-  1. No magic numbers outside config -> everything the app and the simulator
-     need is described by the models below.
-  3. Every parameter carries provenance (assumed | observed | fitted).
-  7. Fail loudly on bad config -> nothing silently defaults; every failure
-     names the offending field.
-
-At M8 `params/observed.yaml` is layered on top of `params/base.yaml` and the
-touched subtrees flip to `source: observed` / `source: fitted`. No code change.
+"""
+This loads, validates and merges the configuration, and it is the module that
+makes "no magic numbers" true rather than aspirational: everything the app and
+the simulator need to know about a cafe is described by the models below, so a
+duration or a price that is not in params/ does not exist. Every parameter
+carries its own provenance, assumed or published or observed or fitted, which
+is what lets a run say out loud how much of itself is still guessed instead of
+presenting a calibrated-looking model. Bad config fails loudly and names the
+offending field, because a parameter that silently defaults is a parameter
+nobody will ever check. Overlays merge left to right, so params/observed.yaml
+layered on params/base.yaml flips the subtrees it touches to observed or fitted
+and a calibration becomes a file drop and a restart. Imported by everything;
+load_params is the entry point.
 """
 
 from __future__ import annotations
@@ -41,24 +43,24 @@ __all__ = [
     "deep_merge",
 ]
 
-#: Where a parameter came from.
-#:   assumed    a guess, to be replaced
-#:   synthetic  from a generated dataset: realistic in shape, but not a record
-#:              of anything that happened anywhere
-#:   published  a conventional figure from an industry or vendor source
-#:   observed   measured at this cafe
-#:   fitted     tuned to match observations
+# Where a parameter came from.
+#   assumed    a guess, to be replaced
+#   synthetic  from a generated dataset: realistic in shape, but not a record
+#              of anything that happened anywhere
+#   published  a conventional figure from an industry or vendor source
+#   observed   measured at this cafe
+#   fitted     tuned to match observations
 Source = Literal["assumed", "synthetic", "published", "observed", "fitted"]
 SOURCES: tuple[str, ...] = ("assumed", "synthetic", "published", "observed", "fitted")
 
 FROM_STAFFING = "from_staffing"
 
-#: Keys that decide what shape a mapping has. An overlay that changes one is
-#: describing a different thing, not amending this one, so it replaces the
-#: mapping instead of merging into it: swapping a lognormal for a constant must
-#: not leave the lognormal's median and sigma behind.
-#: Stations that mean the item is food. Used to tell a basket's drink from its
-#: attachment without a flag on every menu entry.
+# Keys that decide what shape a mapping has. An overlay that changes one is
+# describing a different thing, not amending this one, so it replaces the
+# mapping instead of merging into it: swapping a lognormal for a constant must
+# not leave the lognormal's median and sigma behind.
+# Stations that mean the item is food. Used to tell a basket's drink from its
+# attachment without a flag on every menu entry.
 FOOD_STATIONS: frozenset[str] = frozenset({"panini_press", "food_counter"})
 
 SHAPE_KEYS: tuple[str, ...] = ("dist",)
@@ -97,7 +99,8 @@ def format_hhmm(seconds: float) -> str:
 
 
 def deep_merge(base: Mapping[str, Any], overlay: Mapping[str, Any]) -> dict[str, Any]:
-    """Recursive merge. Mappings merge key-wise; every other value is replaced.
+    """
+    Recursive merge. Mappings merge key-wise; every other value is replaced.
 
     Lists are replaced wholesale on purpose: a half-overridden staffing plan or
     class-block schedule is never what an overlay means.
@@ -183,7 +186,8 @@ class CafeParams(_Strict):
 
 
 class StationParams(_Strict):
-    """A resource with a service-time formula.
+    """
+    A resource with a service-time formula.
 
     Exactly one capacity, plus whichever cost terms apply. `capacity:
     from_staffing` means the station is manned rather than machine-limited and
@@ -196,11 +200,11 @@ class StationParams(_Strict):
     per_6oz_s: float | None = Field(default=None, ge=0)   # per item, x oz/6
     shot_s: float | None = Field(default=None, ge=0)      # per item, x shots
     per_item_s: float | None = Field(default=None, ge=0)
-    #: Extra seconds an item of food costs here, on top of `per_item_s`.
-    #: Measured at the till: 70 laps separate a 13-second food premium from the
-    #: 8.5 seconds any second item costs, and fitting without it blames the item
-    #: count for both -- the two are collinear because food nearly always comes
-    #: with a drink.
+    # Extra seconds an item of food costs here, on top of `per_item_s`.
+    # Measured at the till: 70 laps separate a 13-second food premium from the
+    # 8.5 seconds any second item costs, and fitting without it blames the item
+    # count for both; the two are collinear because food nearly always comes
+    # with a drink.
     food_s: float | None = Field(default=None, ge=0)  # per item, flat
     run_s: float | None = Field(default=None, ge=0)       # per batch if batch_size, else per item
     pour_s: float | None = Field(default=None, ge=0)      # per item
@@ -261,7 +265,8 @@ class StationParams(_Strict):
 
     @property
     def batches(self) -> bool:
-        """Can work here be run several items at a time?
+        """
+        Can work here be run several items at a time?
 
         The register's per-order cost is not batching: it is one interaction
         covering an order, not several orders run together.
@@ -275,7 +280,8 @@ class StationParams(_Strict):
 
 
 class TaskSpec(_Strict):
-    """One item's demand at one station.
+    """
+    One item's demand at one station.
 
     `oz` and `shots` may be zero: a station that charges for both still gets a
     task from a drink that needs only one of them, and saying so explicitly
@@ -288,7 +294,8 @@ class TaskSpec(_Strict):
 
 
 class VariantParams(_Strict):
-    """One way of building an item, e.g. the board's "Hot or Iced".
+    """
+    One way of building an item, e.g. the board's "Hot or Iced".
 
     Not cosmetic: an iced latte never touches the steam wand, so the variant
     changes which stations the drink needs and therefore what it costs at the
@@ -305,10 +312,10 @@ class MenuItemParams(_Strict):
     price_cents: int = Field(gt=0)
     cogs_cents: int = Field(ge=0)
     requires_milk: bool
-    #: As posted on the board, for the medium size. Nothing in the simulation
-    #: reads this; it is here so the app can show what the cafe shows, and so
-    #: the figure has one home rather than being retyped into the frontend.
-    #: The board's own footnote: milk drinks are calculated with 2% milk.
+    # As posted on the board, for the medium size. Nothing in the simulation
+    # reads this; it is here so the app can show what the cafe shows, and so
+    # the figure has one home rather than being retyped into the frontend.
+    # The board's own footnote: milk drinks are calculated with 2% milk.
     calories: int | None = Field(default=None, ge=0)
     tasks: list[TaskSpec] = Field(default_factory=list)
     assembly_s: float = Field(default=0.0, ge=0)
@@ -368,7 +375,8 @@ class MenuItemParams(_Strict):
 
 
 class AttachParams(_Strict):
-    """The thing people add to a drink order.
+    """
+    The thing people add to a drink order.
 
     Food is an attachment, not a first choice. Drawing every basket's first
     item from the whole menu made a quarter of all orders a sandwich with no
@@ -388,10 +396,11 @@ class AttachParams(_Strict):
 
 
 class BasketParams(_Strict):
-    """How many things people buy at once, and whether food is among them.
+    """
+    How many things people buy at once, and whether food is among them.
 
     The `attach` model this supersedes could only ever add food to a drink, so
-    it could not produce two drinks or three items -- 7% of the orders counted
+    it could not produce two drinks or three items, which is 7% of the orders counted
     at the till. It also had one attach rate for every basket, where the counted
     ones say the opposite: bigger baskets are bigger *because* of the food.
 
@@ -440,8 +449,8 @@ class MixParams(_Strict):
     milk: dict[str, float]
     serve: dict[str, float]          # the board's hot/iced split
     attach: AttachParams
-    #: Supersedes `attach` where given. `attach` remains the simple form, and
-    #: is what the example configurations still use.
+    # Supersedes `attach` where given. `attach` remains the simple form, and
+    # is what the example configurations still use.
     basket: BasketParams | None = None
     source: Source | None = None
 
@@ -473,7 +482,8 @@ class ClassBlock(_Strict):
 
 
 class ProfileParams(_Strict):
-    """Demand as a measured curve rather than a story about class timetables.
+    """
+    Demand as a measured curve rather than a story about class timetables.
 
     A point-of-sale export gives the rate hour by hour and says nothing about
     why. For a cafe whose demand is not driven by a bell that is the better
@@ -493,9 +503,9 @@ class ProfileParams(_Strict):
 
 
 class ArrivalsParams(_Strict):
-    #: `class_blocks` builds demand from a timetable; `profile` takes it from a
-    #: measured curve. A campus cafe is the first; a shop on a commuter street
-    #: is the second, and only a log can tell you which you have.
+    # `class_blocks` builds demand from a timetable; `profile` takes it from a
+    # measured curve. A campus cafe is the first; a shop on a commuter street
+    # is the second, and only a log can tell you which you have.
     model: Literal["class_blocks", "profile"] = "class_blocks"
     class_blocks: list[ClassBlock] = Field(default_factory=list)
     profile: ProfileParams | None = None
@@ -548,29 +558,29 @@ class CustomersParams(_Strict):
     # themselves out of the peak, and their order is deferred rather than lost.
     # That is the difference between this and balking, and it is the whole
     # reason it is worth anything.
-    #: What happens between paying for a pre-order and it reaching the bar.
-    #:
-    #: `fixed` is the old behaviour: it goes in one class block ahead, whatever
-    #: the line looks like when it lands. `adaptive` holds the paid order and
-    #: puts it in the queue at the last moment the *live* line still says it
-    #: will be ready on time -- which is the thing a reminder pushed to a phone
-    #: can never do, because once somebody has been told to order, they cannot
-    #: be re-timed.
+    # What happens between paying for a pre-order and it reaching the bar.
+    #
+    # `fixed` is the old behaviour: it goes in one class block ahead, whatever
+    # the line looks like when it lands. `adaptive` holds the paid order and
+    # puts it in the queue at the last moment the *live* line still says it
+    # will be ready on time, which is the thing a reminder pushed to a phone
+    # can never do, because once somebody has been told to order, they cannot
+    # be re-timed.
     preorder_release: Literal["fixed", "adaptive"] = "fixed"
-    #: How often a held order re-checks the line, and how much slack it leaves
-    #: when it decides. Durations, so they live here (ground rule 1).
+    # How often a held order re-checks the line, and how much slack it leaves
+    # when it decides. Durations, so they live here (ground rule 1).
     release_poll_s: float | None = Field(default=None, gt=0)
     release_margin_s: float | None = Field(default=None, ge=0)
 
-    #: Someone using the planner sees what every time of day costs, so a share
-    #: of them pick a quieter one. This is the arrive-by feature's economic
-    #: argument and it is a different thing from `shown_wait`: that is a
-    #: walk-up looking at a line and coming back, this is somebody choosing a
-    #: slot before they set out.
-    #:
-    #: Assumed, and it has to be. Nobody has ever shown these customers a
-    #: forecast, so there is no way to know how many would move -- which is why
-    #: it lives in an arm and is swept rather than set.
+    # Someone using the planner sees what every time of day costs, so a share
+    # of them pick a quieter one. This is the arrive-by feature's economic
+    # argument and it is a different thing from `shown_wait`: that is a
+    # walk-up looking at a line and coming back, this is somebody choosing a
+    # slot before they set out.
+    #
+    # Assumed, and it has to be. Nobody has ever shown these customers a
+    # forecast, so there is no way to know how many would move, which is why
+    # it lives in an arm and is swept rather than set.
     retime_fraction: float = Field(default=0.0, ge=0, le=1)
     retime_threshold_min: float | None = Field(default=None, gt=0)
     retime_window_min: float | None = Field(default=None, gt=0)
@@ -699,7 +709,8 @@ class Params(_Strict):
     @field_validator("stations", "menu", mode="before")
     @classmethod
     def _drop_block_source(cls, value: Any) -> Any:
-        """`source` sits beside the named entries in these blocks; it is
+        """
+        `source` sits beside the named entries in these blocks; it is
         provenance metadata, not a station or a menu item."""
         if isinstance(value, Mapping):
             return {k: v for k, v in value.items() if k not in ("source", "source_of")}
@@ -797,7 +808,8 @@ class Params(_Strict):
         return self.stations[self.bottleneck_station]
 
     def is_food(self, name: str) -> bool:
-        """Whether a menu item is something to eat.
+        """
+        Whether a menu item is something to eat.
 
         Read off the stations it uses rather than carried as a flag: anything
         that goes through the oven or the food counter is food, and nothing has
@@ -810,7 +822,8 @@ class Params(_Strict):
         return bool(stations & FOOD_STATIONS)
 
     def split_mix(self) -> tuple[dict[str, float], dict[str, float]]:
-        """`mix.drink` divided into what people drink and what they eat.
+        """
+        `mix.drink` divided into what people drink and what they eat.
 
         Both come back renormalised, because a basket picks its first item from
         the drinks and its attachment from the food, and each draw needs its own
@@ -941,7 +954,8 @@ def params_from_dict(raw: Mapping[str, Any]) -> Params:
 
 
 def overlay_for(path: str, value: Any) -> dict[str, Any]:
-    """Turn `customers.preorder_adoption` and a number into a config overlay.
+    """
+    Turn `customers.preorder_adoption` and a number into a config overlay.
 
     A swept value goes through the same merge everything else does, so it is
     validated, cross-checked and given provenance exactly like one written in a
@@ -968,7 +982,8 @@ def overlay_for(path: str, value: Any) -> dict[str, Any]:
 def load_params(
     *paths: str | Path, overlay: Mapping[str, Any] | None = None
 ) -> Params:
-    """Load base config plus overlays, left to right. Later files win.
+    """
+    Load base config plus overlays, left to right. Later files win.
 
         load_params("params/base.yaml", "params/observed.yaml")
 

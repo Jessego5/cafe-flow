@@ -2,7 +2,7 @@
 #
 # The customer scrolls to a time, pays, and stops thinking about it. Nothing
 # reaches the bar until the *live* line says ordering now lands by the time they
-# asked for -- which is the whole advantage over pushing them a reminder, since
+# asked for, which is the whole advantage over pushing them a reminder, since
 # a person who has been told to order cannot be re-timed when the queue moves.
 #
 # It also removes the hardest thing in the notification spec. The reminder that

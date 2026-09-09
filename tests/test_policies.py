@@ -1,9 +1,9 @@
-"""M5: what runs together, and what that buys.
-
-`batch_size: 3` on the press was inert until now. It priced a batch in
-`core.capacity` but nothing in the engine ever formed one. These tests pin down
-both halves: the policy picks the work, and the engine actually runs it in one
-cycle.
+"""
+These are the tests for what runs together and what that buys. The press
+carried batch_size: 3 while nothing in the engine ever formed a batch, so it
+priced one in core.capacity and never ran one; these pin down both halves, that
+the policy picks the work and that the engine actually runs it in a single
+cycle. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -113,7 +113,8 @@ def test_work_outside_the_lookahead_waits(params):
 
 
 def test_every_policy_the_config_allows_is_built():
-    """A name the config accepts but nothing implements would quietly fall back
+    """
+    A name the config accepts but nothing implements would quietly fall back
     to FIFO and report someone else's numbers."""
     from core.params import PolicyParams
     from typing import get_args
@@ -164,7 +165,8 @@ def test_a_full_press_takes_one_cycle_per_sandwich_under_fifo(params):
 
 
 def test_a_full_press_takes_one_cycle_when_batched(batching):
-    """The fix: `batch_size: 3` now means something in the engine, not only in
+    """
+    The fix: `batch_size: 3` now means something in the engine, not only in
     the cost model."""
     press = batching.station("panini_press")
     count = press.batch_size
@@ -232,7 +234,8 @@ def test_a_batch_never_exceeds_what_the_station_allows(batching):
 
 
 def test_batches_only_ever_hold_compatible_work(batching):
-    """Every formed batch is one milk type, because the wand is what makes
+    """
+    Every formed batch is one milk type, because the wand is what makes
     milk type matter."""
     result = run(batching, 11)
     items = {item.item_id: item for order in result.orders.values() for item in order.items}
@@ -245,7 +248,8 @@ def test_batches_only_ever_hold_compatible_work(batching):
 
 
 def test_where_the_saving_actually_comes_from(params, batching):
-    """On the observed menu it is the press, not the milk. Recorded so it fails
+    """
+    On the observed menu it is the press, not the milk. Recorded so it fails
     loudly if the mix or the service times ever move enough to change it."""
     counts: Counter = Counter()
     for seed in range(4):
@@ -257,7 +261,8 @@ def test_where_the_saving_actually_comes_from(params, batching):
 
 
 def test_the_press_does_not_hold_itself_idle_waiting_for_a_fuller_batch(batching):
-    """It groups what is already waiting and starts. Holding a station idle in
+    """
+    It groups what is already waiting and starts. Holding a station idle in
     the hope that a third sandwich turns up is a different policy, and a
     riskier one: it trades a certain delay for a possible saving."""
     at_s = batching.meta.start_s + 3600                     # 08:00, two baristas
@@ -274,13 +279,14 @@ def test_the_press_does_not_hold_itself_idle_waiting_for_a_fuller_batch(batching
 
 
 def test_three_sandwiches_on_one_ticket_share_an_oven_cycle(batching):
-    """This used to record the opposite, as a known limit of the dispatcher: an
+    """
+    This used to record the opposite, as a known limit of the dispatcher: an
     order's own items went through a station in sequence, so three sandwiches on
     one ticket took three cycles and a large order was modelled pessimistically.
 
     They no longer do. An item's machine work is submitted without holding the
     barista, so all three reach the dispatcher together and the press runs as
-    many at once as it holds -- two here, so three sandwiches take two cycles
+    many at once as it holds (two here), so three sandwiches take two cycles
     rather than three. That is what the cafe is doing when food comes back
     slower than drinks: waiting to fill the tray."""
     at_s = 11 * 3600
@@ -307,7 +313,8 @@ def test_three_sandwiches_on_one_ticket_share_an_oven_cycle(batching):
 
 
 def test_the_scheduler_lives_in_core(request):
-    """Ground rule 2: if the app and the simulator could disagree about what to
+    """
+    Ground rule 2: if the app and the simulator could disagree about what to
     make next, the logic is in the wrong place. `core` must stay importable
     without the simulator."""
     import ast
@@ -432,7 +439,8 @@ def test_reordering_never_delays_an_order_past_the_guard(params, reordering):
 
 
 def test_reordering_has_no_scope_on_this_cafes_demand(reordering):
-    """Recorded because it is the answer, not because it is a happy one.
+    """
+    Recorded because it is the answer, not because it is a happy one.
 
     A reordering policy can only act on a station with a queue to permute. The
     wand is idle almost every time it is asked for work, so there is nothing to

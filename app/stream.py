@@ -1,13 +1,13 @@
-"""Server-sent events.
-
-The barista view is the reason this app exists at all, and it is watched on an
-iPad on cafe wifi. Two rules follow, both of which have to hold before M2.5
-puts this behind a proxy:
-
-  * Nothing is broadcast until it is committed. The stream announces facts.
-  * A reconnecting client resyncs whole state (`GET /queue`) and only then
-    resumes the stream from Last-Event-ID; a resumed stream alone would leave a
-    client that missed events showing a queue that is quietly wrong.
+"""
+This is the server-sent events layer. The barista view is the reason the app
+exists at all and it is watched on an iPad on cafe wifi, so two rules hold here
+and both had to hold before this went behind a proxy. Nothing is broadcast
+until it is committed, because the stream announces facts rather than
+intentions. And a reconnecting client resyncs whole state through GET /queue
+before it resumes the stream from Last-Event-ID, because a resumed stream alone
+would leave a client that missed events showing a queue that is quietly wrong,
+which is worse than one that is obviously stale. Imported by the routes, which
+publish through the broadcaster.
 """
 
 from __future__ import annotations

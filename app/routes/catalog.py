@@ -1,13 +1,12 @@
-"""Writes to the menu: what the cafe has run out of.
-
-Availability is an operational fact, not a modelling one. The bagels go at
+"""
+This handles writes to the menu, meaning what the cafe has run out of.
+Availability is an operational fact and not a modelling one: the bagels go at
 eleven and come back tomorrow, and neither event should involve a redeploy, so
-it lives on the projection row rather than in params, and `seed_menu` leaves it
-alone while rewriting everything else.
-
-The simulator knows nothing about it, deliberately. A replay is reproducing a
-day that already happened; refusing one of its orders because the counter is out
-of bagels today would make history depend on the present.
+it lives on the projection row rather than in params and seed_menu leaves it
+alone while rewriting everything else. The simulator knows nothing about it,
+deliberately, because a replay is reproducing a day that already happened and
+refusing one of its orders because the counter is out of bagels today would
+make history depend on the present. Mounted by app/main.py.
 """
 
 from __future__ import annotations
@@ -45,7 +44,8 @@ def unavailable(session: Session, names: list[str]) -> list[str]:
 async def set_availability(
     name: str, body: AvailabilityIn, staff: str = Depends(require_staff)
 ) -> dict:
-    """Mark an item sold out, or back on.
+    """
+    Mark an item sold out, or back on.
 
     A PATCH rather than a PUT: everything else about a menu item is projected
     from params and is not the caller's to replace.

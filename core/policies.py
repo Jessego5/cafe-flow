@@ -1,16 +1,14 @@
-"""What to make next, and what to make together.
-
-The scheduler lives in `core/` for the same reason prices and legal state moves
-do: if the app and the simulator could ever disagree about which two sandwiches
-go in the press together, the logic is in the wrong place (ground rule 2).
-
-That is also what makes a finding executable. An arm that measures a policy in
-the simulator and a bar running that policy on real orders are the same code
-selected by the same config key, not two implementations that have to be kept
-in step by hand.
-
-Whether two items *may* run together is a fact about the station and lives in
-`core.capacity`. This module only chooses among the legal options.
+"""
+This decides what to make next and what to make together. The scheduler lives
+in core/ for the same reason prices and legal state moves do: if the app and
+the simulator could ever disagree about which two sandwiches go in the press
+together, the logic is in the wrong place. That is also what makes a finding
+executable rather than merely reported, because an arm that measures a policy
+in the simulator and a bar running that policy on real orders are the same code
+selected by the same config key, not two implementations somebody has to keep
+in step by hand. Whether two items *may* run together at all is a fact about
+the station and lives in core.capacity; this module only chooses among the
+options that are already legal. Imported by app/ and sim/.
 """
 
 from __future__ import annotations
@@ -35,7 +33,8 @@ __all__ = [
 
 @runtime_checkable
 class Queued(Protocol):
-    """Anything waiting its turn at a station.
+    """
+    Anything waiting its turn at a station.
 
     The simulator's carrier holds a SimPy event; the app's holds a database
     row. Neither belongs here, so the policy sees only the two things it needs
@@ -55,7 +54,8 @@ class Policy(Protocol):
         """Pick the work to run next. Never empty when `pending` is not."""
 
     def reset(self) -> None:
-        """Forget anything carried between runs. Policies that remember what
+        """
+        Forget anything carried between runs. Policies that remember what
         they last made need this so laying out a plan twice gives the same
         plan twice."""
 
@@ -78,7 +78,8 @@ class FIFOPolicy:
 
 
 class BatchPolicy:
-    """Group compatible work at the head of the queue.
+    """
+    Group compatible work at the head of the queue.
 
     Named `batch_milk` in the plan, after the case it was written for: same-milk
     lattes steamed in one pitcher rather than one at a time. The rule is
@@ -137,7 +138,8 @@ class BatchPolicy:
 
 
 class BoundedReorderPolicy(BatchPolicy):
-    """Batch, and prefer work that avoids a changeover, though only within a
+    """
+    Batch, and prefer work that avoids a changeover, though only within a
     bounded window, and never at the cost of leaving someone stranded.
 
     Switching the wand from oat to whole means purging and wiping; running the
@@ -198,8 +200,8 @@ class BoundedReorderPolicy(BatchPolicy):
         return pending[0]
 
 
-#: Config name -> policy. A name with no implementation must fail at load
-#: rather than quietly fall back to FIFO and report someone else's numbers.
+# Config name -> policy. A name with no implementation must fail at load
+# rather than quietly fall back to FIFO and report someone else's numbers.
 POLICIES: dict[str, type] = {
     FIFOPolicy.name: FIFOPolicy,
     BatchPolicy.name: BatchPolicy,
@@ -221,7 +223,8 @@ def make_policy(params: Params) -> Policy:
 def plan_batches(
     policy: Policy, station: str, pending: Sequence[Queued], now: float
 ) -> list[list[Queued]]:
-    """Everything currently queued, in the order and groups it would be run.
+    """
+    Everything currently queued, in the order and groups it would be run.
 
     The simulator only ever needs the next batch, because the queue changes
     while it works. A bar display wants the whole plan, so the barista can see

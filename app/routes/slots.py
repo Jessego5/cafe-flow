@@ -1,7 +1,8 @@
-"""Pickup windows and their bottleneck-second budgets.
-
-Built at M2 so the capacity accounting is exercised end to end, but inert until
-`params.slots.enabled` turns on at M10, and only if the M7 findings support it.
+"""
+This serves the pickup windows and their bottleneck-second budgets. It was
+built early so the capacity accounting is exercised end to end, but it stays
+inert until params.slots.enabled turns on, and that only happens if the
+findings support it. Mounted by app/main.py.
 """
 
 from __future__ import annotations

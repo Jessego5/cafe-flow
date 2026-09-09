@@ -1,9 +1,10 @@
-"""The two readings of the espresso bar, and the machinery that compares them.
-
-The machine photographed at the cafe carries a Schaerer logo. If it is a
-super-automatic then there is no pitcher, nothing batches, and the separate
-wand and group head are one serialised resource. Both readings are assumed
-until the model number is confirmed, so both have to run.
+"""
+These are the tests for the two readings of the espresso bar and the machinery
+that compares them. The machine photographed at the cafe carries a Schaerer
+logo, and if it is a super-automatic then there is no pitcher, nothing batches,
+and the separate wand and group head are one serialised resource. Both readings
+stay assumed until the model number is confirmed, so both have to run. Run them
+with pytest.
 """
 
 from __future__ import annotations
@@ -42,7 +43,8 @@ def test_the_overlay_replaces_the_espresso_bar(superauto):
 
 
 def test_nothing_batches_without_a_pitcher(superauto):
-    """The plan calls milk batching the core throughput mechanism. On a
+    """
+    The plan calls milk batching the core throughput mechanism. On a
     super-automatic there is no pitcher to fill once and pour four times."""
     model = StationCapacityModel(superauto)
     assert superauto.bottleneck.batch_key is None
@@ -53,7 +55,8 @@ def test_nothing_batches_without_a_pitcher(superauto):
 
 
 def test_an_iced_latte_still_needs_the_machine(manual, superauto):
-    """The correction the photograph forces: iced drinks skip the frothing, not
+    """
+    The correction the photograph forces: iced drinks skip the frothing, not
     the shot. Under the manual reading they cost the bottleneck nothing."""
     def cost(params, variant):
         model = StationCapacityModel(params)
@@ -108,7 +111,8 @@ def test_both_arms_run_and_conserve():
 
 
 def test_the_arms_face_identical_demand():
-    """Same seed, same arrivals: the two arms differ only in the bar, so any
+    """
+    Same seed, same arrivals: the two arms differ only in the bar, so any
     difference between them is the bar."""
     manual = run_arm(ARMS["manual_bar"], [3])
     superauto = run_arm(ARMS["superauto"], [3])
@@ -116,7 +120,8 @@ def test_the_arms_face_identical_demand():
 
 
 def test_the_espresso_bar_is_not_the_constraint_either_way(manual, superauto):
-    """Recorded because it is the answer to the question the overlay was built
+    """
+    Recorded because it is the answer to the question the overlay was built
     to ask, and because it should fail loudly if demand or service times ever
     move enough to change it."""
     from sim.engine import run
@@ -150,7 +155,8 @@ def test_a_swept_value_goes_through_the_normal_merge():
 
 
 def test_a_swept_value_is_marked_as_an_assumption():
-    """A sweep must not launder a guess into a citation: the published press
+    """
+    A sweep must not launder a guess into a citation: the published press
     time stops being published the moment something else is put in its place."""
     from core.params import load_params, overlay_for
 
@@ -185,7 +191,8 @@ def test_a_sweep_runs_every_arm_at_every_value():
 
 
 def test_more_people_ordering_ahead_means_a_shorter_line(tmp_path):
-    """The mechanism the plan cares about, swept rather than asserted at a
+    """
+    The mechanism the plan cares about, swept rather than asserted at a
     single point.
 
     This asserted `lost_fraction` falling until the arms were moved onto the

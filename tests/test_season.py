@@ -1,8 +1,9 @@
-"""The hot/iced split across a Madison academic year.
-
-Done when: every month overlay loads on top of the observed config, the split
-stays a distribution, it moves the right way with the temperature, and it stays
-`assumed` -- because nobody has counted cups at the shelf in either season.
+"""
+These are the tests for the hot/iced split across a Madison academic year, and
+they are done when every month overlay loads on top of the observed config, the
+split stays a distribution, it moves the right way with the temperature, and it
+stays marked assumed, since nobody has counted cups at the shelf in either
+season. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ def test_every_month_loads_and_stays_a_distribution(month):
 
 @pytest.mark.parametrize("month", sorted(NORMAL_HIGH_F))
 def test_a_constructed_split_is_never_observed(month):
-    """The curve is interpolated between two anchors nobody counted. Marking it
+    """
+    The curve is interpolated between two anchors nobody counted. Marking it
     `observed` would be the exact failure the provenance rules exist to catch."""
     params = load_params(*OBSERVED, f"params/season/{month}.yaml")
     assert params.source_of("mix.serve.iced") == "assumed"
@@ -47,7 +49,8 @@ def test_the_curve_is_clamped_rather_than_extrapolated():
 
 
 def test_the_files_on_disk_match_the_generator():
-    """`params/season/*.yaml` is written by the tool, so a hand edit that drifts
+    """
+    `params/season/*.yaml` is written by the tool, so a hand edit that drifts
     from the normals it claims to come from should show up here."""
     for month, high_f in NORMAL_HIGH_F.items():
         params = load_params(*OBSERVED, f"params/season/{month}.yaml")
@@ -55,7 +58,8 @@ def test_the_files_on_disk_match_the_generator():
 
 
 def test_more_iced_never_moves_the_constraint():
-    """The split governs the steam wand, and the wand is not what gates this
+    """
+    The split governs the steam wand, and the wand is not what gates this
     cafe. If a month ever puts it above the register, that is a finding and this
     test should fail rather than be updated."""
     from analysis.metrics import station_utilisation

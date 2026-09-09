@@ -1,5 +1,5 @@
 # Arm: the same adoption, ordering one class block ahead regardless of the line.
-# The control for adaptive_release.yaml -- same customers, same targets, no idea
+# The control for adaptive_release.yaml: same customers, same targets, no idea
 # what the queue is doing when their order lands in it.
 meta:
   scenario: fixed_release

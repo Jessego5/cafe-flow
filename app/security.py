@@ -1,14 +1,14 @@
-"""Password hashing and session cookies, in the standard library.
-
-`passlib[bcrypt]` is the usual answer and would be fine. It is not used here
-because `requirements.txt` says out loud that it is kept to six pure-Python
-packages so the image stays small, and bcrypt is a native build. `scrypt` has
-been in `hashlib` since 3.6, is memory-hard, and is a sound choice for this;
-taking the dependency would buy familiarity rather than security.
-
-Everything here is small enough to read in one sitting, which is the point. The
-failure this guards against is not a clever attack on the KDF -- it is a bar
-screen on a public URL with no login at all.
+"""
+This does password hashing and session cookies, using nothing but the standard
+library. passlib[bcrypt] is the usual answer and would be fine, but
+requirements.txt says out loud that the app is kept to six pure-Python packages
+so the image stays small, and bcrypt is a native build; scrypt has been in
+hashlib since 3.6, is memory-hard and is a sound choice here, so taking the
+dependency would buy familiarity rather than security. Everything here is small
+enough to read in one sitting, which is the point, because the failure this
+guards against is not a clever attack on the key derivation function but a bar
+screen sitting on a public URL with no login at all. Imported by
+app/routes/auth.py and app/create_staff.py.
 """
 
 from __future__ import annotations
@@ -34,23 +34,24 @@ __all__ = [
 log = logging.getLogger("cafe.security")
 
 SESSION_COOKIE = "cafe_session"
-#: A shift is eight hours; a session that outlives the day it was opened on is a
-#: laptop left logged in behind a counter.
+# A shift is eight hours; a session that outlives the day it was opened on is a
+# laptop left logged in behind a counter.
 SESSION_MAX_AGE_S = 12 * 60 * 60
 
-#: scrypt at the parameters the docs suggest for interactive logins. n is the
-#: cost; raising it is a one-line change and old hashes keep working, because
-#: every stored hash carries the parameters it was made with.
+# scrypt at the parameters the docs suggest for interactive logins. n is the
+# cost; raising it is a one-line change and old hashes keep working, because
+# every stored hash carries the parameters it was made with.
 _N, _R, _P, _DKLEN = 2**14, 8, 1, 32
 
 _key: bytes | None = None
 
 
 def session_key() -> bytes:
-    """The secret sessions are signed with.
+    """
+    The secret sessions are signed with.
 
     From `CAFE_SECRET_KEY`. Without it a random one is generated and every
-    session dies at the next restart -- which is survivable for a demo and said
+    session dies at the next restart, which is survivable for a demo and said
     out loud rather than defaulted to something predictable, because a signing
     key with a default is not a signing key.
     """
@@ -78,7 +79,8 @@ def _unb64(text: str) -> bytes:
 
 
 def hash_password(plain: str) -> str:
-    """`scrypt$n$r$p$salt$hash`, carrying its own parameters.
+    """
+    `scrypt$n$r$p$salt$hash`, carrying its own parameters.
 
     Stored with the cost it was made at, so raising the cost later does not
     invalidate anybody's password.
@@ -111,7 +113,8 @@ def sign_session(username: str, *, issued_at: float | None = None) -> str:
 
 
 def read_session(cookie: str | None, *, now: float | None = None) -> str | None:
-    """The username a cookie proves, or None.
+    """
+    The username a cookie proves, or None.
 
     None for anything wrong: no cookie, a bad signature, an expired one, or a
     shape that does not parse. The caller has one question and gets one answer,

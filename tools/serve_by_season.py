@@ -1,30 +1,23 @@
-"""Turn Madison's climate normals into `mix.serve`, one overlay a month.
-
-`mix.serve` is the hot/iced split, and until now it was one number that stood
-for the whole year. It cannot be. Madison runs from a 74F September to a 29F
-January inside a single academic year, and an iced latte never touches the
-steam wand, so the split decides how much of the menu milk batching can reach
-at all. Carrying one figure means every run outside the month it was formed in
-is quietly wrong about the bar.
-
-This does NOT make the split observed. It makes an assumption that was hidden
-in one number explicit in nine, and gives each one a temperature to argue with.
-Both ends of the line are still assumed:
-
-  * The warm end is an impression at the handoff shelf during the observation
-    window, not a count. It is the better anchor of the two, because it is at
-    least this cafe.
-  * The cold end is the year-round cold share the chains report nationally.
-    Cold drinks stopped being seasonal some years ago; what survives is a much
-    smaller swing than the temperature range suggests. It is a national figure
-    and not this cafe's, which is exactly why the floor is set high.
-
-Linear in the monthly normal high is a choice, not a finding. Nothing here is
-fitted to anything, and one count at the shelf in cold weather would replace
-the whole construction with two measured points.
-
-    python -m tools.serve_by_season
-
+"""
+This turns Madison's climate normals into mix.serve, one overlay a month.
+mix.serve is the hot/iced split, and it used to be one number standing for the
+whole year, which it cannot be: Madison runs from a 74F September to a 29F
+January inside a single academic year, an iced latte never touches the steam
+wand, and so the split decides how much of the menu milk batching can reach at
+all, meaning one figure leaves every run outside the month it was formed in
+quietly wrong about the bar. This does not make the split observed. It makes an
+assumption that was hidden in one number explicit in nine and gives each one a
+temperature to argue with, and both ends of the line are still assumed: the
+warm end is an impression at the handoff shelf during the observation window
+rather than a count, which is still the better anchor of the two because it is
+at least this cafe, while the cold end is the year-round cold share the chains
+report nationally, because cold drinks stopped being seasonal some years ago
+and what survives is a much smaller swing than the temperature range suggests,
+a national figure and not this cafe's, which is exactly why the floor is set
+high. Linear in the monthly normal high is a choice and not a finding, nothing
+here is fitted to anything, and one count at the shelf in cold weather would
+replace the whole construction with two measured points. Run it with python -m
+tools.serve_by_season.
 """
 
 from __future__ import annotations
@@ -34,9 +27,9 @@ from pathlib import Path
 
 import yaml
 
-#: Normal daily maximum temperature, degrees F, Dane County Regional Airport,
-#: NOAA 1991-2020. Only the months a semester runs through are written; the
-#: cafe keeps summer hours the room schedule does not cover.
+# Normal daily maximum temperature, degrees F, Dane County Regional Airport,
+# NOAA 1991-2020. Only the months a semester runs through are written; the
+# cafe keeps summer hours the room schedule does not cover.
 NORMAL_HIGH_F: dict[str, float] = {
     "september": 74.4,
     "october": 60.6,
@@ -49,15 +42,16 @@ NORMAL_HIGH_F: dict[str, float] = {
     "may": 70.2,
 }
 
-#: The two anchors, and the temperatures they sit at. Between them the iced
-#: share moves linearly; outside them it is clamped, because neither anchor was
-#: measured far enough out to extrapolate from.
+# The two anchors, and the temperatures they sit at. Between them the iced
+# share moves linearly; outside them it is clamped, because neither anchor was
+# measured far enough out to extrapolate from.
 WARM_F, WARM_ICED = 74.0, 0.80
 COLD_F, COLD_ICED = 30.0, 0.60
 
 
 def iced_share(high_f: float) -> float:
-    """The assumed iced share at a monthly normal high, rounded to a percent.
+    """
+    The assumed iced share at a monthly normal high, rounded to a percent.
 
     Rounded because a third decimal on a number nobody counted reads as
     precision that is not there.

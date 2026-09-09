@@ -1,8 +1,9 @@
-"""The simulator's side of scheduling.
-
-The decisions live in `core.policies` so the app runs the same scheduler on
-real orders. What stays here is the waiting: a queued item in the simulator
-carries a SimPy event that fires when its station is done with it.
+"""
+This is the simulator's side of scheduling, and it is deliberately thin. The
+decisions all live in core.policies so that the app runs the same scheduler on
+real orders; what stays here is the waiting, where a queued item carries a
+SimPy event that fires when its station is done with it. Imported by
+sim/engine.py.
 """
 
 from __future__ import annotations

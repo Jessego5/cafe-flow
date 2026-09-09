@@ -1,37 +1,26 @@
-"""Demand as the timetable's shape with the queue's level.
-
-Two routes to the same arrival curve had been fitted separately and disagreed
-by a factor of two on the day's volume, which is what happens when each knows
-something the other does not.
-
-`sim/fit_profile.py` takes twelve free rates and bends them until the simulated
-queue matches the counted one. Twelve parameters against twelve observations is
-no degrees of freedom at all: it fits the sampling noise as faithfully as the
-signal, and some of those bins rest on two readings. It also learns nothing
-about the hours nobody watched, which it leaves at the flat value the search
-started from, including the whole morning.
-
-`params/schedule/*.yaml` takes the registrar's room schedule, which is a real
-measurement of when several hundred people are released and cannot sawtooth.
-But it says demand between classes is nearly zero, and a coffee shop does not
-empty at half past one.
-
-So: keep the timetable's shape, and fit only what the schedule cannot know.
-
-    rate(t) = capture(t) * released(t) + background
-
-`released(t)` is the schedule, smeared by the walk over. Three numbers are
-fitted against the counted queue:
-
-    c0          the share of a released class that buys, around noon
-    k           how fast that share decays through the afternoon, per hour
-    background  everyone not walking out of a class in this building
-
-Three parameters against twelve observations, and the structure carries the
-rest. It reaches nearly the free fit's accuracy without the freedom to invent a
-trough because somebody happened to glance twice during a lull.
-
-    python -m sim.fit_hybrid
+"""
+This fits demand as the timetable's shape carrying the queue's level, because
+the two routes to the same arrival curve had been fitted separately and
+disagreed by a factor of two on the day's volume, which is what happens when
+each of them knows something the other does not. The free fit in
+sim/fit_profile.py bends twelve rates until the simulated queue matches the
+counted one, and twelve parameters against twelve observations is no degrees of
+freedom at all: it fits the sampling noise as faithfully as the signal, some of
+those bins rest on two readings, and it learns nothing about the hours nobody
+watched, which it leaves at the flat value the search started from, including
+the whole morning. The registrar's room schedule in params/schedule/*.yaml is
+the opposite, a real measurement of when several hundred people are released
+that cannot sawtooth, except that it says demand between classes is nearly zero
+and a coffee shop does not empty at half past one. So this keeps the
+timetable's shape and fits only what the schedule cannot know, as
+rate(t) = capture(t) * released(t) + background, where released(t) is the
+schedule smeared by the walk over and three numbers are fitted against the
+counted queue: c0, the share of a released class that buys, around noon; k, how
+fast that share decays through the afternoon, per hour; and background,
+everyone not walking out of a class in this building. Three parameters against
+twelve observations, with the structure carrying the rest, reaches nearly the
+free fit's accuracy without the freedom to invent a trough because somebody
+happened to glance twice during a lull. Run it with python -m sim.fit_hybrid.
 """
 
 from __future__ import annotations
@@ -52,10 +41,10 @@ __all__ = ["released_by_bin", "profile_for", "fit_hybrid"]
 
 SECONDS_PER_MINUTE = 60.0
 
-#: Widening this was tried and made the fit worse at every value from 6 minutes
-#: to 30 (MAE 1.04 -> 1.71). The counted peaks are sharp, so the arrivals behind
-#: them are too: people come straight over rather than drifting in. It stays the
-#: config's own `arrivals.sigma_min`.
+# Widening this was tried and made the fit worse at every value from 6 minutes
+# to 30 (MAE 1.04 -> 1.71). The counted peaks are sharp, so the arrivals behind
+# them are too: people come straight over rather than drifting in. It stays the
+# config's own `arrivals.sigma_min`.
 USE_CONFIG_SIGMA = True
 
 
@@ -66,7 +55,8 @@ def _normal_cdf(x: float, sigma: float) -> float:
 def released_by_bin(
     params: Params, bins: list[int], bin_minutes: float
 ) -> dict[int, float]:
-    """Students let out into each bin, spread by how long the walk takes.
+    """
+    Students let out into each bin, spread by how long the walk takes.
 
     A class ending at 12:15 does not deliver its people to the counter at
     12:15. `offset_min` is the walk and `sigma_min` the spread around it, so a
@@ -94,7 +84,8 @@ def profile_for(
     k: float,
     background: float,
 ) -> dict:
-    """The overlay these three numbers imply.
+    """
+    The overlay these three numbers imply.
 
     Capture is flat until noon and decays after it. A student leaving at 15:45
     is going home; one leaving at 12:15 is going to lunch, and the fit only
@@ -126,7 +117,8 @@ def fit_hybrid(
     bin_minutes: float = 30.0,
     seeds: list[int] | None = None,
 ) -> tuple[dict, dict, list[tuple[int, float, float]]]:
-    """Search for the three numbers, coarsely and then locally.
+    """
+    Search for the three numbers, coarsely and then locally.
 
     A grid first because the surface is cheap and the search is three-wide;
     then single steps from the winner, which is all the resolution twelve
@@ -187,7 +179,7 @@ HEADER = """\
 #
 # The background is the finding. base.yaml assumed 8 an hour; the fit wants
 # {bg:.0f}, so most of the demand between classes is not this building's
-# students at all -- which is also why the timetable alone emptied the cafe at
+# students at all, which is also why the timetable alone emptied the cafe at
 # half past one and the counted queue did not.
 #
 # Mean absolute error {mae:.2f} people across the counted bins.

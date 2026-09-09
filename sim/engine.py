@@ -1,14 +1,15 @@
-"""The discrete-event harness, built on the same `core/` the app uses.
-
-Virtual time: a simulated day runs in milliseconds because the clock jumps from
-event to event. That is the whole reason the experiments cannot go through HTTP.
-
-The modelling decision that matters most is here. A drink needs **a barista and
-a station**. With two baristas and one steam wand, the wand contends and the
-baristas block; in a small cafe the same human takes the order and pulls the
-shot, so the register competes for barista time even when it is not the nominal
-bottleneck. Modelling stations as independent parallel servers would invalidate
-every result the project produces.
+"""
+This is the discrete-event harness, built on the same core/ the app uses. It
+runs in virtual time, so a simulated day takes milliseconds because the clock
+jumps from event to event, and that is the whole reason the experiments cannot
+go through HTTP. The modelling decision that matters most is here: a drink
+needs a barista and a station, both. With two baristas and one steam wand the
+wand contends and the baristas block, and in a small cafe the same human takes
+the order and pulls the shot, so the register competes for barista time even
+when it is not the nominal bottleneck. Modelling stations as independent
+parallel servers would invalidate every result the project produces. Run it
+with python -m sim.engine for a single day, or import run_day from the
+experiment and forecast runners.
 """
 
 from __future__ import annotations
@@ -42,7 +43,8 @@ REGISTER = "register"
 
 
 class Barista:
-    """One worker.
+    """
+    One worker.
 
     A barista is held for the whole of a piece of work and seizes stations from
     inside that hold, so they are never parallel with themselves. Baristas come
@@ -78,7 +80,8 @@ class Barista:
 
 @dataclass
 class Cafe:
-    """Resources, staffing, and the service process.
+    """
+    Resources, staffing, and the service process.
 
     Everything it knows about drinks it asks `core/` for: what work an item
     implies, how long it takes, and which state moves are legal.
@@ -123,7 +126,8 @@ class Cafe:
     # ---- staffing ------------------------------------------------------
 
     def staffing(self):
-        """Track the staffing plan by holding spare workers off the floor.
+        """
+        Track the staffing plan by holding spare workers off the floor.
 
         Off-shift baristas are taken out of the pool the moment they are free;
         nobody is pulled off a drink they are already making.
@@ -161,7 +165,8 @@ class Cafe:
         label: str,
         **payload: object,
     ) -> None:
-        """Record a span of station work.
+        """
+        Record a span of station work.
 
         `attended` is the part that matters downstream: a press cycle occupies
         the press but not a person, so machine utilisation and crew utilisation
@@ -204,7 +209,8 @@ class Cafe:
         return entry
 
     def station_server(self, name: str):
-        """Run one batching station for the day.
+        """
+        Run one batching station for the day.
 
         Takes a person first and the machine second, like everything else here,
         and asks the policy what to run together. `core.capacity` prices the
@@ -270,7 +276,8 @@ class Cafe:
         duration_s: float,
         **extra: object,
     ) -> None:
-        """One event for the whole batch, keyed on its first item so the start
+        """
+        One event for the whole batch, keyed on its first item so the start
         and end pair up."""
         head = batch[0]
         self.log.emit(
@@ -295,7 +302,8 @@ class Cafe:
         )
 
     def unattended(self, task: Task, order: Order, item: Item, starter: "Barista"):
-        """A machine cycle that needs a slot but nobody to watch it.
+        """
+        A machine cycle that needs a slot but nobody to watch it.
 
         Run as its own process so the barista is free the whole time. No
         try/finally: a generator that yields from `finally` cannot be closed,
@@ -312,7 +320,8 @@ class Cafe:
             )
 
     def make(self, order: Order, barista: Barista):
-        """Work the order's items, overlapping whatever a person is not needed for.
+        """
+        Work the order's items, overlapping whatever a person is not needed for.
 
         A barista does not stand and watch an extraction. They start the shot,
         steam the milk while it pulls, and pour when both are done, so a latte
@@ -391,7 +400,8 @@ class Cafe:
         return barista
 
     def item_ready(self, order: Order, item: Item, started_s: float) -> None:
-        """This item is on the shelf, whatever the rest of the order is doing.
+        """
+        This item is on the shelf, whatever the rest of the order is doing.
 
         Watched behaviour: a drink goes out when it is poured and the sandwich
         follows when the oven is done. The order is not ready until its last
@@ -455,7 +465,8 @@ class Cafe:
         yield from self.hand_over(order, arrival)
 
     def hand_over(self, order: Order, arrival: Arrival):
-        """Getting the drink to the person, or discovering they have gone.
+        """
+        Getting the drink to the person, or discovering they have gone.
 
         Someone who ordered ahead collects at the time they asked for, so a
         pre-order made early sits on the shelf rather than being handed to
@@ -536,7 +547,8 @@ class Cafe:
         yield self.env.process(self.serve(order, arrival))
 
     def hold_until_release(self, arrival: Arrival):
-        """Keep a paid pre-order back, and join the queue at the last safe moment.
+        """
+        Keep a paid pre-order back, and join the queue at the last safe moment.
 
         The customer chose a time and paid; nothing has reached the bar yet. The
         quote that got them here came off a forecast, but by the time it matters
@@ -564,7 +576,8 @@ class Cafe:
             yield self.env.timeout(min(poll, wanted - self.env.now))
 
     def defers(self, arrival: Arrival) -> bool:
-        """Does this customer see the wait and decide to come back later?
+        """
+        Does this customer see the wait and decide to come back later?
 
         Only walk-ups, only once, and only if the cafe is showing a number at
         all. Unlike a balk this is deferred revenue rather than lost revenue,
@@ -598,7 +611,8 @@ class Cafe:
         return True
 
     def nominal_wait_per_person(self) -> float:
-        """Cached per staffing level: it walks the whole menu to work out what
+        """
+        Cached per staffing level: it walks the whole menu to work out what
         an average order is worth."""
         baristas = self.params.baristas_at(self.env.now)
         if baristas not in self._nominal:
@@ -606,7 +620,8 @@ class Cafe:
         return self._nominal[baristas]
 
     def take_the_order(self, order: Order, arrival: Arrival, register_task: Task):
-        """A walk-up at the till: waiting for a free barista, then ordering.
+        """
+        A walk-up at the till: waiting for a free barista, then ordering.
 
         Patience is spent here and nowhere after it. Reach the register and you
         stay, because you have paid and the drink is being made in front of you.
@@ -639,7 +654,8 @@ class Cafe:
             self.crew.put(barista)
 
     def renege(self, order: Order, arrival: Arrival) -> None:
-        """A walk-up who gave up in the line before ever reaching the till.
+        """
+        A walk-up who gave up in the line before ever reaching the till.
 
         Distinct from balking, which is a decision taken on arrival by looking
         at the queue. This one joined it and then ran out of time. The cafe
@@ -655,7 +671,8 @@ class Cafe:
         )
 
     def balks(self, arrival: Arrival, order: Order) -> bool:
-        """Does this customer look at the line and leave?
+        """
+        Does this customer look at the line and leave?
 
         Someone who ordered ahead has already committed and never balks, which
         is the whole of the pre-order case. The estimate is recorded on the
@@ -698,7 +715,8 @@ class RunResult:
     until_s: float
 
     def census(self) -> dict[str, int]:
-        """The conservation identity, as counts.
+        """
+        The conservation identity, as counts.
 
         placed == picked_up + balked + abandoned + cancelled + in_flight
         """
@@ -740,7 +758,8 @@ def run(
     until_s: float | None = None,
     arrivals: list[Arrival] | None = None,
 ) -> RunResult:
-    """Simulate one day.
+    """
+    Simulate one day.
 
     One generator, created here and passed down, is the whole of the randomness
     (ground rule 5): same params and same seed give a byte-identical log.

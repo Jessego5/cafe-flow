@@ -1,7 +1,7 @@
 # Wednesday in Morgridge Hall, from the Fall 2026 room schedule.
 #
 # Written by `python -m tools.schedule_to_blocks`. Every end time and headcount
-# here is read from the registrar's export rather than guessed -- which is the
+# here is read from the registrar's export rather than guessed, which is the
 # whole point, because the invented blocks it replaces put the day's peak an
 # hour early and stopped at 12:50 while the cafe stays open until 16:30.
 #

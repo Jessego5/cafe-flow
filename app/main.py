@@ -1,11 +1,10 @@
-"""FastAPI application.
-
-One process serves the API and the three built frontends, so there is no CORS
-configuration to get wrong and no second origin to keep in step.
-
-Paths: the API keeps the unprefixed names the spec fixes (`/menu`, `/orders`,
-`/queue`, `/display`, `/slots`, `/stream`); the HTML views live at `/`, `/bar`
-and `/pickup`.
+"""
+This is the FastAPI application, and one process serves both the API and the
+three built frontends, so there is no CORS configuration to get wrong and no
+second origin to keep in step. The API keeps the unprefixed names the spec
+fixes, /menu and /orders and /queue and /display and /slots and /stream, while
+the HTML views live at /, /bar and /pickup. Run it with python -m uvicorn
+app.main:app, after cd web && npm run build has put the views in place.
 """
 
 from __future__ import annotations
@@ -45,11 +44,12 @@ VIEWS = {
 
 
 def _log_to_the_console() -> None:
-    """Make the app's own logs visible under uvicorn.
+    """
+    Make the app's own logs visible under uvicorn.
 
     uvicorn configures its own loggers and leaves the root one alone, so
-    everything this app says -- which configuration it booted on, whether the
-    release loop is running, when a held order fires -- went nowhere in a
+    everything this app says (which configuration it booted on, whether the
+    release loop is running, when a held order fires) went nowhere in a
     container while appearing fine in a test. A deployment whose logs cannot
     say what it came up as is one you have to guess about.
     """

@@ -1,4 +1,8 @@
-"""Response shapes shared by the routes. Presentation only, no rules."""
+"""
+These are the response shapes the routes share. Presentation only, with no
+rules of its own, so that two endpoints returning the same object cannot
+describe it differently. Imported by the other route modules.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +14,7 @@ from core.events import Event
 
 __all__ = ["order_payload", "event_payload", "PAYMENT_STUB"]
 
-#: Payment is out of scope for the research question and is not built (non-goals).
+# Payment is out of scope for the research question and is not built (non-goals).
 PAYMENT_STUB = {"status": "stubbed", "amount_due_cents": 0}
 
 

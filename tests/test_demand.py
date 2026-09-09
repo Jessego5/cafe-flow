@@ -1,7 +1,8 @@
-"""Reading a till's history into a demand model.
-
-The tests build their own transactions rather than downloading anyone's, so
-they say exactly what the answer should be and run without a network.
+"""
+These are the tests for reading a till's history into a demand model. They
+build their own transactions rather than downloading anybody's, so they can say
+exactly what the answer should be and they run without a network. Run them with
+pytest.
 """
 
 from __future__ import annotations
@@ -94,7 +95,8 @@ def test_the_mix_is_what_was_sold():
 
 
 def test_things_the_bar_does_not_make_are_dropped():
-    """A till sells mugs and bags of beans. Counting a bag of beans as an order
+    """
+    A till sells mugs and bags of beans. Counting a bag of beans as an order
     inflates the one number the whole model turns on."""
     drinks = steady(4, range(8, 9), days=1, item="latte")
     retail = steady(4, range(8, 9), days=1, item="Housewares")
@@ -145,7 +147,8 @@ def test_column_names_are_the_caller_s_business():
 
 
 def test_the_fragment_is_marked_synthetic_not_observed():
-    """A generated dataset is realistic in shape and is not a record of
+    """
+    A generated dataset is realistic in shape and is not a record of
     anything that happened, and the provenance has to say so."""
     model = build_demand_model(steady(10, range(8, 10), days=3), bin_minutes=30)
     fragment = to_params_fragment(model)

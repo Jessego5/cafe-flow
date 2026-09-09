@@ -1,9 +1,10 @@
-"""Domain objects shared by the app and the simulator.
-
-Plain dataclasses on purpose: `app/` persists them through SQLModel tables and
-`sim/` moves them through SimPy processes, and neither may add rules of its own
-(ground rule 2). Anything that decides *what a drink costs* or *what may happen
-next* lives in `core/`, not here in the data.
+"""
+These are the domain objects the app and the simulator share, and they are
+plain dataclasses on purpose. app/ persists them through SQLModel tables and
+sim/ moves them through SimPy processes, and neither may add rules of its own
+on the way, so anything that decides what a drink costs or what may happen next
+lives elsewhere in core/ and not here in the data. Imported by app/, sim/,
+analysis/ and the rest of core/.
 """
 
 from __future__ import annotations
@@ -28,7 +29,8 @@ class TaskKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Line:
-    """One thing a customer asks for, before it becomes work.
+    """
+    One thing a customer asks for, before it becomes work.
 
     `variant` is the board's "Hot or Iced". It is not a garnish: the iced build
     skips the steam wand, so it changes what the drink costs at the bottleneck.
@@ -45,7 +47,8 @@ class Line:
 
 @dataclass(frozen=True, slots=True)
 class Task:
-    """One unit of work at one station, with its resolved service time.
+    """
+    One unit of work at one station, with its resolved service time.
 
     `duration_s` is filled in by `core.menu.resolve_tasks` from the station's
     cost terms; nothing downstream recomputes it.
@@ -89,7 +92,8 @@ class Item:
 
 @dataclass(slots=True)
 class Order:
-    """A basket moving through the state machine.
+    """
+    A basket moving through the state machine.
 
     `history` accumulates the events produced by `core.states.transition`. It is
     the same append-only record the log holds, never a parallel mutable summary
@@ -137,7 +141,8 @@ class Order:
 
 @dataclass(slots=True)
 class Batch:
-    """Items a station runs together, with the cost of running them together.
+    """
+    Items a station runs together, with the cost of running them together.
 
     Formed by `sim.policies`; priced by `core.capacity`. A batch of one is a
     normal task and costs exactly what the task costs.
@@ -166,7 +171,8 @@ class Batch:
 
 @dataclass(slots=True)
 class Customer:
-    """A person, with the two tolerances that decide whether they ever order.
+    """
+    A person, with the two tolerances that decide whether they ever order.
 
     Both are drawn from `params.customers` by the simulator; the app never
     creates these.

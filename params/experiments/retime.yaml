@@ -3,7 +3,7 @@
 # Everything else in this project makes the same customers wait less. This is
 # the only lever that changes *when* they come. Somebody using arrive-by sees
 # what every slot costs, and a share of those looking at a busy one take a
-# quieter one instead -- deferred demand, not lost demand.
+# quieter one instead: deferred demand, not lost demand.
 #
 # The fraction is assumed and has to be: nobody has ever shown these customers
 # a forecast, so there is no way to know how many would move. It is swept rather

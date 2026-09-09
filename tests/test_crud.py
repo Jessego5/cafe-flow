@@ -1,8 +1,9 @@
-"""The writable edges: what the cafe has run out of, and changing your mind.
-
-Both sit over an append-only log, which is what makes the second one
-interesting: an edit that only updates the projection leaves every margin in
-`analysis/` reporting the basket the customer changed their mind about.
+"""
+These are the tests for the writable edges, meaning what the cafe has run out
+of and a customer changing their mind. Both sit over an append-only log, which
+is what makes the second one interesting: an edit that only updates the
+projection leaves every margin in analysis/ reporting the basket the customer
+changed their mind about. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -51,14 +52,16 @@ def test_the_bar_can_mark_an_item_sold_out(client):
 
 
 def test_a_hold_is_refused_now_rather_than_at_release(client):
-    """Taking money for a sandwich the cafe has run out of and discovering it an
+    """
+    Taking money for a sandwich the cafe has run out of and discovering it an
     hour later is the worst order of events available here."""
     client.patch("/menu/bacon_egg_cheese_bagel", json={"available": False})
     assert client.post("/held", json={"lines": WITH_FOOD, "wanted_at": "09:00"}).status_code == 409
 
 
 def test_a_replay_is_not_refused_for_something_todays_counter_is_out_of(client):
-    """A replay reproduces a day that already happened; making history depend on
+    """
+    A replay reproduces a day that already happened; making history depend on
     the present would break the drift check for a reason having nothing to do
     with the model."""
     client.patch("/menu/bacon_egg_cheese_bagel", json={"available": False})
@@ -71,7 +74,8 @@ def test_a_replay_is_not_refused_for_something_todays_counter_is_out_of(client):
 
 
 def test_availability_survives_a_reseed(client):
-    """seed_menu rewrites the projection from params on every boot. The bagels
+    """
+    seed_menu rewrites the projection from params on every boot. The bagels
     running out must not be undone by a restart."""
     from app.config import get_params
     from app.db import seed_menu
@@ -121,7 +125,8 @@ def test_a_basket_cannot_change_once_somebody_is_holding_the_cup(client):
 
 
 def test_the_amendment_is_in_the_log_not_only_in_the_row(client):
-    """Every margin in analysis/ is summed from events. An edit the log cannot
+    """
+    Every margin in analysis/ is summed from events. An edit the log cannot
     see is an edit the metrics report the old basket for."""
     order = place(client)
     client.patch(f"/orders/{order['order_id']}", json={"lines": WITH_FOOD})
@@ -136,7 +141,8 @@ def test_the_amendment_is_in_the_log_not_only_in_the_row(client):
 
 
 def test_metrics_count_the_amended_basket(client):
-    """The point of putting deltas in the log rather than new totals: the same
+    """
+    The point of putting deltas in the log rather than new totals: the same
     `analysis.metrics` that reads the simulator's log reads this one."""
     from analysis.metrics import balk_count_and_lost_margin
     from app.db import events_for
@@ -179,7 +185,8 @@ def test_an_empty_basket_is_not_an_amendment(client):
 
 
 def test_a_database_that_predates_a_column_still_boots(tmp_path):
-    """`create_all` creates missing tables and never missing columns, so a
+    """
+    `create_all` creates missing tables and never missing columns, so a
     schema that grew a field passes every test and a fresh container while
     refusing to start against any database that already exists.
 
@@ -225,7 +232,8 @@ def test_a_database_that_predates_a_column_still_boots(tmp_path):
 
 
 def test_a_name_reaches_the_bar_and_never_the_public_display(client):
-    """The number is what a screen strangers stand in front of shows. A wall of
+    """
+    The number is what a screen strangers stand in front of shows. A wall of
     first names is a different thing, and this is the test that keeps it one."""
     placed = client.post(
         "/orders",
@@ -257,7 +265,8 @@ def test_a_name_is_optional_and_blank_is_no_name(client):
 
 
 def test_a_name_is_whatever_somebody_says_it_is(client):
-    """Capped, not validated. Refusing a name for having an apostrophe or an
+    """
+    Capped, not validated. Refusing a name for having an apostrophe or an
     accent in it is how an app tells a person they are wrong about their own."""
     body = {"lines": LATTE, "channel": "walkup", "customer_name": "Zoë O'Brien-史"}
     assert client.post("/orders", json=body).json()["customer_name"] == "Zoë O'Brien-史"

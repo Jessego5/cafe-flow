@@ -1,8 +1,8 @@
-"""Staff login: the guard, and what it deliberately leaves open.
-
-The failure this exists for is not a clever attack. It is that `/bar` and every
-write route were reachable by anybody who found the URL, on an app that was
-about to be deployed.
+"""
+These are the tests for the staff login, covering both the guard and what it
+deliberately leaves open. The failure they exist for is not a clever attack: it
+is that /bar and every write route were reachable by anybody who found the URL,
+on an app that was about to be deployed. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -46,7 +46,8 @@ def test_a_stranger_cannot_advance_somebody_elses_order(anon, staff_account):
 
 
 def test_what_stays_open(anon, staff_account):
-    """Customers have no account and must not need one. Everything they do is
+    """
+    Customers have no account and must not need one. Everything they do is
     reachable by holding an unguessable order id, which is the same trust model
     the whole customer side runs on."""
     order = place(anon)
@@ -59,7 +60,8 @@ def test_what_stays_open(anon, staff_account):
 
 
 def test_a_customer_may_cancel_their_own_order(anon, staff_account):
-    """Refusing this would leave somebody who changed their mind with no way out
+    """
+    Refusing this would leave somebody who changed their mind with no way out
     but asking at the counter."""
     order = place(anon)
     cancelled = anon.post(

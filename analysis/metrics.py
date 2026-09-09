@@ -1,12 +1,12 @@
-"""Metrics, computed from the event log and nothing else.
-
-Ground rule 4: the event log is the only source of truth. Nothing here reads
-mutable state, and nothing here knows whether the log came from the app or the
-simulator. The two write the same schema, so the same functions answer for
-both. That is what makes the M9 drift check meaningful.
-
-This module imports `core` for the event schema and the parameters. It must
-never import `app/` or `sim/`.
+"""
+This computes the metrics, from the event log and nothing else. The log is the
+only source of truth, so nothing here reads mutable state and nothing here
+knows whether the log came from the app or from the simulator; the two write
+the same schema, so the same functions answer for both, and that is precisely
+what makes the drift check meaningful rather than a comparison of two different
+calculations. It imports core for the event schema and the parameters, and must
+never import app/ or sim/. Imported by the analysis entry points and by
+sim/client.py, which pushes the app's log through it.
 """
 
 from __future__ import annotations
@@ -76,7 +76,8 @@ def busiest_window(
     length_s: float = SECONDS_PER_HOUR,
     step_s: float = 300.0,
 ) -> Interval | None:
-    """The window in which the most orders were placed.
+    """
+    The window in which the most orders were placed.
 
     Chosen from the log rather than from the class schedule, so the same
     function finds the rush in a real day as in a simulated one.
@@ -145,7 +146,8 @@ def _channels(events: Sequence[Event]) -> dict[str, str]:
 def order_waits(
     log: Iterable[Event] | EventLog, *, to: State = State.READY
 ) -> dict[str, float]:
-    """Seconds from placing an order to it reaching `to`, per order.
+    """
+    Seconds from placing an order to it reaching `to`, per order.
 
     Orders that never got there are absent rather than zero: a wait that has
     not finished is not a short wait.
@@ -168,7 +170,8 @@ def wait_percentiles(
     window: Interval | None = None,
     to: State = State.READY,
 ) -> dict:
-    """p50/p90/p95 of the wait, optionally split by channel.
+    """
+    p50/p90/p95 of the wait, optionally split by channel.
 
     `window` filters on when the order was *placed*, so a rush is measured by
     the people who joined it rather than by when their drink happened to land.
@@ -247,7 +250,8 @@ def peak_throughput(
 
 @dataclass(frozen=True, slots=True)
 class Span:
-    """One completed piece of station work.
+    """
+    One completed piece of station work.
 
     `attended` separates the two questions the log has to answer: a press cycle
     occupies the press for four minutes but a person for none of it, so machine
@@ -291,7 +295,8 @@ def _spans(events: Sequence[Event]) -> list[Span]:
 def station_busy_seconds(
     log: Iterable[Event] | EventLog, *, window: Interval | None = None
 ) -> dict[str, float]:
-    """Seconds of work done at each station. Assembly work has no station and
+    """
+    Seconds of work done at each station. Assembly work has no station and
     is reported under `None`."""
     busy: dict[str, float] = defaultdict(float)
     for span in _spans(_events(log)):
@@ -307,7 +312,8 @@ def station_utilisation(
     *,
     window: Interval | None = None,
 ) -> dict[str, float]:
-    """Busy fraction per station, against its parallel capacity.
+    """
+    Busy fraction per station, against its parallel capacity.
 
     Capacity is resolved at the middle of the window, because a station whose
     capacity follows the staffing plan has a different ceiling at 08:00 than at
@@ -332,7 +338,8 @@ def machine_utilisation(
     *,
     window: Interval | None = None,
 ) -> dict[str, float]:
-    """Alias for `station_utilisation`, named for what it measures once
+    """
+    Alias for `station_utilisation`, named for what it measures once
     attended and unattended work are told apart."""
     return station_utilisation(log, params, window=window)
 
@@ -343,7 +350,8 @@ def crew_utilisation(
     *,
     window: Interval | None = None,
 ) -> float:
-    """Busy fraction of the whole crew.
+    """
+    Busy fraction of the whole crew.
 
     Counts attended work only. A press running on its own is not a person being
     busy, and treating it as one is what makes a shift look fuller than it is.
@@ -384,7 +392,8 @@ def balk_count_and_lost_margin(
     *,
     window: Interval | None = None,
 ) -> dict:
-    """What the queue cost, in customers and in money.
+    """
+    What the queue cost, in customers and in money.
 
     Read from the log alone: the margin behind an order is written onto the
     event when it is placed and again when it is lost, so this needs no access
@@ -450,7 +459,8 @@ def promises(log: Iterable[Event] | EventLog) -> dict[str, float]:
 def experienced_waits(
     log: Iterable[Event] | EventLog, *, to: State = State.READY
 ) -> dict[str, float]:
-    """How long each customer actually stood there.
+    """
+    How long each customer actually stood there.
 
     Not the same as placed-to-ready. Someone who ordered ahead for eleven
     o'clock and collected at eleven waited no time at all, and counting their
@@ -477,7 +487,8 @@ def promise_error(
     percentiles: Sequence[int] = DEFAULT_PERCENTILES,
     window: Interval | None = None,
 ) -> dict:
-    """Ready-at minus promised-at, signed, in seconds.
+    """
+    Ready-at minus promised-at, signed, in seconds.
 
     Negative is early. `late_fraction` is the number that matters to a
     customer: a promise kept on average but missed a third of the time is not
@@ -498,7 +509,8 @@ def promise_error(
 def batch_rate(
     log: Iterable[Event] | EventLog, *, window: Interval | None = None
 ) -> dict:
-    """How much of the batchable work was actually made in company.
+    """
+    How much of the batchable work was actually made in company.
 
     Reads the size recorded on each station run, so a station that ran one item
     when it could have held two counts against the rate. Per station, because
@@ -551,7 +563,8 @@ def fairness_gap(
     percentile: int = 95,
     window: Interval | None = None,
 ) -> dict:
-    """How much worse the queue is for the people standing in it.
+    """
+    How much worse the queue is for the people standing in it.
 
     Measured on what each customer actually experienced, so the pre-order lead
     time does not count against them. A large positive gap means ordering ahead

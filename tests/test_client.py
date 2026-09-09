@@ -1,9 +1,10 @@
-"""M9 acceptance tests: the app and the core must not have drifted.
-
-Both runtimes share `core/`, so in principle they cannot disagree about what a
-latte costs or which state moves are legal. These tests make that a fact rather
-than a hope, and, just as importantly, prove the check would notice if it
-stopped being true.
+"""
+These are the tests that say the app and the core have not drifted. Both
+runtimes share core/, so in principle they cannot disagree about what a latte
+costs or which state moves are legal; these make that a fact rather than a
+hope, and, just as importantly, prove the check would notice if it stopped
+being true by deliberately breaking the app and watching the check fail. Run
+them with pytest.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ def live(app_env):
 
 
 def test_the_app_and_the_core_agree(live):
-    """Replay a whole simulated day over HTTP and compare it to the in-process
+    """
+    Replay a whole simulated day over HTTP and compare it to the in-process
     run: prices, bottleneck costs, item lists, state paths, state counts and
     lost margin, all through the same metrics code."""
     report = drift_check(live, load_params(BASE), seed=0)
@@ -35,7 +37,8 @@ def test_the_app_and_the_core_agree(live):
 
 
 def test_the_check_would_notice_a_price_that_drifted(live, monkeypatch):
-    """A check that cannot fail proves nothing. If `app/` ever grew its own
+    """
+    A check that cannot fail proves nothing. If `app/` ever grew its own
     idea of what an order costs, this is what would catch it."""
     import app.routes.orders as orders
 
@@ -70,7 +73,8 @@ def test_the_replay_reaches_every_order(live):
 
 
 def test_a_replayed_order_is_flagged_simulated(live):
-    """`dev` and `demo` take them; `pilot` refuses them at the API. Either way
+    """
+    `dev` and `demo` take them; `pilot` refuses them at the API. Either way
     a replayed order is never mistaken for a real one."""
     import asyncio
 
@@ -116,7 +120,8 @@ def live_with_slots(app_env, tmp_path, monkeypatch):
 
 
 def test_a_slot_cannot_be_overbooked_under_concurrency(live_with_slots):
-    """The capacity check and the decrement have to be one transaction. Split
+    """
+    The capacity check and the decrement have to be one transaction. Split
     into a read and a write they interleave, and a slot with room for five
     takes twenty bookings."""
     outcome = check_slot_concurrency(live_with_slots, attempts=50)
@@ -132,7 +137,8 @@ def test_a_slot_cannot_be_overbooked_under_concurrency(live_with_slots):
 
 
 def test_the_concurrency_check_says_so_when_there_is_nothing_to_book(live):
-    """Slots are off in the base config, and a check that quietly passes
+    """
+    Slots are off in the base config, and a check that quietly passes
     against a disabled feature is worse than one that fails."""
     with pytest.raises(RuntimeError, match="slots are disabled"):
         check_slot_concurrency(live, attempts=2)

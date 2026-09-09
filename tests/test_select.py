@@ -1,8 +1,9 @@
-"""Choosing a scheduler for whatever operation the config describes.
-
-This is the piece that makes the project a tool rather than one cafe's answer,
-so most of these tests are about the two ways it refuses: it will not switch on
-noise, and it will not select against a model nobody has checked.
+"""
+These are the tests for choosing a scheduler for whatever operation the config
+describes. That is the piece which makes the project a tool rather than one
+cafe's answer, so most of these are about the two ways it refuses: it will not
+switch on noise, and it will not select against a model nobody has checked. Run
+them with pytest.
 """
 
 from __future__ import annotations
@@ -36,7 +37,8 @@ def test_a_clear_winner_is_adopted():
 
 
 def test_overlapping_intervals_are_not_a_difference():
-    """The whole point. Two policies whose intervals overlap have not been told
+    """
+    The whole point. Two policies whose intervals overlap have not been told
     apart, and switching between them is acting on noise."""
     goal = OBJECTIVES["margin"]
     chosen, confident = decide(
@@ -46,7 +48,8 @@ def test_overlapping_intervals_are_not_a_difference():
 
 
 def test_the_same_gap_becomes_a_decision_once_the_intervals_shrink():
-    """More seeded days, narrower interval, same means: now it switches. A
+    """
+    More seeded days, narrower interval, same means: now it switches. A
     selector that never selects would be no use."""
     goal = OBJECTIVES["margin"]
     chosen, confident = decide(
@@ -69,7 +72,8 @@ def test_smaller_is_better_for_a_wait():
 
 
 def test_a_tie_goes_to_the_simpler_policy():
-    """Adopting a scheduler that is harder to explain to a barista, for a
+    """
+    Adopting a scheduler that is harder to explain to a barista, for a
     difference the evidence cannot see, is a bad trade at any confidence."""
     goal = OBJECTIVES["margin"]
     tied = [
@@ -105,7 +109,8 @@ def test_it_runs_every_policy_and_names_one():
 
 
 def test_it_will_not_select_against_a_model_nobody_has_checked():
-    """A model that is mostly assumed will still name a winner, confidently,
+    """
+    A model that is mostly assumed will still name a winner, confidently,
     and be wrong."""
     selection = select_policy([BASE], objective="margin", seeds=2)
     assert selection.assumed_fraction > MAX_ASSUMED
@@ -129,7 +134,8 @@ def test_the_selection_is_just_a_parameter_overlay(tmp_path):
 
 
 def test_a_different_operation_gets_its_own_answer():
-    """The claim the whole design rests on: feed it another cafe and the
+    """
+    The claim the whole design rests on: feed it another cafe and the
     machinery works out what that one should do, not what this one does."""
     other = load_params(OTHER)
     assert other.cafe.name != load_params(BASE).cafe.name
@@ -166,7 +172,8 @@ EXAMPLES = [
 
 @pytest.mark.parametrize("config", EXAMPLES)
 def test_every_example_configuration_runs_and_can_be_selected_for(config):
-    """Three operations built three different ways (a menu board, a hand
+    """
+    Three operations built three different ways (a menu board, a hand
     written sketch, and a transaction log), and the same machinery answers for
     all of them."""
     params = load_params(config)
@@ -187,7 +194,8 @@ def test_the_configurations_really_are_different_operations():
 
 
 def test_a_synthetic_configuration_says_it_is_synthetic():
-    """A generated dataset is realistic in shape and is not a record of
+    """
+    A generated dataset is realistic in shape and is not a record of
     anything that happened. Marking it observed would be the one lie the
     provenance system exists to prevent."""
     maven = load_params("params/examples/maven_roasters.yaml")
@@ -198,7 +206,8 @@ def test_a_synthetic_configuration_says_it_is_synthetic():
 
 
 def test_every_params_file_reaches_the_runs():
-    """A selection that read the incumbent from the whole config stack but ran
+    """
+    A selection that read the incumbent from the whole config stack but ran
     the arms on the base alone would compare policies against a configuration
     nobody asked about, and say nothing about the one they did."""
     plain = select_policy(["params/base.yaml"], objective="margin", seeds=4)

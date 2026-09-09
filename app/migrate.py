@@ -1,7 +1,8 @@
-"""Schema and startup data, applied before the server accepts traffic.
-
-Run by `deploy/entrypoint.sh` so a container that cannot migrate fails at boot
-with a clear message, rather than on the first order of a rush.
+"""
+This applies the schema and the startup data before the server accepts traffic.
+It is run by deploy/entrypoint.sh rather than at import time, so a container
+that cannot migrate fails at boot with a clear message instead of failing on
+the first order of a rush. Run it with python -m app.migrate.
 """
 
 from __future__ import annotations

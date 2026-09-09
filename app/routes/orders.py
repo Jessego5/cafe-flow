@@ -1,9 +1,10 @@
-"""Placing orders and moving them through the state machine.
-
-Every rule invoked here lives in `core/`: `core.menu` decides what an order
-costs and what work it implies, `core.capacity` prices it in bottleneck-seconds,
-and `core.states` decides which moves are legal. This module only translates
-HTTP into those calls and persists the result.
+"""
+This places orders and moves them through the state machine. Every rule it
+invokes lives in core/, where core.menu decides what an order costs and what
+work it implies, core.capacity prices it in bottleneck-seconds and core.states
+decides which moves are legal; this module only translates HTTP into those
+calls and persists the result, which is what keeps the app from growing a
+second opinion about the domain. Mounted by app/main.py.
 """
 
 from __future__ import annotations
@@ -57,16 +58,16 @@ class OrderIn(BaseModel):
     channel: Channel = Channel.WALKUP
     slot_id: str | None = None
     customer_id: str | None = None
-    #: What the bar calls out. Trimmed and capped rather than validated: a name
-    #: is whatever somebody says it is, and refusing one because it has a space
-    #: or an accent in it is how an app tells a person they are wrong about
-    #: their own name.
+    # What the bar calls out. Trimmed and capped rather than validated: a name
+    # is whatever somebody says it is, and refusing one because it has a space
+    # or an accent in it is how an app tells a person they are wrong about
+    # their own name.
     customer_name: str | None = Field(default=None, max_length=40)
-    #: The caller showed this customer a ready time before they committed, so
-    #: record what was quoted. Off by default, and deliberately so: an order
-    #: placed without a quote must move through exactly the states `core` moves
-    #: it through, or the app and the simulator no longer describe the same
-    #: cafe (ground rule 2). The time itself is still the server's own.
+    # The caller showed this customer a ready time before they committed, so
+    # record what was quoted. Off by default, and deliberately so: an order
+    # placed without a quote must move through exactly the states `core` moves
+    # it through, or the app and the simulator no longer describe the same
+    # cafe (ground rule 2). The time itself is still the server's own.
     quoted: bool = False
 
 
@@ -76,7 +77,8 @@ class TransitionIn(BaseModel):
 
 
 class PlanIn(BaseModel):
-    """Either direction. Give a `wanted_at` and it works backwards; leave it out
+    """
+    Either direction. Give a `wanted_at` and it works backwards; leave it out
     and it answers for ordering right now."""
 
     lines: list[LineIn] = Field(min_length=1)
@@ -94,7 +96,8 @@ def _simulated(header: str | None) -> bool:
 
 
 def _forecast_quote(params, lines, now_s):
-    """What the app would tell this customer their order is ready by.
+    """
+    What the app would tell this customer their order is ready by.
 
     Quoted here rather than taken from the client: a promise the cafe is going
     to be measured against has to be the cafe's own number, not one a caller
@@ -243,7 +246,8 @@ async def create_order(
 
 @router.post("/plan")
 async def plan(body: PlanIn) -> dict:
-    """When it will be ready, or when to order for a time you have in mind.
+    """
+    When it will be ready, or when to order for a time you have in mind.
 
     The wait comes from a forecast the simulator produced, so the number quoted
     here is a prediction the model actually made, which means `promise_error`
@@ -319,11 +323,12 @@ class AmendIn(BaseModel):
 
 @router.patch("/orders/{order_id}")
 async def amend_order(order_id: str, body: AmendIn) -> dict:
-    """Change the basket, while nobody has started making it.
+    """
+    Change the basket, while nobody has started making it.
 
     Only from `placed`. Once a barista has accepted the order they are holding
     the cup, and editing what is in it from a phone is not a thing a cafe can
-    honour -- so this is a 409 rather than a silent no-op, because the customer
+    honour, so this is a 409 rather than a silent no-op, because the customer
     needs to know their change did not take.
 
     The amendment is written to the log, not just to the row. Every margin in
@@ -428,14 +433,15 @@ async def move_order(
     body: TransitionIn,
     staff: str | None = Depends(current_staff),
 ) -> dict:
-    """Advance one order. Idempotent by (order, target state).
+    """
+    Advance one order. Idempotent by (order, target state).
 
     A barista on a laggy connection taps twice; the second tap must not skip a
     state or write a second event.
 
     Staff only, with one exception: a customer may cancel their own order. That
-    is the same trust model as the rest of the customer side -- the order id is
-    an unguessable uuid and holding it is what proves the order is yours -- and
+    is the same trust model as the rest of the customer side (the order id is
+    an unguessable uuid, and holding it is what proves the order is yours), and
     refusing it would leave somebody who changed their mind with no way out but
     asking at the counter.
     """

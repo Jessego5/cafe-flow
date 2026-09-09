@@ -1,8 +1,9 @@
-"""The 'within a second' half of the M2 acceptance criterion.
-
-Runs a real uvicorn server, because SSE latency is a property of the transport
-and the ASGI server, not of the route function. The same test doubles as the
-guard on the reconnect contract that M2.5 deploys behind a proxy.
+"""
+These are the tests for the within-a-second half of the acceptance criterion.
+They run a real uvicorn server, because SSE latency is a property of the
+transport and the ASGI server rather than of the route function, and the same
+tests double as the guard on the reconnect contract that the app is deployed
+behind a proxy with. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ def _free_port() -> int:
 
 @pytest.fixture
 def bar_session(live_server, staff_account):
-    """A logged-in bar, over real HTTP. Advancing an order is a staff route, so
+    """
+    A logged-in bar, over real HTTP. Advancing an order is a staff route, so
     the taps in these tests need a session the way a barista's browser does."""
     from tests.conftest import STAFF_PASSWORD, STAFF_USER
 
@@ -146,7 +148,8 @@ def test_every_tap_is_broadcast_in_order(live_server, bar_session):
 
 
 def test_a_reconnecting_client_can_resume_from_last_event_id(live_server, bar_session):
-    """Cafe wifi drops. A client that reconnects with Last-Event-ID gets what it
+    """
+    Cafe wifi drops. A client that reconnects with Last-Event-ID gets what it
     missed; it still refetches whole queue state, which `/queue` provides."""
     order_id = httpx.post(
         f"{live_server}/orders", json={"lines": [{"drink": "drip_coffee"}]}

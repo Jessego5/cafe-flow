@@ -1,8 +1,9 @@
-"""Pre-orders paid for and held back until the live queue says to place them.
-
-The feature's whole claim is that the release decision happens later than the
-quote did, with the actual line in hand. These check that it does, that nothing
-reaches the bar before it, and that the rule is the one the simulator runs.
+"""
+These are the tests for pre-orders that are paid for and held back until the
+live queue says to place them. The feature's whole claim is that the release
+decision happens later than the quote did, with the actual line in hand, so
+these check that it does, that nothing reaches the bar before it, and that the
+rule is the one the simulator runs. Run them with pytest.
 """
 
 from __future__ import annotations
@@ -40,7 +41,8 @@ def hold(client, wanted_at="09:00"):
 
 
 def test_a_held_order_is_not_an_order(client, at):
-    """It must emit no order events until released. If you find yourself wanting
+    """
+    It must emit no order events until released. If you find yourself wanting
     to log one against an order_id, it does not have one yet."""
     from app.routes.held import release_due
 
@@ -54,7 +56,8 @@ def test_a_held_order_is_not_an_order(client, at):
 
 
 def test_it_releases_when_the_live_queue_says_to_not_when_the_forecast_did(client, at):
-    """The point of holding. The quote came off a forecast; the release happens
+    """
+    The point of holding. The quote came off a forecast; the release happens
     against the line as it actually is, which on a quiet morning is later."""
     from app.routes.held import release_due
 
@@ -137,7 +140,8 @@ def test_a_time_in_the_past_or_after_closing_is_refused(client, at):
 
 
 def test_the_server_never_takes_an_order_time_from_the_caller(client, at):
-    """Same rule as POST /orders and its quoted flag: this is a time the cafe
+    """
+    Same rule as POST /orders and its quoted flag: this is a time the cafe
     will act on, so a client must not be able to name it."""
     response = client.post(
         "/held",
@@ -149,7 +153,8 @@ def test_the_server_never_takes_an_order_time_from_the_caller(client, at):
 
 
 def test_the_release_rule_is_the_one_the_simulator_runs(client, at):
-    """`now + estimate + margin >= wanted`, in both runtimes. If these drifted
+    """
+    `now + estimate + margin >= wanted`, in both runtimes. If these drifted
     the cafe would be telling people one thing while the model assumed another.
     """
     import inspect
@@ -167,7 +172,8 @@ def test_the_release_rule_is_the_one_the_simulator_runs(client, at):
 
 
 def test_both_shapes_carry_what_the_card_renders(client, at):
-    """The held card has nowhere else to read the basket from: until the hold
+    """
+    The held card has nowhere else to read the basket from: until the hold
     becomes an order there is no order to look it up on."""
     posted = hold(client, "09:00")
     fetched = client.get(f"/held/{posted['held_id']}").json()
@@ -178,7 +184,8 @@ def test_both_shapes_carry_what_the_card_renders(client, at):
 
 
 def test_holding_needs_its_clocks_configured(client, at, monkeypatch):
-    """Durations live in config. A cafe that has not said how much slack to
+    """
+    Durations live in config. A cafe that has not said how much slack to
     leave has not decided whether it wants this, so refuse rather than invent
     the number the whole behaviour turns on."""
     params = get_params()
@@ -191,7 +198,8 @@ def test_holding_needs_its_clocks_configured(client, at, monkeypatch):
 
 
 def test_a_held_order_keeps_its_name_through_release(client, at):
-    """The hold is paid for. Losing the name on the way to the bar is losing the
+    """
+    The hold is paid for. Losing the name on the way to the bar is losing the
     only handle the counter has on a coffee somebody has been charged for."""
     from app.routes.held import release_due
 

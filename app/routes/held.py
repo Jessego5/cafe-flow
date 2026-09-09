@@ -1,22 +1,19 @@
-"""Pre-orders that have been paid for and not yet put in the queue.
-
-The customer scrolls to a time, pays, and stops thinking about it. Nothing
-reaches the bar until the *live* queue says ordering now lands by the time they
-asked for.
-
-That last part is the whole feature, and the reason this is a server-side hold
-rather than a notification. A reminder has to commit to the forecast that sold
-the customer their time: once somebody has been told to order, they cannot be
-re-timed when the queue moves. Holding the order means the decision happens with
-the actual line in hand. Simulated over twelve days at half adoption, a fixed
-lead had the median drink ready 59 minutes early; deciding late has it within a
-minute, 91% on time.
-
-The release rule is `sim/engine.py::hold_until_release`, character for
-character, because the app telling somebody one thing while the model assumes
-another is the failure this project keeps guarding against:
-
-    release when  now + estimate + margin >= wanted
+"""
+This holds pre-orders that have been paid for and not yet put in the queue. The
+customer scrolls to a time, pays and stops thinking about it, and nothing
+reaches the bar until the live queue says that ordering now lands by the time
+they asked for. That last part is the whole feature and the reason this is a
+server-side hold rather than a notification, because a reminder has to commit
+to the forecast that sold the customer their time: once somebody has been told
+to order, they cannot be re-timed when the queue moves. Holding the order means
+the decision happens with the actual line in hand, and simulated over twelve
+days at half adoption a fixed lead had the median drink ready 59 minutes early
+while deciding late has it within a minute, 91% on time. The release rule is
+sim/engine.py::hold_until_release character for character, release when
+now + estimate + margin >= wanted, because the app telling somebody one thing
+while the model assumes another is the failure this project keeps guarding
+against. Mounted by app/main.py; the release loop is started by the app on
+startup.
 """
 
 from __future__ import annotations
@@ -72,7 +69,8 @@ class HeldIn(BaseModel):
 
 
 def _release_clocks(params: Params) -> tuple[float, float]:
-    """Poll interval and slack, or a 503 saying holding is not configured.
+    """
+    Poll interval and slack, or a 503 saying holding is not configured.
 
     Durations live in config (ground rule 1), and a cafe that has not said how
     much slack to leave has not decided whether it wants this feature. Better to
@@ -90,7 +88,8 @@ def _release_clocks(params: Params) -> tuple[float, float]:
 
 
 def _live_wait_s(session: Session, params: Params) -> float | None:
-    """What somebody joining right now would wait, from the queue as it is.
+    """
+    What somebody joining right now would wait, from the queue as it is.
 
     The same estimate `/menu` shows and `sim/engine.py` releases against. None
     outside the staffing plan, where there is nobody on the bar to quote for.
@@ -105,7 +104,8 @@ def _live_wait_s(session: Session, params: Params) -> float | None:
 
 @router.post("/held", status_code=201)
 async def hold_order(body: HeldIn) -> dict:
-    """Take payment and hold the order. The server re-derives the timing.
+    """
+    Take payment and hold the order. The server re-derives the timing.
 
     No `order_at` is accepted from the caller, for the same reason `POST /orders`
     does not accept a quoted ready time: this is a time the cafe will act on, and
@@ -175,7 +175,7 @@ async def hold_order(body: HeldIn) -> dict:
         # The card shows what was bought; there is nowhere else to read it from
         # until the hold becomes an order.
         "lines": json.loads(row.lines_json),
-        # What we expect right now. It moves -- that is the feature -- so the
+        # What we expect right now. It moves (that is the feature), so the
         # screen is told to say "usually around" rather than count down to it.
         "expected_order_at": format_hhmm(row.quoted_order_at_s),
         "expected_order_at_s": row.quoted_order_at_s,
@@ -206,10 +206,11 @@ async def get_held(held_id: str) -> dict:
 
 @router.delete("/held/{held_id}", status_code=204)
 async def cancel_held(held_id: str) -> None:
-    """Idempotent: cancelling an already-released or unknown hold is a 204.
+    """
+    Idempotent: cancelling an already-released or unknown hold is a 204.
 
     A released hold is a live order and cancelling it is the order's own
-    business, not this endpoint's -- but saying so with a 409 would make the
+    business, not this endpoint's, but saying so with a 409 would make the
     client handle a race it cannot win.
     """
     with session_scope() as session:
@@ -261,7 +262,8 @@ def _release(session: Session, row: HeldOrderRow, params: Params, now_s: float):
 
 
 def release_due() -> list[str]:
-    """Release every hold the live queue says it is time for.
+    """
+    Release every hold the live queue says it is time for.
 
     Also releases anything that has reached the time it was wanted: a hold that
     never fires is worse than a late drink, and a line growing faster than the
@@ -311,7 +313,8 @@ def release_due() -> list[str]:
 
 
 async def release_loop() -> None:
-    """The background task. One machine, so no leader election.
+    """
+    The background task. One machine, so no leader election.
 
     `deploy/fly.toml` sets `min_machines_running = 1` and
     `auto_stop_machines = false`, so there is exactly one of these. Say so here,

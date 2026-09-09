@@ -1,4 +1,10 @@
-"""M8: turning a counted rush into parameters, and refusing to lie about it."""
+"""
+These are the tests for turning a counted rush into parameters, and for
+refusing to lie about how well it fits. The gate is the part that matters: a
+calibration that cannot reproduce what was counted has to fail rather than
+quietly widen, because the answer to a model that disagrees with the floor is
+to fix the model. Run them with pytest.
+"""
 
 from __future__ import annotations
 
@@ -61,7 +67,8 @@ def test_a_counted_rush_reads_back(seen):
 
 
 def test_a_dated_header_keeps_its_date():
-    """A counter who writes the date gets it recorded; one who writes a label
+    """
+    A counter who writes the date gets it recorded; one who writes a label
     instead loses nothing that is used downstream."""
     dated = read_summary("Elsewhere Coffee, 2024-01-31\nwatched: 10 min\norders: 9\n")
     assert (dated.where, dated.on) == ("Elsewhere Coffee", "2024-01-31")
@@ -72,7 +79,8 @@ def test_a_dated_header_keeps_its_date():
 
 
 def test_a_half_finished_session_still_reads(params):
-    """Someone who only managed the order count should not lose the afternoon
+    """
+    Someone who only managed the order count should not lose the afternoon
     to a parser."""
     partial = read_summary("Ground Truth, counted rush\nwatched: 10 min\norders: 14\n")
     assert partial.orders == 14
@@ -160,7 +168,8 @@ def test_the_fit_reproduces_the_volume_that_was_counted(seen, params):
 
 
 def test_a_volume_the_class_blocks_cannot_supply_is_refused(params):
-    """Fitting has limits, and reaching them means the arrivals model is wrong
+    """
+    Fitting has limits, and reaching them means the arrivals model is wrong
     rather than the knob being mis-set."""
     impossible = read_summary("Ground Truth, counted rush\nwatched: 5 min\norders: 400\n")
     with pytest.raises(ConfigError, match="class_blocks"):
@@ -168,7 +177,8 @@ def test_a_volume_the_class_blocks_cannot_supply_is_refused(params):
 
 
 def test_the_balk_gap_is_reported_because_nothing_was_fitted_to_it(seen, params):
-    """Volume agreeing proves little: it is what the knob was turned to match.
+    """
+    Volume agreeing proves little: it is what the knob was turned to match.
     Balking is the honest test."""
     overlay = to_overlay(seen, params)
     capture, _ = fit_capture_rate(seen, [BASE], overlay, runner, seeds=[0, 1])
@@ -193,7 +203,8 @@ def test_calibration_moves_the_provenance(seen, params):
 
 
 def test_calibration_needs_no_simulator_to_be_tested(seen, params):
-    """The arithmetic is separable from the thing that runs a day: a stub
+    """
+    The arithmetic is separable from the thing that runs a day: a stub
     runner is enough to exercise the fit."""
     from core.events import EventLog, EventType
     from core.states import State
@@ -246,7 +257,8 @@ def test_the_checklist_reads_back(field):
 
 
 def test_what_the_machine_is_decides_how_many_it_holds(params):
-    """The whole reason to ask: a press takes two side by side and a microwave
+    """
+    The whole reason to ask: a press takes two side by side and a microwave
     takes one, and that is what removes the batching."""
     for answer, run_s, holds in [
         ("microwave", 60.0, 1), ("high-speed oven", 45.0, 1), ("panini press", 240.0, 2)
@@ -277,7 +289,8 @@ def test_hours_and_staffing_come_across(field, params):
 
 
 def test_a_dedicated_cashier_is_raised_rather_than_quietly_modelled(params):
-    """serve() always takes a barista for the register, so the shared
+    """
+    serve() always takes a barista for the register, so the shared
     assumption lives in the code. Emitting a config change would model
     something the engine cannot do."""
     from analysis.calibrate import open_questions
@@ -297,7 +310,8 @@ def test_balks_without_a_depth_are_flagged(params):
 
 
 def test_the_depth_people_gave_up_at_is_checked_against_the_model(field, params):
-    """A second unfitted comparison: the rate says how many left, the depth
+    """
+    A second unfitted comparison: the rate says how many left, the depth
     says how patient they were."""
     overlay = to_overlay(field, params)
     calibrated = load_params(BASE, overlay=overlay)
@@ -320,13 +334,15 @@ def test_the_queue_samples_read_back(field):
 
 
 def test_the_depth_at_a_balk_is_biased_high(field):
-    """It only ever reads the queue when it was long enough that someone left,
+    """
+    It only ever reads the queue when it was long enough that someone left,
     which is why the timed samples are the honest measure."""
     assert field.typical_balk_line > field.typical_line
 
 
 def test_an_order_is_counted_once_while_it_waits():
-    """Counting a transition into each waiting state would add the same order
+    """
+    Counting a transition into each waiting state would add the same order
     three times on its way through, and the depth would only ever climb."""
     from analysis.calibrate import _queue_over_time
     from analysis.metrics import Interval
@@ -343,7 +359,8 @@ def test_an_order_is_counted_once_while_it_waits():
 
 
 def test_the_fit_falls_back_to_the_queue_when_nobody_counted_orders():
-    """The checklist collects depth, not volume, which is what the original
+    """
+    The checklist collects depth, not volume, which is what the original
     plan fitted against anyway."""
     seen = read_summary(FIELD)
     assert seen.orders == 0
@@ -370,7 +387,7 @@ def test_the_gate_judges_whatever_was_actually_collected(field):
     assert "queue" in report.render()
     # Never claims a volume nobody counted. Asserted on the row rather than on
     # "0/h", which this used to look for and which matches inside any modelled
-    # rate ending in a zero -- "140/h" broke it the first time one did.
+    # rate ending in a zero: "140/h" broke it the first time one did.
     assert not any(
         line.strip().startswith("volume") for line in report.render().splitlines()
     ), report.render()
@@ -401,7 +418,8 @@ def test_a_timed_observation_keeps_its_clock():
 
 
 def test_the_pause_shows_as_a_gap_not_as_readings():
-    """Nothing between 10:52 and 10:58, because nobody was watching, which is
+    """
+    Nothing between 10:52 and 10:58, because nobody was watching, which is
     the point of being able to pause."""
     seen = read_summary(TIMED)
     minutes = [
@@ -434,7 +452,8 @@ def test_a_timed_observation_calibrates(params):
 
 
 def test_the_fit_survives_a_stumble_in_the_objective():
-    """Each evaluation averages a handful of simulated days, so it carries
+    """
+    Each evaluation averages a handful of simulated days, so it carries
     noise. One misstep sends bisection the wrong way with no route back, and
     keeping the last midpoint rather than the best candidate seen would return
     whatever it happened to land on."""
@@ -445,7 +464,8 @@ def test_the_fit_survives_a_stumble_in_the_objective():
     target = seen.typical_line
 
     def wobbly(params, seed):
-        """Queue depth rises with the capture rate, with a dip partway that a
+        """
+        Queue depth rises with the capture rate, with a dip partway that a
         naive bisection would fall into."""
         capture = params.arrivals.capture_rate
         depth = capture * 100

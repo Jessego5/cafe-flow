@@ -1,9 +1,11 @@
-"""Who walks in, when, and what they ask for.
-
-Demand is class-driven: a block of sections lets out, some fraction of those
-students come here, and they arrive a few minutes later spread around a mean.
-Everything below is drawn from one seeded generator in a fixed order, so the
-same seed reproduces the same day exactly (ground rule 5).
+"""
+This decides who walks in, when, and what they ask for. Demand is class-driven
+rather than a flat rate: a block of sections lets out, some fraction of those
+students come here, and they arrive a few minutes later spread around a mean,
+which is what gives the day the shape the registrar's room schedule implies.
+Everything is drawn from one seeded generator in a fixed order, so the same
+seed reproduces the same day exactly and a diff between two runs means a real
+change rather than a different roll. Imported by sim/engine.py.
 """
 
 from __future__ import annotations
@@ -24,7 +26,8 @@ SECONDS_PER_HOUR = 3600.0
 
 @dataclass(frozen=True, slots=True)
 class Arrival:
-    """One customer, with the order they intend to place and what they will
+    """
+    One customer, with the order they intend to place and what they will
     put up with to get it.
 
     `at_s` is when the order is *placed*. For someone ordering ahead that is a
@@ -73,9 +76,10 @@ def line_of(params: Params, name: str, milk: str, serve: str) -> Line:
 
 
 def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
-    """One basket: how many things, whether one of them is food, and what.
+    """
+    One basket: how many things, whether one of them is food, and what.
 
-    Food is an attachment rather than a first choice -- drawing every basket's
+    Food is an attachment rather than a first choice: drawing every basket's
     first item from the whole menu made a quarter of all orders a sandwich with
     nobody buying a coffee. But it is an attachment that makes the basket
     bigger: of the orders counted at the till, 11% of single items were food
@@ -86,7 +90,7 @@ def _draw_lines(params: Params, rng: np.random.Generator) -> tuple[Line, ...]:
     one drink, so it cannot produce two drinks or three items.
 
     A fixed number of draws, always in the same order and always all of them,
-    even where the answer is discarded -- a conditional draw would make the seed
+    even where the answer is discarded, because a conditional draw would make the seed
     mean different things for different baskets.
     """
     drinks, foods = params.split_mix()
@@ -144,7 +148,8 @@ def _from_class_blocks(params: Params, rng: np.random.Generator) -> list[tuple[f
 
 
 def _from_profile(params: Params, rng: np.random.Generator) -> list[tuple[float, str]]:
-    """Demand as a measured curve.
+    """
+    Demand as a measured curve.
 
     A non-homogeneous Poisson process: each bin's count is drawn from its own
     rate and placed uniformly inside it. `capture_rate` still scales the whole
@@ -171,11 +176,12 @@ def _from_profile(params: Params, rng: np.random.Generator) -> list[tuple[float,
 
 
 def _forecast_for(params: Params) -> "Forecast | None":
-    """The wait-by-time-of-day the app would be showing, or None.
+    """
+    The wait-by-time-of-day the app would be showing, or None.
 
     Only loaded when somebody is going to act on it. A cafe not offering
     arrive-by has no forecast in front of anyone, and a missing file is then not
-    an error -- it is a cafe that has not run `python -m sim.forecast`.
+    an error: it is a cafe that has not run `python -m sim.forecast`.
     """
     if params.customers.retime_fraction <= 0:
         return None
@@ -188,11 +194,12 @@ def _forecast_for(params: Params) -> "Forecast | None":
 def _retimed(
     wanted_at_s: float, forecast: "Forecast", params: Params
 ) -> float:
-    """The slot this customer picks once they can see what each one costs.
+    """
+    The slot this customer picks once they can see what each one costs.
 
     The planner shows the wait at every time of day. Somebody who wanted 12:15,
     sees eleven minutes there and three at 12:45, and is not in a hurry, takes
-    12:45 -- which is the whole economic argument for arrive-by, and the only
+    12:45, which is the whole economic argument for arrive-by, and the only
     lever in this project that moves demand rather than rearranging it.
 
     Scans forward in the forecast's own bins and takes the first under the
@@ -214,7 +221,8 @@ def _retimed(
 
 
 def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]:
-    """The whole day's demand, sorted by arrival time.
+    """
+    The whole day's demand, sorted by arrival time.
 
     Two ways of getting there, chosen by `arrivals.model`: a timetable of class
     blocks, or a curve measured from a transaction log. Either way a Poisson
@@ -256,8 +264,8 @@ def generate_arrivals(params: Params, rng: np.random.Generator) -> list[Arrival]
         defer_roll = float(rng.random())
 
         # Somebody ordering ahead is choosing a time, not accepting one. Where
-        # the app shows them what each costs, a share of them move off the peak
-        # -- deferred demand rather than lost demand, and the only thing here
+        # the app shows them what each costs, a share of them move off the peak,
+        # deferred demand rather than lost demand, and the only thing here
         # that changes *when* people come rather than how they are served.
         if (
             forecast is not None

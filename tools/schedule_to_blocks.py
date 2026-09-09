@@ -1,23 +1,18 @@
-"""Turn a room-schedule export into `arrivals.class_blocks`.
-
-The class blocks in `params/base.yaml` were invented: five round numbers ending
-on the hour that looked like how a university ought to behave. A real export
-says what actually lets out, when, and how many people are in it, which is the
-one part of demand you can know without standing in the cafe.
-
-Two things the export settles that a fitted curve cannot. It puts demand at the
-times classes actually end -- which turn out not to be the tidy :50 boundaries
-that were guessed -- and it covers the whole day, including an afternoon that
-was previously carried by a flat background rate.
-
-It cannot settle how many of those students walk over. That stays
-`capture_rate`, fitted against a counted queue.
-
-Weekdays differ enough to matter (Morgridge runs 117 section-meetings on a
-Thursday and 48 on a Friday), so each weekday is written as its own overlay
-rather than averaged into one fictional day.
-
-    python -m tools.schedule_to_blocks --xlsx data/morgridge_hall_fall2026_classes.xlsx
+"""
+This turns a room-schedule export into arrivals.class_blocks. The class blocks
+in params/base.yaml were invented, five round numbers ending on the hour that
+looked like how a university ought to behave, whereas a real export says what
+actually lets out, when, and how many people are in it, which is the one part
+of demand you can know without standing in the cafe. It settles two things a
+fitted curve cannot. It puts demand at the times classes actually end, which
+turn out not to be the tidy :50 boundaries that were guessed, and it covers the
+whole day, including an afternoon that was previously carried by a flat
+background rate. What it cannot settle is how many of those students walk over,
+which stays capture_rate, fitted against a counted queue. Weekdays differ
+enough to matter, since Morgridge runs 117 section-meetings on a Thursday and
+48 on a Friday, so each weekday is written as its own overlay rather than
+averaged into one fictional day. Run it with python -m tools.schedule_to_blocks
+--xlsx data/morgridge_hall_fall2026_classes.xlsx.
 """
 
 from __future__ import annotations
@@ -43,13 +38,13 @@ yaml.SafeDumper.add_representer(
 
 __all__ = ["Meeting", "read_meetings", "blocks_for", "DAYS"]
 
-#: The export writes Thursday as R, the usual registrar convention.
+# The export writes Thursday as R, the usual registrar convention.
 DAYS: dict[str, str] = {
     "M": "monday", "T": "tuesday", "W": "wednesday",
     "R": "thursday", "F": "friday",
 }
 
-#: "TR 2:30 PM-3:45 PM Rm 6618", and a cell may hold several separated by "/".
+# "TR 2:30 PM-3:45 PM Rm 6618", and a cell may hold several separated by "/".
 MEETING = re.compile(
     r"\b([MTWRF]{1,5})\s+(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)"
 )
@@ -66,7 +61,8 @@ def _minutes(clock: str) -> int:
 
 
 def read_meetings(path: Path) -> list[tuple[str, int, int]]:
-    """Every (weekday letter, end time in minutes, headcount) the sheet holds.
+    """
+    Every (weekday letter, end time in minutes, headcount) the sheet holds.
 
     A section meeting MWF releases its students three times a week, so it is
     three meetings here. Enrollment is preferred over capacity: a room that
@@ -115,7 +111,8 @@ def blocks_for(
     opens_min: int,
     closes_min: int,
 ) -> tuple[list[dict], int]:
-    """One block per distinct end time on that weekday, inside opening hours.
+    """
+    One block per distinct end time on that weekday, inside opening hours.
 
     `sections` and `avg_enrollment` are kept as separate fields because that is
     the shape the model already takes; their product is the headcount, which is
@@ -154,7 +151,7 @@ HEADER = """\
 # {weekday_title} in {building}, from the Fall 2026 room schedule.
 #
 # Written by `python -m tools.schedule_to_blocks`. Every end time and headcount
-# here is read from the registrar's export rather than guessed -- which is the
+# here is read from the registrar's export rather than guessed, which is the
 # whole point, because the invented blocks it replaces put the day's peak an
 # hour early and stopped at 12:50 while the cafe stays open until 16:30.
 #

@@ -430,7 +430,7 @@ mix:
   serve: { hot: 0.20, iced: 0.80 }
 
   # Food is an attachment, not a first choice. `item` is left out so the food
-  # is drawn from the food share of `drink` above -- a salad is 110 seconds and
+  # is drawn from the food share of `drink` above; a salad is 110 seconds and
   # eleven dollars where a bagel is 75 and five, so turning all food into one
   # bagel distorts both the bar and the till.
   attach: { rate: 0.286, alone: 0.09 }

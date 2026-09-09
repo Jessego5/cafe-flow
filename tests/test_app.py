@@ -1,11 +1,11 @@
-"""M2 acceptance tests.
-
-Done when: a person can place an order in the student view, watch it appear in
-the barista view within a second, tap it through to ready, and see the number on
-the display; `order_events` contains the full trace.
-
-The within-a-second half is a property of the SSE transport and is proved
-against a running server in `tests/test_stream.py`; everything else is here.
+"""
+These are the acceptance tests for the app, and they are done when a person can
+place an order in the student view, watch it appear in the barista view within a
+second, tap it through to ready and see the number on the display, with
+order_events holding the full trace. The within-a-second half is a property of
+the SSE transport rather than of any route function, so it is proved against a
+running server in tests/test_stream.py and everything else is here. Run them
+with pytest.
 """
 
 from __future__ import annotations
@@ -93,7 +93,8 @@ def test_placing_an_order_prices_it_and_costs_it(client):
 
 
 def test_an_iced_latte_costs_nothing_at_the_wand(client):
-    """Same price, same drink, no steam. The variant reaches the capacity
+    """
+    Same price, same drink, no steam. The variant reaches the capacity
     accounting, not just the label on the cup."""
     hot = place(client, {"drink": "latte", "milk_type": "oat", "variant": "hot"})
     iced = place(client, {"drink": "latte", "milk_type": "oat", "variant": "iced"})
@@ -232,7 +233,8 @@ def test_dev_accepts_simulated_orders_and_flags_them(client):
 
 
 def test_pilot_rejects_simulated_orders_at_the_api(app_env, monkeypatch):
-    """A simulated order on the bar during a real rush destroys trust in the
+    """
+    A simulated order on the bar during a real rush destroys trust in the
     tool permanently, so this is a 403 and not a filter."""
     from fastapi.testclient import TestClient
 
@@ -350,7 +352,8 @@ def test_a_full_slot_is_refused(with_slots):
 
 
 def test_capacity_check_and_decrement_are_one_transaction(tmp_path):
-    """Concurrent reservations against a slot with room for K leave exactly K
+    """
+    Concurrent reservations against a slot with room for K leave exactly K
     winners. This is the invariant the M9 concurrency test re-checks over HTTP.
     """
     params = get_params()
@@ -410,7 +413,8 @@ def test_a_rejected_order_leaves_no_trace(client):
 
 
 def test_only_core_writes_the_event_log(root):
-    """Ground rule 4 as an import-level invariant: `app/` never builds an event
+    """
+    Ground rule 4 as an import-level invariant: `app/` never builds an event
     row or emits one itself; it hands `core.states` a log to write through."""
     import ast
 
@@ -489,7 +493,8 @@ def test_fifo_suggests_nothing_to_run_together(client):
 
 
 def test_the_bar_is_told_what_to_run_together(app_env, tmp_path, monkeypatch):
-    """The payoff of keeping the scheduler in core: the policy an experiment
+    """
+    The payoff of keeping the scheduler in core: the policy an experiment
     measured is the policy the bar is shown, not a second implementation."""
     from fastapi.testclient import TestClient
 
@@ -561,7 +566,8 @@ def test_a_finished_order_drops_out_of_the_suggestions(app_env, tmp_path, monkey
 
 
 def test_the_app_shows_the_wait_the_model_would_assume(client):
-    """One estimate, in core, used by both. If they disagreed the cafe would
+    """
+    One estimate, in core, used by both. If they disagreed the cafe would
     tell people one thing while the model assumed another."""
     from core.waiting import estimate_wait_s, nominal_seconds_per_order
 

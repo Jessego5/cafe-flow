@@ -1,19 +1,18 @@
-"""Fit an arrival curve so the simulated queue reproduces the observed one.
-
-The class-block model was invented: five tidy blocks, each arriving in a very
-tight window. It puts thirty people through the door in five minutes, which is
-why it produced seventeen-minute median waits against a cafe where queues of
-eleven cleared in twenty.
-
-Nobody counted arrivals; you cannot, standing in a cafe. What was counted is
-the queue, every couple of minutes. So the curve is fitted rather than measured:
-raise the rate in bins where the model is short of what was seen, lower it where
-it is over, and repeat. Demand rises monotonically with the rate in each bin and
-the bins barely interact at this load, so a few passes converge.
-
-The result is `arrivals.model: profile`, which is the same machinery the NYC
-transaction log used. There it was read straight off timestamps; here it is
-inferred from its consequences.
+"""
+This fits an arrival curve so the simulated queue reproduces the observed one.
+The class-block model it replaced was invented, five tidy blocks each arriving
+in a very tight window, and it put thirty people through the door in five
+minutes, which is why it produced seventeen-minute median waits against a cafe
+where queues of eleven cleared in twenty. Nobody counted arrivals, because you
+cannot while standing in a cafe; what was counted is the queue, every couple of
+minutes. So the curve is inferred from its consequences rather than measured:
+raise the rate in bins where the model is short of what was seen, lower it
+where it is over, and repeat, which converges in a few passes because demand
+rises monotonically with the rate in each bin and the bins barely interact at
+this load. The result is arrivals.model: profile, the same machinery the NYC
+transaction log used, except that there it was read straight off timestamps.
+Run it with python -m sim.fit_profile. Prefer sim/fit_hybrid.py, which fits
+three parameters rather than twelve.
 """
 
 from __future__ import annotations
@@ -143,8 +142,8 @@ def main() -> None:
 
     Path(args.out).write_text(
         "# Fitted by sim/fit_profile.py so the simulated queue reproduces the one\n"
-        "# counted in the cafe. Arrivals were never counted -- you cannot count\n"
-        "# them standing in a cafe -- so the curve is inferred from its\n"
+        "# counted in the cafe. Arrivals were never counted, because you cannot\n"
+        "# count them standing in a cafe, so the curve is inferred from its\n"
         "# consequences rather than measured.\n\n"
         + yaml.safe_dump(overlay, sort_keys=False)
     )

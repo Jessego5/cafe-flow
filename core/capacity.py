@@ -1,11 +1,13 @@
-"""The bottleneck cost function.
-
-Everything that meters capacity (slot sizing in `app/`, batching gains in
-`sim/policies.py`, utilisation in `analysis/`) asks this module how many
-bottleneck-seconds a thing costs. Which station that is comes from
-`params.bottleneck_station`, so M8 can move it (to `register`, say) by editing
-YAML. When the bottleneck is the register the cost is flat per order and slots
-degenerate to order counts, with no code change.
+"""
+This is the bottleneck cost function, the one place that says how much of the
+constraint a piece of work consumes. Everything that meters capacity asks this
+module for bottleneck-seconds rather than counting orders: slot sizing in app/,
+batching gains in sim/policies.py, utilisation in analysis/. Which station is
+the constraint is not decided here but read from params.bottleneck_station, so
+moving it to the register is a YAML edit and not a code change, and when the
+register is the bottleneck the cost goes flat per order and slots quietly
+degenerate into order counts, which is the correct behaviour and needs no
+special case. Imported by app/, sim/ and analysis/ rather than run on its own.
 """
 
 from __future__ import annotations
@@ -51,7 +53,8 @@ def task_seconds(
     include_order_terms: bool = False,
     is_food: bool = False,
 ) -> float:
-    """Service time for one task run on its own.
+    """
+    Service time for one task run on its own.
 
     Per-batch terms (setup) are included by default because a task run alone
     still pays setup. Per-order terms (the register) are not part of a drink's
@@ -80,7 +83,8 @@ class CapacityModel(Protocol):
 
 
 class StationCapacityModel:
-    """Costs measured at one station, read from params.
+    """
+    Costs measured at one station, read from params.
 
     Reads `bottleneck_station` unless told otherwise, so the same class also
     answers "how much group-head time does this order need" during M8's
@@ -99,7 +103,8 @@ class StationCapacityModel:
         return self._work_seconds([item]) + self._order_seconds([item])
 
     def batch_cost(self, items: Sequence[Item]) -> float:
-        """Bottleneck-seconds when these items are made together.
+        """
+        Bottleneck-seconds when these items are made together.
 
         Setup is paid once per batch instead of once per item, and per-order
         terms once per distinct order, so this can only ever be <= the sum of
@@ -134,7 +139,8 @@ class StationCapacityModel:
 
     @property
     def order_scoped(self) -> bool:
-        """Does this station handle whole orders rather than named tasks?
+        """
+        Does this station handle whole orders rather than named tasks?
 
         The register does: no menu item lists it, but every order goes through
         it and every item on the order is rung up.
@@ -146,7 +152,8 @@ class StationCapacityModel:
         return bool(item.tasks_at(self.station_name)) or self.order_scoped
 
     def group(self, items: Sequence[Item], batch_id_prefix: str = "b") -> list[Batch]:
-        """Split items into the batches this station would actually run.
+        """
+        Split items into the batches this station would actually run.
 
         Deterministic: input order is preserved and groups fill greedily, so the
         same pending queue always yields the same batches (ground rule 5).
@@ -187,7 +194,8 @@ class StationCapacityModel:
         return out
 
     def compatible(self, current: Sequence[Item], candidate: Item) -> bool:
-        """Could this item join that batch?
+        """
+        Could this item join that batch?
 
         The rule lives here rather than in a scheduling policy: whether two
         drinks can be steamed together is a fact about the station, not a
@@ -217,7 +225,8 @@ class StationCapacityModel:
     # ---- seconds -------------------------------------------------------
 
     def _item_seconds(self, item: Item) -> float:
-        """Per-item terms, summed over this item's tasks at the station.
+        """
+        Per-item terms, summed over this item's tasks at the station.
 
         An order-scoped station has no named tasks, so its flat per-item terms
         are charged once for the item itself: the register's few seconds an item
@@ -229,7 +238,7 @@ class StationCapacityModel:
             if not self.order_scoped:
                 return 0.0
             # A sandwich costs longer to ring up than a coffee does, over and
-            # above being one more item -- measured at 13 seconds against 8.5.
+            # above being one more item, measured at 13 seconds against 8.5.
             return sum(
                 seconds
                 for seconds, per, attr in self.station.cost_terms.values()
@@ -283,7 +292,8 @@ class StationCapacityModel:
     # ---- slot plumbing (M2) -------------------------------------------
 
     def capacity_seconds(self, window_s: float, t_s: float | None = None) -> float:
-        """Bottleneck-seconds a window of wall time provides.
+        """
+        Bottleneck-seconds a window of wall time provides.
 
         Multiplies by the station's parallelism, resolving `from_staffing`
         against the staffing plan when a time is given.

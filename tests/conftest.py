@@ -1,3 +1,12 @@
+"""
+This file holds the shared test fixtures. The app tests run against a fresh
+SQLite database built from the real schema rather than out/cafe.db, so they
+never read or write a real day's orders and every test starts from a cafe we
+described ourselves, and the params fixtures load the committed YAML so a test
+that passes against an invented config cannot pass here. pytest picks this file
+up on its own, there is nothing to import.
+"""
+
 import sys
 from pathlib import Path
 
@@ -30,7 +39,8 @@ def params():
 
 @pytest.fixture
 def corrupt(raw_base):
-    """Deep-copy the base config, apply an edit, and validate it.
+    """
+    Deep-copy the base config, apply an edit, and validate it.
 
     `edit(cfg)` mutates the copy in place; the fixture returns the resulting
     ConfigError message so tests can assert the bad field is named.
@@ -63,7 +73,8 @@ FROZEN_NOW_S = 8 * 3600.0  # 08:00 local, inside the staffing plan
 
 @pytest.fixture
 def app_env(tmp_path, monkeypatch):
-    """A fresh database, fresh params cache and a frozen wall clock.
+    """
+    A fresh database, fresh params cache and a frozen wall clock.
 
     The app runs on wall-clock time, so without freezing it the tests would be
     flaky at the edges of the cafe day.
@@ -86,7 +97,7 @@ def app_env(tmp_path, monkeypatch):
     get_params.cache_clear()
 
     # Every route module that reads the clock. `app.routes.menu` was missing,
-    # so /menu alone ran on the real wall clock while /queue ran at 08:00 --
+    # so /menu alone ran on the real wall clock while /queue ran at 08:00,
     # which made the one test comparing them pass only when the suite happened
     # to run inside the 07:30-10:00 staffing block, and fail the rest of the day
     # on numbers that were both correct.
@@ -102,7 +113,8 @@ def app_env(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(app_env, staff_account):
-    """A logged-in bar. Most tests here are the cafe operating, not a stranger
+    """
+    A logged-in bar. Most tests here are the cafe operating, not a stranger
     poking at it, so the default client is staff. `anon` is the one that is
     not, and it is what the guard is tested with."""
     from fastapi.testclient import TestClient
@@ -138,9 +150,10 @@ def ensure_staff():
 
 
 def sign_in(test_client):
-    """Log a bespoke TestClient in.
+    """
+    Log a bespoke TestClient in.
 
-    Tests that build their own app -- a different policy, a different env --
+    Tests that build their own app (a different policy, a different env)
     still need a session for the staff routes, and this is the one line that
     gives them one rather than each rediscovering the credentials.
     """
@@ -170,7 +183,8 @@ def staff_account(app_env):
 
 @pytest.fixture
 def with_slots(app_env, tmp_path, monkeypatch):
-    """Turn slots on, the way M10 would if the M7 findings supported it.
+    """
+    Turn slots on, the way M10 would if the M7 findings supported it.
 
     The cafe day is widened so a bookable slot exists whatever time the suite
     runs at; everything else stays as configured.

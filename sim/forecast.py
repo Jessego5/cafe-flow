@@ -1,18 +1,17 @@
-"""What the wait will be, by time of day.
-
-The app has to answer two questions a customer actually asks: *if I order now,
-when do I get it*, and *if I want it at quarter past, when should I order*. Both
-need a wait it can look up rather than one it can only measure after the fact.
-
-That forecast comes from the simulator (many days, averaged, binned by time of
-day) and is written out as a file the app reads. The app never imports the
-simulator; it reads a forecast the way it reads params and the policy selection.
-So a promise made at the counter is a prediction the model actually made, and
-`promise_error` can be run over the app's own log afterwards to see whether it
-held.
-
-Two numbers per bin: the mean wait, and a high quantile. The second is what an
-honest promise is built on. Quoting the mean means missing half of them.
+"""
+This computes what the wait will be by time of day, because the app has to
+answer two questions a customer actually asks, if I order now when do I get it,
+and if I want it at quarter past when should I order, and both need a wait it
+can look up rather than one it can only measure after the fact. The forecast
+comes from the simulator, many days averaged and binned by time of day, and is
+written out as a file the app reads; the app never imports the simulator but
+reads a forecast the way it reads params and the policy selection, which is
+what makes a promise at the counter a prediction the model actually made and
+lets promise_error be run over the app's own log afterwards to see whether it
+held. Each bin carries two numbers, the mean wait and a high quantile, and the
+second is what an honest promise is built on, because quoting the mean means
+missing half of them. Run it with python -m sim.forecast, which writes
+params/forecast.yaml.
 """
 
 from __future__ import annotations
@@ -32,9 +31,9 @@ __all__ = ["Forecast", "forecast", "to_dict", "SAFE_QUANTILE"]
 
 SECONDS_PER_MINUTE = 60.0
 
-#: Promises are quoted off this rather than the mean. A promise kept on average
-#: is missed half the time, and a promise missed half the time is not one anyone
-#: relies on twice.
+# Promises are quoted off this rather than the mean. A promise kept on average
+# is missed half the time, and a promise missed half the time is not one anyone
+# relies on twice.
 SAFE_QUANTILE = 80
 
 
@@ -56,7 +55,8 @@ def to_dict(result: Forecast) -> dict:
 def forecast(
     params: Params, runner, *, seeds: list[int] | None = None, bin_minutes: float = 15.0
 ) -> Forecast:
-    """Wait by time of day, from many simulated days.
+    """
+    Wait by time of day, from many simulated days.
 
     Binned by when the order was *placed*, because that is the moment a customer
     is deciding, and it is the only time they can act on.
@@ -103,8 +103,8 @@ def forecast(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Forecast the wait by time of day.")
-    # The hybrid, not the free fit. The free fit never saw the morning -- nobody
-    # was counting before 10:20, so its early bins hold the flat value its
+    # The hybrid, not the free fit. The free fit never saw the morning, because
+    # nobody was counting before 10:20, so its early bins hold the flat value its
     # search started from, and the app was quoting 2.8 minutes at 09:00 for a
     # building that lets 520 students out at 09:15. A promise is the one place
     # a placeholder cannot be allowed to stand in for a measurement.
@@ -135,7 +135,7 @@ def main() -> None:
     Path(args.out).write_text(
         "# Written by sim/forecast.py. The app reads this to answer 'when will\n"
         "# it be ready' and 'when should I order', so a promise made at the\n"
-        "# counter is a prediction the model actually made -- and promise_error\n"
+        "# counter is a prediction the model actually made, and promise_error\n"
         "# can be run over the app's own log afterwards to see whether it held.\n"
         f"# Quoted off the {SAFE_QUANTILE}th percentile, not the mean: a promise\n"
         "# kept on average is missed half the time.\n\n"

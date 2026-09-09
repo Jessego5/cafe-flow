@@ -12,15 +12,16 @@
 #
 # The background is the finding. base.yaml assumed 8 an hour; the fit wants
 # 24, so most of the demand between classes is not this building's
-# students at all -- which is also why the timetable alone emptied the cafe at
+# students at all, which is also why the timetable alone emptied the cafe at
 # half past one and the counted queue did not.
 #
 # Mean absolute error 1.04 people across the counted bins.
 #
-# The morning is confirmed out of sample. Nothing here was fitted to it -- the
-# queue was only counted from 10:20 -- yet 20 orders were later counted on a
-# Thursday in 09:15-09:35 against this model's 20.1 for that day, where the free-rate fit predicts 7.3
-# and never once reached 20 in twenty simulated days. See
+# The morning is confirmed out of sample. Nothing here was fitted to it (the
+# queue was only counted from 10:20), yet 20 orders were later counted on a
+# Thursday in 09:15-09:35 against this model's 20.1 for that day, where the
+# free-rate fit predicts 7.3 and never once reached 20 in twenty simulated
+# days. See
 # observations/morning-order-count.txt.
 
 arrivals:

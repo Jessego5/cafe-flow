@@ -1,19 +1,16 @@
-"""Cut a sheet of product art into one PNG per menu item.
-
-The sheet carries its own alpha, so there is no matte to reconstruct: each
-sprite is a connected run of opaque pixels, and the transparency that ships is
-the transparency that was drawn. (An earlier version of this script keyed the
-art off a black background, because the sheet had reached us as a JPEG with the
-alpha flattened away. Everything it did, thresholds, fringe removal, a
-redrawn outline, was working around that one lost channel, and all of it is
-gone.)
-
+"""
+This cuts a sheet of product art into one PNG per menu item. The sheet carries
+its own alpha, so there is no matte to reconstruct: each sprite is a connected
+run of opaque pixels, and the transparency that ships is the transparency that
+was drawn. An earlier version of this script keyed the art off a black
+background, because the sheet had reached us as a JPEG with the alpha flattened
+away, and everything it did, the thresholds and the fringe removal and a
+redrawn outline, was working around that one lost channel; all of it is gone.
 Sprites are ordered the way the sheet reads, left to right and top to bottom,
-and named for their key in `params/base.yaml`. Order is the only assumption
-here, so --dry-run reports the row counts to check it against the picture.
-
-    python tools/slice_product_art.py sheet.png --dry-run
-    python tools/slice_product_art.py sheet.png --out web/student/img
+and named for their key in params/base.yaml, so order is the only assumption
+here and --dry-run reports the row counts to check it against the picture. Run
+it with python tools/slice_product_art.py sheet.png --dry-run, then again with
+--out web/student/img.
 """
 
 from __future__ import annotations
@@ -85,7 +82,8 @@ def components(mask: np.ndarray) -> dict[int, list[tuple[int, int, int]]]:
 
 
 def sprites(alpha: np.ndarray) -> list[list[tuple[int, int, int]]]:
-    """Every drawn shape on the sheet, in reading order.
+    """
+    Every drawn shape on the sheet, in reading order.
 
     Rows are read off the vertical centres rather than off empty bands: a tall
     sandwich starts above where the bagel over it ends, so the rows overlap and
@@ -115,7 +113,8 @@ def sprites(alpha: np.ndarray) -> list[list[tuple[int, int, int]]]:
 
 
 def cut(sheet: Image.Image, spans: list[tuple[int, int, int]], pad: float) -> Image.Image:
-    """One sprite, alone on a transparent square.
+    """
+    One sprite, alone on a transparent square.
 
     Only this shape's own pixels are copied: the crop rectangle of a sandwich
     overlaps the bagel above it, and a neighbour's crust in the corner of the

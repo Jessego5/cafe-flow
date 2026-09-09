@@ -1,11 +1,10 @@
-"""Make a staff account.
-
-    python -m app.create_staff jess
-
-Prompts for the password rather than taking it as an argument, because an
-argument lands in the shell history and in the process list. There is no
-registration endpoint on purpose: the cafe has one bar and the people behind it
-are known to each other, so accounts are made by somebody with a shell.
+"""
+This makes a staff account. It prompts for the password rather than taking it
+as an argument, because an argument lands in the shell history and in the
+process list. There is no registration endpoint on purpose: the cafe has one
+bar and the people behind it are known to each other, so accounts are made by
+somebody with a shell, which for one bar is the right amount of ceremony. Run
+it with python -m app.create_staff jess.
 """
 
 from __future__ import annotations

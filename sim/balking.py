@@ -1,13 +1,12 @@
-"""Whether a customer joins the queue at all, and by which channel.
-
-Until now the model assumed infinite patience: nobody ever left, so a long
-queue cost nothing and throughput was a ceiling nobody would reach in practice.
-This is where a wait acquires a consequence.
-
-A walk-up arrives, looks at the line, estimates what it will cost them, and
-leaves if that exceeds what they will put up with. Someone who ordered ahead has
-already committed and never balks, which is the whole of the pre-order case,
-and why the balk count is the revenue argument.
+"""
+This decides whether a customer joins the queue at all, and by which channel.
+The model assumed infinite patience until this existed, which meant nobody ever
+left, a long queue cost nothing and throughput was a ceiling nobody would reach
+in practice; this is where a wait acquires a consequence. A walk-up arrives,
+looks at the line, estimates what it will cost them and leaves if that exceeds
+what they will put up with, while somebody who ordered ahead has already
+committed and never balks, which is the whole of the pre-order case and why the
+balk count is the revenue argument. Imported by sim/engine.py.
 """
 
 from __future__ import annotations
@@ -47,7 +46,8 @@ def sample_minutes(dist, rng: np.random.Generator) -> float:
 
 
 def draw_channel(params: Params, rng: np.random.Generator) -> Channel:
-    """Walk up, or order ahead. Adoption is a config fraction today and an
+    """
+    Walk up, or order ahead. Adoption is a config fraction today and an
     observable at the pickup shelf once someone counts."""
     return (
         Channel.PREORDER
@@ -57,7 +57,8 @@ def draw_channel(params: Params, rng: np.random.Generator) -> Channel:
 
 
 def preorder_lead_s(params: Params) -> float:
-    """How far ahead someone orders: one class block.
+    """
+    How far ahead someone orders: one class block.
 
     Taken from the gap between the blocks themselves, so a timetable with
     90-minute periods moves this without touching any code.

@@ -1,10 +1,12 @@
-"""The order state machine. The single authority on what may happen next.
-
-`app/` and `sim/` both call `transition()`; neither is allowed its own idea of a
-legal move (ground rule 2). Every call produces exactly one event, which is what
-makes the conservation identity at M3 hold:
-
-    placed == picked_up + balked + abandoned + cancelled + in_flight_at_end
+"""
+This is the order state machine and the single authority on what may happen
+next. app/ and sim/ both call transition() and neither is allowed its own idea
+of a legal move, which is what keeps a bug in one runtime from being a
+different bug in the other. Every call produces exactly one event, and that is
+what makes the conservation identity hold: placed == picked_up + balked +
+abandoned + cancelled + in_flight_at_end, checked in the metrics rather than
+assumed, so an order that goes missing shows up as arithmetic that no longer
+balances. Imported by app/ and sim/.
 """
 
 from __future__ import annotations
@@ -45,7 +47,7 @@ class State(StrEnum):
         return state in TERMINAL
 
 
-#: The whole rulebook. An entry that maps to an empty set is an absorbing state.
+# The whole rulebook. An entry that maps to an empty set is an absorbing state.
 LEGAL: dict[State, set[State]] = {
     # A balked customer is recorded as an order that never got made, so that
     # balks stay inside the conservation identity instead of vanishing.
@@ -63,7 +65,7 @@ TERMINAL: frozenset[State] = frozenset(
     state for state, onward in LEGAL.items() if not onward
 )
 
-#: Terminal states that mean the cafe never earned the order.
+# Terminal states that mean the cafe never earned the order.
 LOST: frozenset[State] = frozenset({State.BALKED, State.ABANDONED, State.CANCELLED})
 
 PENDING_SEQ = -1  # replaced by EventLog.append
@@ -92,7 +94,8 @@ def place(
     log: "EventLog | None" = None,
     **payload: Any,
 ) -> Event:
-    """The order's first event: it came into existence.
+    """
+    The order's first event: it came into existence.
 
     Creation has no from-state, so it is not a transition, but it still has to
     be an event, `placed` is the left-hand side of the conservation identity
@@ -131,7 +134,8 @@ def promise(
     log: "EventLog | None" = None,
     **payload: Any,
 ) -> Event:
-    """Quote a time the order will be ready by.
+    """
+    Quote a time the order will be ready by.
 
     Not a state change (the order is where it was), but it has to be an event,
     because how far a promise missed can only be measured against what was
@@ -167,7 +171,8 @@ def amend(
     bottleneck_delta_s: float = 0.0,
     **payload: Any,
 ) -> Event:
-    """Change what an order is for, before anyone has started making it.
+    """
+    Change what an order is for, before anyone has started making it.
 
     Not a state change either: the order stays where it is, it is just for
     something else now. It still has to be an event, because every margin in
@@ -215,7 +220,8 @@ def transition(
     log: "EventLog | None" = None,
     **payload: Any,
 ) -> Event:
-    """Move `order` to `to` at time `at`, returning the event to append.
+    """
+    Move `order` to `to` at time `at`, returning the event to append.
 
     Raises IllegalTransition and leaves the order untouched if the move is not
     in LEGAL. Pass `log` to have the event appended (and sequenced) for you;
