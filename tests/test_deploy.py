@@ -7,8 +7,8 @@ machine, at boot, in front of a cafe.
 
 from __future__ import annotations
 
-import re
 import stat
+import tomllib
 
 import pytest
 
@@ -18,6 +18,18 @@ DEPLOY_FILES = ["Dockerfile", "entrypoint.sh", "fly.toml", "litestream.yml", "RE
 @pytest.fixture(scope="module")
 def deploy(request):
     return request.config.rootpath / "deploy"
+
+
+@pytest.fixture(scope="module")
+def fly(deploy):
+    """fly.toml, parsed.
+
+    These used to match strings, which tied them to whichever quote style the
+    `fly` CLI last rewrote the file in and broke on a reformat that changed
+    nothing. Assert on values instead.
+    """
+    with (deploy / "fly.toml").open("rb") as handle:
+        return tomllib.load(handle)
 
 
 def test_the_deploy_directory_is_complete(deploy):
@@ -32,26 +44,26 @@ def test_the_entrypoint_is_executable(deploy):
         assert mode & stat.S_IXUSR, f"{name} is not executable"
 
 
-def test_fly_pins_one_machine(deploy):
+def test_fly_pins_one_machine(fly):
     """SQLite in WAL mode is single-writer; two machines silently corrupt state."""
-    fly = (deploy / "fly.toml").read_text()
-    assert "min_machines_running = 1" in fly
-    assert "auto_stop_machines = false" in fly
-    assert "auto_start_machines = false" in fly
-    # a stopped or duplicated machine is the failure this pins down
-    assert not re.search(r"min_machines_running\s*=\s*([02-9])", fly)
+    service = fly["http_service"]
+    assert service["min_machines_running"] == 1
+    assert service["auto_start_machines"] is False
+    # fly turned this into an enum; 'off' is what false used to mean, and the
+    # other values ('stop', 'suspend') are exactly what must not happen here.
+    assert service["auto_stop_machines"] in (False, "off")
 
 
-def test_fly_mounts_a_volume_and_checks_health(deploy):
-    fly = (deploy / "fly.toml").read_text()
-    assert 'destination = "/data"' in fly
-    assert 'path = "/healthz"' in fly
+def test_fly_mounts_a_volume_and_checks_health(fly):
+    assert any(mount["destination"] == "/data" for mount in fly["mounts"])
+    assert any(
+        check["path"] == "/healthz" for check in fly["http_service"]["checks"]
+    )
 
 
-def test_the_heartbeat_stays_under_the_proxy_idle_timeout(deploy):
+def test_the_heartbeat_stays_under_the_proxy_idle_timeout(fly):
     """A proxy that times out before the next heartbeat kills every stream."""
-    fly = (deploy / "fly.toml").read_text()
-    heartbeat = int(re.search(r'CAFE_SSE_HEARTBEAT_S = "(\d+)"', fly).group(1))
+    heartbeat = int(fly["env"]["CAFE_SSE_HEARTBEAT_S"])
     assert 0 < heartbeat <= 30
 
 
