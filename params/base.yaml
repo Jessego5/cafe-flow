@@ -3,7 +3,7 @@
 # Provenance (ground rule 3). `source` on a mapping applies to everything
 # beneath it; `source_of` overrides individual keys in that same mapping.
 #
-#   observed   read off the menu boards photographed 2026-08-27
+#   observed   read off the menu boards photographed in the cafe
 #   published  a conventional figure from an industry or vendor source, cited
 #              at the parameter
 #   assumed    still a guess
@@ -63,7 +63,7 @@ stations:
   # 12oz of milk in 12 + 13*2 = 38s, inside the 30-45s a barista is quoted for
   # a pitcher. A 32oz pitcher therefore holds two medium drinks, not four.
   # changeover_s is purging and wiping between milks. Small, and the only
-  # thing a reordering policy has to work with — worth a stopwatch.
+  # thing a reordering policy has to work with, worth a stopwatch.
   steam_wand:    { capacity: 1, setup_s: 12, per_6oz_s: 13, changeover_s: 10,
                    batch_key: milk_type, max_batch_oz: 32,
                    source_of: { setup_s: published, per_6oz_s: published } }
@@ -80,7 +80,7 @@ stations:
   brew_tap:      { capacity: 4, pour_s: 10 }
 
   # Close the lid and walk away. A pressed sandwich occupies the press, not a
-  # person — and it goes on occupying it until someone comes back for it.
+  # person, and it goes on occupying it until someone comes back for it.
   # 3-5 minutes a sandwich, one or two at a time. Run one at a time that is
   # 10-15 sandwiches an hour, which is the published throughput of a single
   # 14-inch grill and the FIFO baseline here.
@@ -371,9 +371,22 @@ menu:
 # ---------------------------------------------------------------------------
 # mix
 #
-# All assumed. `serve` is the hot/iced split, and it is the single most
-# important thing to count during observation: it decides how large a share of
-# the menu milk batching can touch at all.
+# All assumed. `serve` is the hot/iced split, and it decides how large a share
+# of the menu milk batching can touch at all, because an iced drink never goes
+# near the steam wand.
+#
+# 20/80 stands for the warm end of the year, which is when the cafe was
+# watched. It is read off cup material at the handoff shelf, where hot goes out
+# in paper and cold in plastic, so the split is legible without hearing an
+# order. That is a look rather than a tally, so it stays `assumed`, but it
+# replaces a 45/55 that was invented, and it is the right end of the range to
+# carry as the default, since it is the one the rest of this file was formed
+# against.
+#
+# The split cannot be one number across a Madison academic year: September runs
+# a 74F normal high and January a 29F one. `params/season/*.yaml` overlays this
+# key per month, written by `python -m tools.serve_by_season`, which also
+# documents where the two anchors come from and what would replace them.
 # ---------------------------------------------------------------------------
 mix:
   source: assumed
@@ -414,7 +427,7 @@ mix:
   milk: { two_percent: 0.30, oat: 0.32, whole: 0.12, nonfat: 0.08,
           almond: 0.10, soy: 0.08 }
 
-  serve: { hot: 0.45, iced: 0.55 }
+  serve: { hot: 0.20, iced: 0.80 }
 
   # Food is an attachment, not a first choice. `item` is left out so the food
   # is drawn from the food share of `drink` above -- a salad is 110 seconds and
@@ -429,7 +442,7 @@ arrivals:
     - { ends_at: "10:50", sections: 16, avg_enrollment: 32 }
     - { ends_at: "11:50", sections: 12, avg_enrollment: 30 }
     - { ends_at: "12:50", sections: 10, avg_enrollment: 28 }
-  capture_rate: 0.055          # FITTED AT M8 — primary calibration knob
+  capture_rate: 0.055          # FITTED AT M8, primary calibration knob
   offset_min: 3.0
   sigma_min: 2.5
   background_per_hour: 8
