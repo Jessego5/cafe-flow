@@ -1,0 +1,15 @@
+# May in Madison: normal daily high 70.2F.
+#
+# Written by `python -m tools.serve_by_season`. The iced share is
+# interpolated between 80% iced at 74F and 60% at 30F,
+# and both of those are assumed rather than counted. See the module
+# docstring for where each anchor comes from and what would replace it.
+#
+# This moves load off the steam wand and onto the cold bar. It does not
+# move the register, which is the constraint.
+
+mix:
+  serve:
+    hot: 0.22
+    iced: 0.78
+  source: assumed
