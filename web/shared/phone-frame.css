@@ -1,6 +1,6 @@
 /* A phone, drawn.
  *
- * Bezel, dynamic island, side buttons and status bar are all CSS — no images,
+ * Bezel, dynamic island, side buttons and status bar are all CSS: no images,
  * no device-mockup dependency. The point is the sizing: `--phone-width` sets
  * the screen's width and every other dimension is derived from it, so one
  * variable resizes the whole device and nothing drifts out of proportion.
@@ -198,14 +198,19 @@
    two borders, so `width: 2r + w` puts the stroke's *inner* edge at r and the
    rings sit a full stroke apart. Under border-box the same numbers make the
    stroke straddle r, which closes the gaps and welds the three rings into one
-   blob — and collapses the r=0 wedge into a degenerate box whose border eats
+   blob, and collapses the r=0 wedge into a degenerate box whose border eats
    it, whose two 45-degree mitres then round to different whole pixels and grow
    a step down one side. */
 .phone-frame__wifi {
   --s: 1.8em;
-  --stroke: calc(var(--s) * 0.1147);
-  --pitch: calc(var(--s) * 0.164);
-  --tip: calc(var(--stroke) * 1.3);
+  /* Stroke against pitch is what decides whether this reads as three rings or
+     one blob. The gap between rings is `pitch - stroke`, and at a fifteen-pixel
+     status bar it needs to be wider than the ink either side of it or the
+     antialiasing closes it: a third of a stroke of gap is what the old numbers
+     left, and it filled in. These give it one and a third. */
+  --stroke: calc(var(--s) * 0.075);
+  --pitch: calc(var(--s) * 0.174);
+  --tip: calc(var(--stroke) * 1.5);
 
   position: relative;
   /* --s is the outer ring's box, but a 90-degree sweep only paints sin(45) of

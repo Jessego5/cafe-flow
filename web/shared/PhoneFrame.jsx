@@ -5,8 +5,8 @@ import './phone-frame.css'
 //
 // One wrapper: whatever you nest inside renders on the screen, interactive and
 // scrollable, clipped to the screen's corners. Nothing about the device is an
-// image — the bezel, the island, the side buttons and the status bar are all
-// drawn — and every dimension derives from `--phone-width`, so `width` is the
+// image: the bezel, the island, the side buttons and the status bar are all
+// drawn, and every dimension derives from `--phone-width`, so `width` is the
 // only knob needed to resize the whole thing.
 //
 //   <PhoneFrame>            <YourApp />           </PhoneFrame>

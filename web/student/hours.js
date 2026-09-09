@@ -38,6 +38,7 @@ export function serviceHours(config, at = new Date()) {
     open,
     opens,
     closes,
+    now,                       // minutes since midnight, on the cafe's clock
     label: `${pretty(config.opens_at)} – ${pretty(config.closes_at)}`,
     // Closed says which way: before opening you can wait, after it you cannot.
     notice: open

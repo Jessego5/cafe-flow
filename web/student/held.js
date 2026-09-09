@@ -2,7 +2,7 @@
 //
 // A held order is paid for and not yet in the queue. The server holds it and
 // puts it in when the *live* line says ordering now lands by the time asked
-// for — so there is no release loop here, and there must not be one: a loop in
+// for, so there is no release loop here, and there must not be one: a loop in
 // the browser only runs while a tab is open, which is the exact thing holding
 // the order server-side exists to avoid.
 //

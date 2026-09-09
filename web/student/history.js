@@ -1,6 +1,6 @@
 // The order ids this phone has placed.
 //
-// There is no per-customer endpoint — the API keys orders by id and the cafe
+// There is no per-customer endpoint: the API keys orders by id and the cafe
 // has no accounts (auth is stubbed, non-goals). So the phone remembers its own
 // receipts and re-fetches each one. An id the server no longer knows is
 // dropped rather than shown as an error: resetting the demo database should not

@@ -5,7 +5,7 @@ import { productImage } from './products.js'
 //
 // The board has no product photography and this app is not going to invent
 // any, so the thumbnails carry a drawn mark instead: a cup for the drinks, a
-// plate for the kitchen. It reads as a placeholder on purpose — nobody should
+// plate for the kitchen. It reads as a placeholder on purpose: nobody should
 // mistake a sketch for a picture of what they are about to be handed.
 
 const INK = '#1a1917'

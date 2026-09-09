@@ -23,7 +23,7 @@ export default defineConfig({
         barista: resolve(__dirname, 'barista.html'),
         display: resolve(__dirname, 'display.html'),
         // the component gallery: not a product surface, so `app/main.py` does
-        // not route to it — open frame.html directly
+        // not route to it. Open frame.html directly
         frame: resolve(__dirname, 'frame.html'),
       },
     },

@@ -1,0 +1,23 @@
+/* The desk the phone sits on.
+ *
+ * Only used when the window is big enough for a device to fit in it; a phone
+ * gets the app itself. The frame keeps the size it has everywhere else, 390px
+ * of screen, and a window too short to hold it scrolls rather than shrinking
+ * the device.
+ */
+
+html.student-stage,
+body.student-stage { height: 100%; }
+
+body.student-stage {
+  margin: 0;
+  background: #edeae5;
+  overflow: auto;
+}
+
+.stage {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}

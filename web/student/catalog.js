@@ -2,7 +2,7 @@
 //
 // Presentation only. Every fact here is either derived from what `/menu`
 // already returns (stations, variants, whether it takes milk) or is copy that
-// describes the station plan in words — a latte's blurb says "two shots under
+// describes the station plan in words: a latte's blurb says "two shots under
 // steamed milk" because that is literally its plan in `params/base.yaml`. No
 // nutrition, no calories, no claims the cafe has not made.
 
@@ -65,7 +65,7 @@ const BOARD = {
 }
 
 // For the rest the board gives a name and a price and nothing else, so these
-// describe the build instead — each one is that item's station plan in words,
+// describe the build instead. Each one is that item's station plan in words,
 // and nothing is claimed here that `params/base.yaml` does not already say.
 const DERIVED = {
   drip_coffee: 'Off the urn, poured to order. The fastest cup on the board.',
@@ -117,14 +117,14 @@ export function badges(item) {
 }
 
 // The four the bar makes most, by the drink shares in `params/base.yaml`
-// (latte .130, drip .095, cold brew .065, the bagel .055). Not personalised —
+// (latte .130, drip .095, cold brew .065, the bagel .055). Not personalised:
 // this app has no idea who you are, and says so rather than pretending.
 const MOST_ORDERED = ['latte', 'drip_coffee', 'cold_brew', 'bacon_egg_cheese_bagel']
 
 // The hero names the cafe, and takes that name from `/config` rather than
 // holding a copy of it. Beneath it, who the beans come from, in the size the
-// board gives it. Half of that line is the board's own wording — it reads
-// "PROUDLY POURING Peet's Coffee" above the Peet's logo — and half is from the
+// board gives it. Half of that line is the board's own wording, and it reads
+// "PROUDLY POURING Peet's Coffee" above the Peet's logo, and half is from the
 // cafe rather than the wall: Ground Truth supplies it too, which no board we
 // photographed says.
 export const FEATURE = {
@@ -145,11 +145,11 @@ export function nameLines(name) {
 // left-hand jump list uses, where a two-word label wraps and reads as two
 // entries. Sections without a `rail` are short enough already.
 //
-// These are the cafe's sections, photographed 2026-09-03, in the cafe's own
+// These are the cafe's sections, as photographed, in the cafe's own
 // order and wording: two drink boards reading Coffee & Espresso, Cold Brew,
 // Tea & Sparkling, Non-Coffee, then Breakfast Paninis, Lunch Paninis, Salads,
-// Soups. An earlier version of this file grouped by station instead — Espresso
-// bar, Brew & cold brew — which is how the drink is made rather than how it is
+// Soups. An earlier version of this file grouped by station instead: Espresso
+// bar, Brew & cold brew, which is how the drink is made rather than how it is
 // sold, and it disagreed with the board in three places: drip coffee sits
 // under Coffee & Espresso, the sparkling cold brew under Tea & Sparkling, and
 // cocoa in a section of its own.

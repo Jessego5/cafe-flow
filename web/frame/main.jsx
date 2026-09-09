@@ -24,7 +24,7 @@ function Demo() {
     <div className="gallery">
       <h1>Phone frame</h1>
       <p className="lede">
-        One wrapper around arbitrary content — here, the whole cafe app, live. The bezel, island,
+        One wrapper around arbitrary content: here, the whole cafe app, live. The bezel, island,
         side buttons and status bar are drawn in CSS, and every dimension derives from{' '}
         <code>--phone-width</code>: drag it and the device resizes as one piece.
       </p>

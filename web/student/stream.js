@@ -1,7 +1,7 @@
 // One event-stream connection per phone.
 //
-// Two panels on this screen care about live state — the wait estimate and this
-// phone's own orders — and a cafe full of customers each holding two open
+// Two panels on this screen care about live state, the wait estimate and this
+// phone's own orders, and a cafe full of customers each holding two open
 // streams is fan-out the server does not need to do. So the page opens one
 // connection and hands every subscriber the same signal.
 //
