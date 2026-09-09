@@ -148,7 +148,7 @@ def _from_profile(params: Params, rng: np.random.Generator) -> list[tuple[float,
 
     A non-homogeneous Poisson process: each bin's count is drawn from its own
     rate and placed uniformly inside it. `capture_rate` still scales the whole
-    curve, so the same knob calibrates either model — which is what lets a
+    curve, so the same knob calibrates either model, which is what lets a
     measured shape and a fitted volume live together.
     """
     profile = params.arrivals.profile

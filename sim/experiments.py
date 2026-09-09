@@ -4,7 +4,7 @@ The experiments cannot go through HTTP: an arm is hundreds of orders and a
 sweep is hundreds of arms, and the DES runs a simulated day in milliseconds
 because virtual time jumps event to event.
 
-Today this runs named arms — a set of parameter overlays — across seeds and
+Today this runs named arms (a set of parameter overlays) across seeds and
 reports the difference with a confidence interval. M7 adds the parameter sweeps
 on top of the same machinery.
 """
@@ -53,7 +53,7 @@ class Arm:
 #: The second file is the one that was missing. `observed.yaml` fits a single
 #: `capture_rate` on top of the *invented* class timetable in `base.yaml`;
 #: `fitted_arrivals.yaml` replaces that timetable with a curve fitted to the
-#: queue counted on 2026-09-03. Without it every experiment here ran on a
+#: queue counted in the cafe. Without it every experiment here ran on a
 #: fabricated demand shape while `sim/forecast.py` -- and therefore every
 #: promise the app quotes a customer -- ran on the fitted one. The analysis and
 #: the product disagreed about what day it was.
@@ -119,7 +119,7 @@ ARMS: dict[str, Arm] = {
     "microwave_batched": Arm(
         "microwave_batched",
         OBSERVED + ("params/experiments/microwave.yaml", "params/experiments/batch.yaml"),
-        "the same, with batching on — which now has only the wand to work with",
+        "the same, with batching on, which now has only the wand to work with",
     ),
     "shown_wait": Arm(
         "shown_wait",
@@ -134,7 +134,7 @@ ARMS: dict[str, Arm] = {
     "observed": Arm(
         "observed",
         OBSERVED,
-        "the cafe as it was measured on 2026-09-03",
+        "the cafe as it was measured",
     ),
     "timetable": Arm(
         "timetable",

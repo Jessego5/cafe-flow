@@ -1,18 +1,19 @@
-# Hypothesis: the food is pre-made and held in a fridge, then heated to order
-# in a microwave or a high-speed oven.
+# Counterfactual: the same pre-made food, on a station that heats one at a time.
 #
-# Three changes at once, and the third is the one that matters:
+# Observation settled the first two of these and refuted the third, which is why
+# this file is an arm rather than a hypothesis:
 #
-#   1. The cycle is much shorter. Heating a wrapped sandwich is around a
-#      minute, against three to five for a press.
+#   1. The cycle is short. Heating a wrapped sandwich is around a minute,
+#      against the three to five the config had for a press.
 #   2. There is nothing to assemble. Someone built it earlier; the barista
 #      takes it out, unwraps it and hands it over.
-#   3. IT HOLDS ONE. A press takes two side by side; a microwave takes one.
-#      That removes the batching this project found the whole saving in.
+#   3. IT HOLDS ONE. This is the counterfactual. The cafe's oven holds three,
+#      and `params/observed.yaml` carries that. A station holding one removes
+#      the batching this project had expected to find the saving in, so the arm
+#      exists to price what that would have cost.
 #
-# UNCONFIRMED, from what the cafe looks like rather than a timed observation.
-# The station is still called panini_press, which is now a misnomer; it would
-# be renamed in base.yaml if this holds up.
+# The station is still called panini_press, which is a misnomer either way. It
+# stays because renaming it is a config change with no result attached.
 
 meta:
   scenario: microwave

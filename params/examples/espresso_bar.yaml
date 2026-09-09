@@ -2,7 +2,7 @@
 #
 # A small espresso bar: no food, no cold brew, one wand, one group head, and
 # twice the drink volume in a shorter day. Everything the machinery needs comes
-# from this file — feed it and it works out which scheduler this bar should run,
+# from this file, feed it and it works out which scheduler this bar should run,
 # and it need not be the one Ground Truth should.
 #
 # Entirely assumed. It exists to exercise the tool, not to describe anywhere.

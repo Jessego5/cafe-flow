@@ -384,7 +384,7 @@ def check_slot_concurrency(base_url: str, *, attempts: int = 50) -> dict:
 
     The capacity check and the decrement have to be one transaction. Split into
     a read and a write they interleave, and a slot with room for ten takes
-    thirty bookings — which nobody notices until the pickup shelf is full of
+    thirty bookings, which nobody notices until the pickup shelf is full of
     drinks nobody can make.
     """
     with httpx.Client(base_url=base_url, timeout=30.0) as client:

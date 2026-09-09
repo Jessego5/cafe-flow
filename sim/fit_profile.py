@@ -5,14 +5,14 @@ tight window. It puts thirty people through the door in five minutes, which is
 why it produced seventeen-minute median waits against a cafe where queues of
 eleven cleared in twenty.
 
-Nobody counted arrivals — you cannot, standing in a cafe. What was counted is
+Nobody counted arrivals; you cannot, standing in a cafe. What was counted is
 the queue, every couple of minutes. So the curve is fitted rather than measured:
 raise the rate in bins where the model is short of what was seen, lower it where
 it is over, and repeat. Demand rises monotonically with the rate in each bin and
 the bins barely interact at this load, so a few passes converge.
 
 The result is `arrivals.model: profile`, which is the same machinery the NYC
-transaction log used — there it was read straight off timestamps, here it is
+transaction log used. There it was read straight off timestamps; here it is
 inferred from its consequences.
 """
 
@@ -143,7 +143,7 @@ def main() -> None:
 
     Path(args.out).write_text(
         "# Fitted by sim/fit_profile.py so the simulated queue reproduces the one\n"
-        "# counted on 2026-09-03. Arrivals were never counted -- you cannot count\n"
+        "# counted in the cafe. Arrivals were never counted -- you cannot count\n"
         "# them standing in a cafe -- so the curve is inferred from its\n"
         "# consequences rather than measured.\n\n"
         + yaml.safe_dump(overlay, sort_keys=False)

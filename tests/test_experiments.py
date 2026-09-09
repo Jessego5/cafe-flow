@@ -193,7 +193,7 @@ def test_more_people_ordering_ahead_means_a_shorter_line(tmp_path):
     true: patience was being spent *after* the register, so the model shed
     customers who had already ordered, and ordering ahead 'rescued' them.
     Once the budget is spent in the line where it belongs, almost nobody is
-    lost at all — which is what a full day of watching found — and there is no
+    lost at all, which is what watching the cafe found, and there is no
     lost revenue left for the app to recover.
 
     What survives is the claim worth making anyway: ordering ahead takes people

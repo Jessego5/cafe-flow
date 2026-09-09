@@ -54,7 +54,7 @@ jobs:
   drift:
     # M9: the app's event log must produce the same metrics as the in-process
     # run for the same scenario. If they disagree the app and the core have
-    # drifted, and that is a bug in app/, not a tolerance to widen — so this
+    # drifted, and that is a bug in app/, not a tolerance to widen, so this
     # gates the deploy rather than reporting.
     name: app/core drift check
     runs-on: ubuntu-latest

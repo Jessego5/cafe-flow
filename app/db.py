@@ -180,8 +180,8 @@ class OrderEventRow(SQLModel, table=True):
 class HealthRow(SQLModel, table=True):
     """One row, rewritten by every health check.
 
-    The check needs to prove the database file is writable — a read-only volume
-    and a full disk both fail here — without appending to `order_events`, which
+    The check needs to prove the database file is writable (a read-only volume
+    and a full disk both fail here) without appending to `order_events`, which
     may only ever contain real transitions.
     """
 
@@ -675,7 +675,7 @@ def load_order(session: Session, order_id: str, params: Params) -> tuple[OrderRo
 def open_orders(
     session: Session, *, include_simulated: bool = True, on: date | None = None
 ) -> list[tuple[OrderRow, list[OrderItemRow]]]:
-    """Everything still in flight, oldest first — the barista's queue."""
+    """Everything still in flight, oldest first: the barista's queue."""
     statement = select(OrderRow).where(
         OrderRow.state.in_([str(s) for s in State if not State.is_terminal(s)])
     )

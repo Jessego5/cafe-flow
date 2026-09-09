@@ -186,7 +186,7 @@ def main() -> None:
     path = Path(args.xlsx)
     if not path.exists():
         raise SystemExit(
-            f"{path} not found. Raw schedules live in data/, which is gitignored — "
+            f"{path} not found. Raw schedules live in data/, which is gitignored. "
             "see data/README.md."
         )
 

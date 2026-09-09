@@ -5,8 +5,8 @@ decide who gives up; the app asks it to put a number on a screen. If those two
 ever disagreed, the cafe would be telling customers one thing and the model
 would be assuming another (ground rule 2).
 
-It is deliberately the estimate a *person* could make — people ahead, times how
-long each looks like taking — not the best forecast available from the state of
+It is deliberately the estimate a *person* could make: people ahead, times how
+long each looks like taking. Not the best forecast available from the state of
 every station. Nobody standing at a counter computes anything better, and the
 number is only useful if it is the one a customer would arrive at themselves.
 """
@@ -36,7 +36,7 @@ def nominal_seconds_per_order(params: Params, baristas: int) -> float:
 
     Derived rather than configured: the mix-weighted hands-on time of an order
     plus the register, divided by the people working. A first-order estimate,
-    and meant to be — it stands in for what someone can infer from watching the
+    and meant to be: it stands in for what someone can infer from watching the
     counter, not for what the cafe actually achieves.
     """
     per_item: list[float] = []

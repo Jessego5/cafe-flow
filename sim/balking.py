@@ -6,7 +6,7 @@ This is where a wait acquires a consequence.
 
 A walk-up arrives, looks at the line, estimates what it will cost them, and
 leaves if that exceeds what they will put up with. Someone who ordered ahead has
-already committed and never balks — which is the whole of the pre-order case,
+already committed and never balks, which is the whole of the pre-order case,
 and why the balk count is the revenue argument.
 """
 

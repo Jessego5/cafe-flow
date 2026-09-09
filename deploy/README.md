@@ -36,7 +36,7 @@ somebody with a shell, which for one bar is the right amount of ceremony.
 ## Backups
 
 Litestream replicates `/data/cafe.db` continuously. Set the credentials as
-secrets — without `LITESTREAM_BUCKET` the container runs unreplicated and says
+secrets, without `LITESTREAM_BUCKET` the container runs unreplicated and says
 so at boot, which is fine for `dev` and `demo` and not fine for `pilot`.
 
     fly secrets set -c deploy/fly.toml \

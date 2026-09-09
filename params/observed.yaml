@@ -1,5 +1,6 @@
-# Ground Truth, observed 2026-09-03. 49 queue readings between 10:20 and 15:44,
-# plus notes across the day, plus the menu boards photographed the same day.
+# Ground Truth, from observation in the cafe. 49 queue readings between 10:20
+# and 15:44, plus notes taken alongside them, plus the menu boards photographed
+# there.
 #
 # What was seen rather than guessed: the hours, the staffing, what heats the
 # food and how many it holds, that the till is a dedicated station, and the
@@ -7,18 +8,18 @@
 #
 # One partial: the till person never makes drinks, so the register should not
 # draw on the barista pool at all. The engine always takes a barista for the
-# register phase, so capacity 1 is as close as the config can get — it stops
+# register phase, so capacity 1 is as close as the config can get: it stops
 # the register scaling with the crew, but still spends one barista's time.
 #
 # Two things the boards say that this file cannot hold. The soups are priced by
 # size, cup 3.99 and bowl 4.39, and `variants` here means the hot-or-iced serve
-# choice drawn from mix.serve — a second axis would need a model, not a value,
+# choice drawn from mix.serve, a second axis would need a model, not a value,
 # so only the cup price is carried. Likewise the paid extras: whipped cream
 # +0.60, syrup +0.65, sauce +0.85, alternative milk at no charge, and on the
 # food board an extra salad topping +1.00, a premium topping +1.75, a Vienna
 # roll +1.00. Nothing here models a paid modifier.
 
-# The cafe's own name. base.yaml carries "Ground Truth" marked assumed — a
+# The cafe's own name. base.yaml carries "Ground Truth" marked assumed, a
 # placeholder for the scenario, never something anyone at the counter says.
 cafe:
   name: Morgridge Coffee
@@ -73,12 +74,12 @@ arrivals:
   source_of: { capture_rate: fitted }
 
 customers:
-  # One person left in a whole day of watching, at a line of eleven. The
-  # assumed seven-minute median had the cafe shedding a third of its demand,
-  # which is not what happens here: people wait.
+  # One person left in all the watching, at a line of eleven. The assumed
+  # seven-minute median had the cafe shedding a third of its demand, which is
+  # not what happens here: people wait.
   #
   # This is raised to the least it can be and still be consistent with that one
-  # balk. `time_budget_min` was left alone deliberately — the model still lost
+  # balk. `time_budget_min` was left alone deliberately, the model still lost
   # far more customers than were seen leaving, and turning a second patience
   # knob to bury that would have been tuning the fit rather than fixing the
   # model.
@@ -86,15 +87,15 @@ customers:
   # Fixing the model is what happened instead. The budget was being spent after
   # the register, so anyone whose drink took too long was recorded as having
   # walked out on an order they had already paid for. It is now spent in the
-  # line, before the till, and abandonment falls to about one a day on its own
-  # — with the number itself never touched.
+  # line, before the till, and abandonment falls to about one a day on its own,
+  # with the number itself never touched.
   balk_tolerance_min: { dist: lognormal, median: 20.0, sigma: 0.5 }
   source_of: { balk_tolerance_min: fitted }
 
 # ---------------------------------------------------------------------------
 # menu
 #
-# Read off the two boards photographed 2026-09-03. Calories are the board's own
+# Read off the two boards photographed in the cafe. Calories are the board's own
 # figures for the medium size, and the board's footnote applies: milk drinks
 # are calculated with 2% milk, the Black Tie excepted. The food board posts no
 # calories at all, so the sandwiches, salads and soups have none here.

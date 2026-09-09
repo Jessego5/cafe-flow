@@ -1,7 +1,7 @@
 """Figures. Every one states how much of what it shows is still guessed.
 
 Ground rule 3 asks reports to say what fraction of their inputs are assumed.
-A figure is a report — arguably the most-quoted kind — so the provenance line
+A figure is a report, arguably the most-quoted kind, so the provenance line
 is part of the drawing, not part of the caption someone might crop off.
 
 Imports `core` and `analysis` only; like the rest of `analysis/`, it must not

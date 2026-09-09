@@ -91,7 +91,7 @@ def local(params: Params, moment: datetime | None = None) -> datetime:
 
 
 def day_seconds(params: Params, moment: datetime | None = None) -> float:
-    """Seconds since local midnight — the same clock the simulator uses."""
+    """Seconds since local midnight, the same clock the simulator uses."""
     here = local(params, moment)
     midnight = here.replace(hour=0, minute=0, second=0, microsecond=0)
     return (here - midnight).total_seconds()

@@ -3,7 +3,7 @@
 # It adds no capacity. What it does is move arrivals: someone who sees twelve
 # minutes at noon and comes back at twenty past has taken themselves out of the
 # peak. Their order is deferred, not lost, and that is the whole difference
-# between this and balking — which is why it is worth something at a cafe where
+# between this and balking, which is why it is worth something at a cafe where
 # almost nobody balks.
 #
 # It is the one lever here that targets what the observation found: two sharp

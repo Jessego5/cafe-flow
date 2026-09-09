@@ -221,7 +221,7 @@ def test_analysis_imports_neither_runtime(request):
     """Ground rule: a metric is computed from the log and nothing else.
 
     `calibrate.py` is the one module that has to *drive* a runtime rather than
-    read its output, and it takes that as an injected argument — so the only
+    read its output, and it takes that as an injected argument, so the only
     import of `sim` in `analysis/` sits inside a function, never at module
     scope where it would make the package depend on a simulator.
     """

@@ -1,8 +1,8 @@
 """Liveness for the platform's health check.
 
 Fly restarts a machine that fails this, so it has to test the things that
-actually break in production — a read-only volume, a full disk, a database that
-never got migrated — and nothing else.
+actually break in production (a read-only volume, a full disk, a database that
+never got migrated) and nothing else.
 """
 
 from __future__ import annotations

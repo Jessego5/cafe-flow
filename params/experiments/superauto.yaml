@@ -1,6 +1,6 @@
 # Hypothesis: the espresso bar is one Schaerer super-automatic.
 #
-# The machine photographed on 2026-08-27 carries a Schaerer logo, twin bean
+# The machine photographed in the cafe carries a Schaerer logo, twin bean
 # hoppers and a touchscreen, and no group heads or portafilters are visible
 # anywhere in the frames. Schaerer builds super-automatics almost exclusively.
 # If that is what it is, two things follow that the base config gets wrong:
@@ -10,14 +10,14 @@
 #      the plan's core throughput mechanism.
 #   2. Grinding, extraction and frothing are one cycle on one machine. The
 #      separate steam wand and group head collapse into a single serialised
-#      resource that every espresso drink queues on — iced ones included, since
+#      resource that every espresso drink queues on, iced ones included, since
 #      they skip the frothing but not the shot.
 #
 # Run this against the base config to cost both readings before going back with
 # a camera. Whichever the machine turns out to be, one of these is already the
 # answer.
 #
-#   python -m sim.experiments --compare
+#   python -m sim.experiments --arms observed,superauto
 #
 # UNCONFIRMED, and what would confirm it: the model number on the front panel
 # or the sticker on the back. The twin hoppers and touchscreen match the

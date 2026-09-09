@@ -9,7 +9,7 @@ queue matches the counted one. Twelve parameters against twelve observations is
 no degrees of freedom at all: it fits the sampling noise as faithfully as the
 signal, and some of those bins rest on two readings. It also learns nothing
 about the hours nobody watched, which it leaves at the flat value the search
-started from — including the whole morning.
+started from, including the whole morning.
 
 `params/schedule/*.yaml` takes the registrar's room schedule, which is a real
 measurement of when several hundred people are released and cannot sawtooth.

@@ -95,7 +95,7 @@ def place(
     """The order's first event: it came into existence.
 
     Creation has no from-state, so it is not a transition, but it still has to
-    be an event — `placed` is the left-hand side of the conservation identity
+    be an event, `placed` is the left-hand side of the conservation identity
     and nothing may be counted from mutable state (ground rule 4).
     """
     current = State(order.state)
@@ -133,7 +133,7 @@ def promise(
 ) -> Event:
     """Quote a time the order will be ready by.
 
-    Not a state change — the order is where it was — but it has to be an event,
+    Not a state change (the order is where it was), but it has to be an event,
     because how far a promise missed can only be measured against what was
     actually promised at the time, and that cannot be reconstructed later from
     a config file that has since changed.

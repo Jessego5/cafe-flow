@@ -28,7 +28,7 @@ class QueuedItem:
 
     This is the app's carrier for `core.policies`: the simulator passes one
     holding a SimPy event, the bar passes one holding a row. The scheduler that
-    sees them is the same code either way, which is the point — a policy
+    sees them is the same code either way, which is the point: a policy
     measured in an experiment is the policy the bar runs, not a reimplementation
     of it.
     """
@@ -126,7 +126,7 @@ async def get_queue(staff: str = Depends(require_staff)) -> dict:
     depth = observable_queue_depth(order["state"] for order in orders)
 
     # Outside the staffing plan there is nobody on the bar, so there is no wait
-    # to quote — and the bar screen still has to render. Same reasoning as
+    # to quote, and the bar screen still has to render. Same reasoning as
     # `/menu`: a closed cafe reports no estimate rather than raising, because
     # the queue itself is worth showing whether or not anyone is on shift.
     try:

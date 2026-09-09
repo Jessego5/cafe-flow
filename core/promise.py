@@ -1,9 +1,9 @@
 """When it will be ready, and when to order for a time you have in mind.
 
 Two directions of one question, the way a maps app answers both "leave now" and
-"arrive by". Forward is a lookup. Backward is a fixed point — the right moment
-to order depends on the queue at that moment, which depends on when you order —
-so it is solved by walking back from the time wanted and taking the latest start
+"arrive by". Forward is a lookup. Backward is a fixed point: the right moment
+to order depends on the queue at that moment, which depends on when you order.
+So it is solved by walking back from the time wanted and taking the latest start
 that still lands in time.
 
 The forecast itself comes from the simulator, written out as a file. The app
@@ -160,7 +160,7 @@ def plan_for(
 
     Walks back from the time wanted and takes the latest start that still lands
     in time. Latest rather than earliest, because ordering sooner than necessary
-    only means the drink sits on the shelf getting cold — and because the whole
+    only means the drink sits on the shelf getting cold, and because the whole
     point is to move the order into the trough, not out of the day.
 
     The walk always ends on `earliest` rather than stepping past it. Stepping in

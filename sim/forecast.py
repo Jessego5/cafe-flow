@@ -4,8 +4,8 @@ The app has to answer two questions a customer actually asks: *if I order now,
 when do I get it*, and *if I want it at quarter past, when should I order*. Both
 need a wait it can look up rather than one it can only measure after the fact.
 
-That forecast comes from the simulator — many days, averaged, binned by time of
-day — and is written out as a file the app reads. The app never imports the
+That forecast comes from the simulator (many days, averaged, binned by time of
+day) and is written out as a file the app reads. The app never imports the
 simulator; it reads a forecast the way it reads params and the policy selection.
 So a promise made at the counter is a prediction the model actually made, and
 `promise_error` can be run over the app's own log afterwards to see whether it

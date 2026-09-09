@@ -1,8 +1,8 @@
 """Choose the scheduling policy for whatever cafe the config describes.
 
 This is the piece that makes the project a tool rather than one cafe's answer.
-Feed it a different `base.yaml` — a different menu, different stations,
-different demand — and it works out which of the schedulers in `core.policies`
+Feed it a different `base.yaml` with a different menu, different stations and
+different demand, and it works out which of the schedulers in `core.policies`
 that operation should run, on the evidence of many simulated days.
 
 Two rules keep it honest, and they matter more than the search:
@@ -140,7 +140,7 @@ class Selection:
     def render(self) -> str:
         scale, unit = _units(self.objective.metric)
         lines = [
-            f"objective: {self.objective.key} — {self.objective.describe}",
+            f"objective: {self.objective.key}, {self.objective.describe}",
             f"{self.seeds} seeded days per policy, {self.provenance}",
             "",
             f"{'policy':<18}{'':>4}{self.objective.metric:>26}",

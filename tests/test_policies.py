@@ -1,6 +1,6 @@
 """M5: what runs together, and what that buys.
 
-`batch_size: 3` on the press was inert until now — it priced a batch in
+`batch_size: 3` on the press was inert until now. It priced a batch in
 `core.capacity` but nothing in the engine ever formed one. These tests pin down
 both halves: the policy picks the work, and the engine actually runs it in one
 cycle.

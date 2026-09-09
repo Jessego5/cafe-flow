@@ -166,8 +166,8 @@ EXAMPLES = [
 
 @pytest.mark.parametrize("config", EXAMPLES)
 def test_every_example_configuration_runs_and_can_be_selected_for(config):
-    """Three operations built three different ways — a menu board, a hand
-    written sketch, and a transaction log — and the same machinery answers for
+    """Three operations built three different ways (a menu board, a hand
+    written sketch, and a transaction log), and the same machinery answers for
     all of them."""
     params = load_params(config)
     selection = select_policy([config], objective="margin", seeds=2)

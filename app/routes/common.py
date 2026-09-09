@@ -1,4 +1,4 @@
-"""Response shapes shared by the routes. Presentation only — no rules."""
+"""Response shapes shared by the routes. Presentation only, no rules."""
 
 from __future__ import annotations
 

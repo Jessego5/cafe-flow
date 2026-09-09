@@ -66,7 +66,7 @@ async def get_menu() -> dict:
         "queue_depth": depth,
         "wait_estimate_s": None if per_order is None else round(estimate_wait_s(depth, per_order), 1),
         # What one order is worth on its own. An empty queue is not a zero
-        # wait — there is still a drink to make — and the menu header says so
+        # wait, because there is still a drink to make, and the header says so
         # rather than promising nothing. `/queue` already reports this.
         "seconds_per_order": None if per_order is None else round(per_order, 1),
         # every surface states how much of what it shows is still guessed

@@ -1,7 +1,7 @@
 """Writes to the menu: what the cafe has run out of.
 
 Availability is an operational fact, not a modelling one. The bagels go at
-eleven and come back tomorrow, and neither event should involve a redeploy — so
+eleven and come back tomorrow, and neither event should involve a redeploy, so
 it lives on the projection row rather than in params, and `seed_menu` leaves it
 alone while rewriting everything else.
 

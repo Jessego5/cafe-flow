@@ -1,7 +1,7 @@
 """The bottleneck cost function.
 
-Everything that meters capacity — slot sizing in `app/`, batching gains in
-`sim/policies.py`, utilisation in `analysis/` — asks this module how many
+Everything that meters capacity (slot sizing in `app/`, batching gains in
+`sim/policies.py`, utilisation in `analysis/`) asks this module how many
 bottleneck-seconds a thing costs. Which station that is comes from
 `params.bottleneck_station`, so M8 can move it (to `register`, say) by editing
 YAML. When the bottleneck is the register the cost is flat per order and slots

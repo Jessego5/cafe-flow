@@ -306,7 +306,7 @@ class MenuItemParams(_Strict):
     cogs_cents: int = Field(ge=0)
     requires_milk: bool
     #: As posted on the board, for the medium size. Nothing in the simulation
-    #: reads this — it is here so the app can show what the cafe shows, and so
+    #: reads this; it is here so the app can show what the cafe shows, and so
     #: the figure has one home rather than being retyped into the frontend.
     #: The board's own footnote: milk drinks are calculated with 2% milk.
     calories: int | None = Field(default=None, ge=0)

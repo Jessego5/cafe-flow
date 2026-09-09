@@ -4,8 +4,8 @@ The sheet carries its own alpha, so there is no matte to reconstruct: each
 sprite is a connected run of opaque pixels, and the transparency that ships is
 the transparency that was drawn. (An earlier version of this script keyed the
 art off a black background, because the sheet had reached us as a JPEG with the
-alpha flattened away. Everything it did — thresholds, fringe removal, a
-redrawn outline — was working around that one lost channel, and all of it is
+alpha flattened away. Everything it did, thresholds, fringe removal, a
+redrawn outline, was working around that one lost channel, and all of it is
 gone.)
 
 Sprites are ordered the way the sheet reads, left to right and top to bottom,
@@ -26,18 +26,18 @@ import numpy as np
 from PIL import Image
 
 ORDER = [
-    # row 1 — espresso bar
+    # row 1: espresso bar
     "espresso", "americano", "cappuccino", "latte", "latte_iced",
     "vanilla_latte", "caramel_macchiato", "mocha", "white_chocolate_mocha",
-    # row 2 — brew & cold brew
+    # row 2: brew & cold brew
     "drip_coffee", "cold_brew", "cold_brew_oat_latte", "black_tie",
     "sparkling_grapefruit_cold_brew",
-    # row 3 — tea & matcha, then sparkling & cocoa
+    # row 3: tea & matcha, then sparkling & cocoa
     "brewed_tea", "iced_tea", "matcha_latte", "chai_latte",
     "sparkling_passion_fruit_black_tea", "sparkling_lemonade", "cocoa",
-    # row 4 — breakfast
+    # row 4: breakfast
     "bacon_egg_cheese_bagel", "sausage_egg_cheese", "vegan_sausage_egg_cheese",
-    # row 5 — sandwiches & salads
+    # row 5: sandwiches & salads
     "italian_herb_chicken", "mona_lisa", "monterey_turkey",
     "caesar_salad", "build_your_own_salad", "broccoli_cheese_soup",
     "chicken_dumpling_soup",
@@ -159,7 +159,7 @@ def main() -> int:
     print(f"{sheet.width}x{sheet.height}  sprites per row: {counts}  total {len(flat)}")
 
     if counts != EXPECTED or len(flat) != len(ORDER):
-        print(f"!! expected {EXPECTED} totalling {len(ORDER)} — check the naming against the sheet")
+        print(f"!! expected {EXPECTED} totalling {len(ORDER)}: check the naming against the sheet")
         if not args.dry_run:
             return 1
 

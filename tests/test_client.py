@@ -2,7 +2,7 @@
 
 Both runtimes share `core/`, so in principle they cannot disagree about what a
 latte costs or which state moves are legal. These tests make that a fact rather
-than a hope — and, just as importantly, prove the check would notice if it
+than a hope, and, just as importantly, prove the check would notice if it
 stopped being true.
 """
 

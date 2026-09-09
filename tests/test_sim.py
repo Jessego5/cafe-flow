@@ -4,8 +4,8 @@ Done when: the day conserves customers; the same seed reproduces the same log;
 a lone latte takes exactly its make time; and the arrival pattern shows five
 distinct bursts.
 
-The tests about who holds what — a barista never parallel with themselves, a
-station never over capacity — guard the modelling decision that would otherwise
+The tests about who holds what (a barista never parallel with themselves, a
+station never over capacity) guard the modelling decision that would otherwise
 silently invalidate every result: stations are seized by baristas, not run as
 independent parallel servers.
 """

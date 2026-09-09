@@ -1,7 +1,7 @@
 """Pickup windows and their bottleneck-second budgets.
 
 Built at M2 so the capacity accounting is exercised end to end, but inert until
-`params.slots.enabled` turns on at M10 — and only if the M7 findings support it.
+`params.slots.enabled` turns on at M10, and only if the M7 findings support it.
 """
 
 from __future__ import annotations

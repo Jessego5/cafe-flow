@@ -1,5 +1,5 @@
 # Fitted by sim/fit_profile.py so the simulated queue reproduces the one
-# counted on 2026-09-03. Arrivals were never counted -- you cannot count
+# counted in the cafe. Arrivals were never counted -- you cannot count
 # them standing in a cafe -- so the curve is inferred from its
 # consequences rather than measured.
 

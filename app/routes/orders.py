@@ -98,7 +98,7 @@ def _forecast_quote(params, lines, now_s):
 
     Quoted here rather than taken from the client: a promise the cafe is going
     to be measured against has to be the cafe's own number, not one a caller
-    can name. Returns None when there is no forecast to quote from — an order
+    can name. Returns None when there is no forecast to quote from: an order
     is still an order, it just carries no promise.
     """
     try:
@@ -246,7 +246,7 @@ async def plan(body: PlanIn) -> dict:
     """When it will be ready, or when to order for a time you have in mind.
 
     The wait comes from a forecast the simulator produced, so the number quoted
-    here is a prediction the model actually made — which means `promise_error`
+    here is a prediction the model actually made, which means `promise_error`
     can be run over this app's own log afterwards to see whether it held.
     """
     params = get_params()

@@ -1,4 +1,4 @@
-# fly.toml — deploy from the repository root so the build context is the whole
+# fly.toml, deploy from the repository root so the build context is the whole
 # repo:
 #
 #   fly deploy -c deploy/fly.toml
@@ -10,8 +10,8 @@
 # ONE MACHINE. SQLite in WAL mode is single-writer, and the order log is the only
 # source of truth for every metric in the project: two machines writing the same
 # volume corrupt it silently. `min_machines_running = 1` keeps one up; the
-# ceiling is set outside this file with `fly scale count 1` — there is no
-# max_machines_running key — and must be re-checked after any scaling change.
+# ceiling is set outside this file with `fly scale count 1`, since there is no
+# max_machines_running key, and must be re-checked after any scaling change.
 
 app = 'cafe-flow-demo'
 primary_region = 'ord'           # near campus; the volume must be here too
@@ -24,7 +24,7 @@ primary_region = 'ord'           # near campus; the volume must be here too
   dockerfile = 'Dockerfile'
 
 [env]
-  CAFE_ENV = 'demo'              # dev | demo | pilot — pilot refuses simulated orders
+  CAFE_ENV = 'demo'              # dev | demo | pilot, pilot refuses simulated orders
   CAFE_SSE_HEARTBEAT_S = '15'    # must stay below the proxy idle timeout
   DATA_DIR = '/data'
   PORT = '8080'
@@ -46,7 +46,7 @@ primary_region = 'ord'           # near campus; the volume must be here too
 
   # SSE holds one connection open per open view for the whole shift, so the
   # limits count connections rather than requests. This is the first ceiling
-  # this app will actually reach — long before the database, which sees under
+  # this app will actually reach, long before the database, which sees under
   # one write a second at the simulated peak.
   [http_service.concurrency]
     type = 'connections'

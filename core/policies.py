@@ -82,8 +82,8 @@ class BatchPolicy:
 
     Named `batch_milk` in the plan, after the case it was written for: same-milk
     lattes steamed in one pitcher rather than one at a time. The rule is
-    general, because the press has the same shape — two sandwiches in one cycle
-    rather than two cycles — and on the observed menu that is where the saving
+    general, because the press has the same shape (two sandwiches in one cycle
+    rather than two cycles) and on the observed menu that is where the saving
     turns out to be.
 
     Only work already waiting is grouped. Holding a station idle in the hope
@@ -137,7 +137,7 @@ class BatchPolicy:
 
 
 class BoundedReorderPolicy(BatchPolicy):
-    """Batch, and prefer work that avoids a changeover — but only within a
+    """Batch, and prefer work that avoids a changeover, though only within a
     bounded window, and never at the cost of leaving someone stranded.
 
     Switching the wand from oat to whole means purging and wiping; running the

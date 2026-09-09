@@ -209,7 +209,7 @@ class Cafe:
         Takes a person first and the machine second, like everything else here,
         and asks the policy what to run together. `core.capacity` prices the
         batch, so a press cycle costs the same whether it holds one sandwich or
-        three — which is the entire point of running three.
+        three, which is the entire point of running three.
         """
         station = self.params.station(name)
         resource = self.stations[name]
@@ -315,20 +315,20 @@ class Cafe:
         """Work the order's items, overlapping whatever a person is not needed for.
 
         A barista does not stand and watch an extraction. They start the shot,
-        steam the milk while it pulls, and pour when both are done — so a latte
+        steam the milk while it pulls, and pour when both are done, so a latte
         costs `max(shot, steam) + pour`, not the sum. Working strictly in series
         priced a latte at 112 seconds against a sandwich's 90 and made drinks
         the slower half of the menu, which is the wrong way round from what the
         cafe does.
 
         So: everything needing no person starts at once and runs in the
-        background — the group head, and the oven, which is why a sandwich heats
+        background (the group head, and the oven), which is why a sandwich heats
         while the coffee gets made. Attended work is done in series by the one
         barista holding the order, because a person cannot steam and pour at the
         same time. Assembly waits for its own item's machines and nothing else.
 
-        Resources are still taken in the same order — a person, then a machine —
-        and never the other way round. The background processes only ever take a
+        Resources are still taken in the same order, a person and then a
+        machine, never the other way round. The background processes only ever take a
         machine, so they cannot be holding one while the foreground waits for a
         person: that cycle is what deadlocked a busy cafe once already.
 
@@ -427,7 +427,7 @@ class Cafe:
 
         # Somebody who ordered on their phone does not use the till. They chose,
         # paid and left before they got here, so they spend no register seconds
-        # and no barista's time taking them — which is the entire mechanism the
+        # and no barista's time taking them, which is the entire mechanism the
         # app has. Charging them for it had every pre-order queueing twice.
         #
         # It matters more than a transaction's worth of seconds, because part of
@@ -567,8 +567,8 @@ class Cafe:
         """Does this customer see the wait and decide to come back later?
 
         Only walk-ups, only once, and only if the cafe is showing a number at
-        all. Unlike a balk this is deferred revenue rather than lost revenue —
-        which is exactly why it is worth something even where nobody balks.
+        all. Unlike a balk this is deferred revenue rather than lost revenue,
+        and that is exactly why it is worth something even where nobody balks.
         """
         rules = self.params.customers
         if not rules.shown_wait or arrival.channel is not Channel.WALKUP:
@@ -611,7 +611,7 @@ class Cafe:
         Patience is spent here and nowhere after it. Reach the register and you
         stay, because you have paid and the drink is being made in front of you.
         Spending it later instead had the model shedding ~77 customers a day at
-        a cafe where a full day of watching produced one.
+        a cafe where watching produced one.
         """
         waiting = self.crew.get()
         if math.isfinite(arrival.time_budget_s):
@@ -642,7 +642,7 @@ class Cafe:
         """A walk-up who gave up in the line before ever reaching the till.
 
         Distinct from balking, which is a decision taken on arrival by looking
-        at the queue. This one joined it and then ran out of time — the cafe
+        at the queue. This one joined it and then ran out of time. The cafe
         never took the order, so unlike the old accounting there is no drink
         made for somebody who has already gone.
         """

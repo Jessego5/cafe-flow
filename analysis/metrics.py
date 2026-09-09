@@ -2,7 +2,7 @@
 
 Ground rule 4: the event log is the only source of truth. Nothing here reads
 mutable state, and nothing here knows whether the log came from the app or the
-simulator — the two write the same schema, so the same functions answer for
+simulator. The two write the same schema, so the same functions answer for
 both. That is what makes the M9 drift check meaningful.
 
 This module imports `core` for the event schema and the parameters. It must
@@ -392,7 +392,7 @@ def balk_count_and_lost_margin(
     is accepted for the signature the plan fixes and is not required.
 
     A balk is someone who looked at the line and left. An abandonment is someone
-    who ordered, waited, and was gone by the time it was ready — the cafe made
+    who ordered, waited, and was gone by the time it was ready. The cafe made
     that one, so it cost ingredients as well as the sale.
     """
     events = _within(_events(log), window)
@@ -556,7 +556,7 @@ def fairness_gap(
     Measured on what each customer actually experienced, so the pre-order lead
     time does not count against them. A large positive gap means ordering ahead
     is buying its adopters a materially better cafe than everyone else gets,
-    which is a policy question rather than a bug — but one nobody can weigh
+    which is a policy question rather than a bug, but one nobody can weigh
     without the number.
     """
     events = _events(log)

@@ -1,7 +1,7 @@
 # Arm E: batch, and prefer work that avoids a changeover.
 #
 # Switching the wand between milks means purging and wiping. Running the oat
-# drinks together avoids it — but a policy that always chases the cheapest
+# drinks together avoids it, but a policy that always chases the cheapest
 # changeover strands whoever ordered the unpopular thing, so it only looks a
 # bounded way down the queue and anything past the guard goes next regardless.
 #
