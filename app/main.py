@@ -14,7 +14,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_params, service_date, settings
@@ -88,6 +88,20 @@ async def lifespan(app: FastAPI):
         releaser.cancel()
 
 
+class HashedAssets(StaticFiles):
+    """
+    Vite puts a hash of the contents in every asset filename, so a given URL
+    can never change what it returns and is safe to keep for a year. Caching
+    them hard is also what makes `no-cache` on the HTML cheap: the document
+    revalidates on every visit, and the megabyte behind it does not.
+    """
+
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 def create_app() -> FastAPI:
     params = get_params()
     app = FastAPI(
@@ -125,7 +139,7 @@ def create_app() -> FastAPI:
 
     dist = settings.web_dist
     if (dist / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+        app.mount("/assets", HashedAssets(directory=dist / "assets"), name="assets")
 
     for path, filename in VIEWS.items():
         def view(_filename: str = filename):
@@ -138,7 +152,12 @@ def create_app() -> FastAPI:
                     },
                     status_code=503,
                 )
-            return FileResponse(target)
+            # Revalidate every time. The file is small and the check is a 304,
+            # and the alternative is what happened here: with no Cache-Control
+            # a browser caches the HTML on its own guess, keeps asking for the
+            # asset names that HTML was built with, and a deploy reaches nobody
+            # who had already opened the page.
+            return FileResponse(target, headers={"Cache-Control": "no-cache"})
 
         app.get(path, include_in_schema=False)(view)
 

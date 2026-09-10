@@ -255,6 +255,34 @@ def test_pilot_rejects_simulated_orders_at_the_api(app_env, monkeypatch):
         assert pilot.post("/orders", json={"lines": [DRIP]}).status_code == 201
 
 
+def test_a_deploy_reaches_a_browser_that_has_been_here_before(app_env, tmp_path, monkeypatch):
+    """
+    The HTML revalidates and the hashed assets do not.
+
+    With no Cache-Control at all a browser picks a lifetime by its own
+    heuristic, keeps asking for the asset names the cached HTML was built
+    with, and a deploy reaches nobody who had already opened the page. That is
+    not theoretical: it is how a shipped fix stayed invisible."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "student.html").write_text("<!doctype html><title>x</title>")
+    (dist / "assets" / "student-abc123.js").write_text("console.log(1)")
+    monkeypatch.setattr(app_env, "web_dist", dist)
+
+    with TestClient(create_app()) as fresh:
+        page = fresh.get("/")
+        assert page.status_code == 200
+        assert page.headers["cache-control"] == "no-cache"
+
+        asset = fresh.get("/assets/student-abc123.js")
+        assert asset.status_code == 200
+        assert "immutable" in asset.headers["cache-control"]
+
+
 def test_the_demo_clock_is_always_inside_opening_hours(app_env, monkeypatch):
     """
     A portfolio link is opened at every hour except the seven and a half the

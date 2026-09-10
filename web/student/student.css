@@ -779,23 +779,13 @@ button:disabled { cursor: default; }
 .ticket .track span.done { background: var(--ink); }
 .ticket ul { margin: 0.3rem 0 0; padding-left: 1.05rem; color: var(--ink-soft); font-size: 0.88rem; }
 
-/* Cancelling: a plain link until it is asked to confirm, because the button
-   that stops a drink being made should not sit under a thumb looking like the
-   one that changes the milk. */
-.ticket .drop { border: 0; background: none; color: var(--muted); font-size: 0.82rem; padding: 0.55rem 0 0; }
+/* Cancelling looks like changing, because they are the same kind of move on
+   the same card and one of them was already a button here. */
 .ticket .strike { margin: 0.55rem 0 0; }
-.ticket .confirm {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 0.7rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--hair);
-}
-.ticket .confirm .hint { flex: 1 1 100%; }
-.ticket .confirm .drop { color: var(--bad); padding: 0; }
-.ticket .confirm .keep { border: 0; background: none; color: var(--ink); font-size: 0.82rem; padding: 0; }
+.ticket .confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; }
+.ticket .confirm .hint { flex: 1 1 100%; margin-top: 0.6rem; }
+.ticket .confirm .drop,
+.ticket .confirm .keep { margin-top: 0; }
 
 .empty { text-align: center; color: var(--faint); padding: 2.6rem 1rem; }
 .empty .slab { color: var(--ink); }
