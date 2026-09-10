@@ -64,7 +64,7 @@ h2 {
   font-family: var(--sans);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--muted);
   margin: 1.6rem 0 0.5rem;
@@ -132,7 +132,7 @@ select, input {
 .pill {
   font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.06em;
   border: 1px solid var(--line);
   padding: 0.18rem 0.5rem;
   color: var(--muted);
@@ -182,7 +182,7 @@ header.bar .pill.sim { color: #d9b872; border-color: rgba(217, 184, 114, 0.6); }
 .variant {
   text-transform: uppercase;
   font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   color: var(--warn);
 }
 
