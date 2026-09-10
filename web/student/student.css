@@ -779,13 +779,34 @@ button:disabled { cursor: default; }
 .ticket .track span.done { background: var(--ink); }
 .ticket ul { margin: 0.3rem 0 0; padding-left: 1.05rem; color: var(--ink-soft); font-size: 0.88rem; }
 
-/* Cancelling looks like changing, because they are the same kind of move on
-   the same card and one of them was already a button here. */
-.ticket .strike { margin: 0.55rem 0 0; }
-.ticket .confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; }
-.ticket .confirm .hint { flex: 1 1 100%; margin-top: 0.6rem; }
-.ticket .confirm .drop,
-.ticket .confirm .keep { margin-top: 0; }
+/* The two moves on a live order, sharing a row under a hairline. Square and
+   quiet like everything else here, and equal width, because neither of them is
+   the main thing to do on this card: the main thing is waiting for the coffee.
+   Cancelling is the one that cannot be undone, so it carries the red and sits
+   on the right, away from the thumb that is scrolling. */
+.ticket .actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--hair);
+}
+.ticket .actions button {
+  flex: 1;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  text-align: center;
+}
+.ticket .actions .drop { color: var(--bad); border-color: #e6d5d5; }
+.ticket .strike { margin: 0.7rem 0 0; }
+
+.ticket .ask { margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--hair); }
+.ticket .ask .hint { display: block; color: var(--ink-soft); }
+.ticket .ask .actions { margin-top: 0.6rem; padding-top: 0; border-top: 0; }
 
 .empty { text-align: center; color: var(--faint); padding: 2.6rem 1rem; }
 .empty .slab { color: var(--ink); }
@@ -824,7 +845,6 @@ button:disabled { cursor: default; }
   background: none; border: 0; padding: 0; cursor: pointer;
   color: inherit; font: inherit; opacity: 0.7; text-decoration: underline;
 }
-.ticket .drop { margin-top: 0.6rem; }
 
 /* Name for the order. Optional, and it looks optional. */
 .who {

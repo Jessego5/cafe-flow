@@ -30,6 +30,8 @@ export function Ticket({ order, since, onChange, onCancel }) {
   // a re-order is a new number and a new place in the line.
   const [confirming, setConfirming] = useState(false)
   const [failed, setFailed] = useState(null)
+  const changeable = Boolean(onChange) && order.state === 'placed'
+  const cancellable = Boolean(onCancel) && CANCELLABLE.includes(order.state)
   // `waiting_s` is what the server measured when it answered; `since` is how
   // long ago that was. Same arithmetic the bar view does, and it never has to
   // trust the phone's clock to agree with the cafe's.
@@ -69,23 +71,15 @@ export function Ticket({ order, since, onChange, onCancel }) {
 
       {failed && <p className="strike">{failed}</p>}
 
-      {/* Only while it is still `placed`. Once a barista has accepted it they
-          are holding the cup and the server refuses, so the button goes rather
-          than failing when tapped. */}
-      {onChange && order.state === 'placed' && !confirming && (
-        <button className="drop" onClick={() => onChange(order)}>
-          Change this order
-        </button>
-      )}
-
-      {onCancel && CANCELLABLE.includes(order.state) && (
-        confirming ? (
-          <div className="confirm">
-            <span className="hint">
-              {order.state === 'placed'
-                ? 'Cancel this order?'
-                : 'The bar has started this one. Cancel it anyway?'}
-            </span>
+      {confirming ? (
+        <div className="ask">
+          <span className="hint">
+            {order.state === 'placed'
+              ? 'Cancel this order? A new one goes to the back of the line.'
+              : 'The bar has started this one. Cancel it anyway?'}
+          </span>
+          <div className="actions">
+            <button onClick={() => setConfirming(false)}>Keep it</button>
             <button
               className="drop"
               onClick={() => {
@@ -100,14 +94,27 @@ export function Ticket({ order, since, onChange, onCancel }) {
             >
               Yes, cancel
             </button>
-            <button className="keep" onClick={() => setConfirming(false)}>
-              Keep it
-            </button>
           </div>
-        ) : (
-          <button className="drop" onClick={() => { setFailed(null); setConfirming(true) }}>
-            Cancel order
-          </button>
+        </div>
+      ) : (
+        (changeable || cancellable) && (
+          <div className="actions">
+            {/* Only while it is still `placed`. Once a barista has accepted it
+                they are holding the cup and the server refuses, so the button
+                goes rather than failing when tapped. */}
+            {changeable && <button onClick={() => onChange(order)}>Change this order</button>}
+            {cancellable && (
+              <button
+                className="drop"
+                onClick={() => {
+                  setFailed(null)
+                  setConfirming(true)
+                }}
+              >
+                Cancel order
+              </button>
+            )}
+          </div>
         )
       )}
     </div>
