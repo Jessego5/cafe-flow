@@ -137,7 +137,7 @@ button:disabled { cursor: default; }
 
 .eyebrow {
   font-size: 0.68rem;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--faint);
 }
@@ -148,7 +148,7 @@ button:disabled { cursor: default; }
 .tag {
   display: inline-block;
   font-size: 0.62rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   padding: 0.12rem 0.36rem;
   border-radius: 0.15rem;
@@ -423,7 +423,7 @@ button:disabled { cursor: default; }
   top: 0;
   left: 0;
   font-size: 0.55rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.85);
@@ -639,7 +639,7 @@ button:disabled { cursor: default; }
 .held .drop { border: 0; background: none; color: var(--muted); font-size: 0.82rem; padding: 0; }
 .held .state {
   font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   padding: 0.15rem 0.45rem;
   border: 1px solid var(--back);
@@ -722,7 +722,7 @@ button:disabled { cursor: default; }
 .member .title {
   font-size: 1.05rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 .member .perks { margin-top: 2.2rem; font-size: 0.76rem; color: #6a5f4c; }
@@ -755,7 +755,7 @@ button:disabled { cursor: default; }
 
 .state {
   font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   padding: 0.15rem 0.45rem;
   border: 1px solid var(--line);
