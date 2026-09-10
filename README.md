@@ -61,7 +61,7 @@ $ curl -s localhost:8000/menu | jq '{queue_depth, wait_estimate_s, provenance}'
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt   # app + simulator + tests
-.venv/bin/python -m pytest -q                             # 383 tests, ~50s
+.venv/bin/python -m pytest -q                             # 385 tests, ~50s
 
 cd web && npm install && npm run build && cd ..
 .venv/bin/python -m uvicorn app.main:app --reload
@@ -88,7 +88,7 @@ frontend work `cd web && npm run dev` proxies them to uvicorn on :8000.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `CAFE_ENV` | `dev` | `pilot` refuses simulated orders at the API |
+| `CAFE_ENV` | `dev` | `demo` loops the business day so the app is never shut; `pilot` refuses simulated orders at the API |
 | `CAFE_DB` | `out/cafe.db` | SQLite; Litestream replicates it in production |
 | `CAFE_PARAMS` | `params/base.yaml:params/observed.yaml` | colon separated, merged left to right |
 | `CAFE_SECRET_KEY` | *(generated)* | unset means every login ends when the process does |
@@ -304,13 +304,13 @@ modelled. Naming that field `serve_style` at the start would have left room.
 ## Testing & reliability
 
 ```bash
-.venv/bin/python -m pytest -q                   # 383 tests
+.venv/bin/python -m pytest -q                   # 385 tests
 .venv/bin/python -m sim.client --drift-check    # app and core agree
 CAFE_PARAMS="params/base.yaml:params/experiments/slots_check.yaml" \
   .venv/bin/python -m sim.client --concurrency  # a slot cannot be overbooked
 ```
 
-- **383 tests** across the core, the app, the simulator, calibration, auth and
+- **385 tests** across the core, the app, the simulator, calibration, auth and
   the deploy scripts. CI runs pytest, builds the three views, builds the image,
   and runs the drift and concurrency checks before it will deploy.
 - **The deploy assertions read values, not strings.** They used to match

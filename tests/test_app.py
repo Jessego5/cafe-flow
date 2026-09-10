@@ -255,6 +255,55 @@ def test_pilot_rejects_simulated_orders_at_the_api(app_env, monkeypatch):
         assert pilot.post("/orders", json={"lines": [DRIP]}).status_code == 201
 
 
+def test_the_demo_clock_is_always_inside_opening_hours(app_env, monkeypatch):
+    """
+    A portfolio link is opened at every hour except the seven and a half the
+    cafe is open, and on the real clock a visitor at 9pm gets a correct and
+    useless app: every time today is past, so /plan is unachievable and Pay
+    and hold is refused. `demo` loops the business day instead.
+
+    Checked across a full real day of arrival times rather than at one, since
+    the failure being guarded against is time-of-day dependent by nature."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.config import DEMO_PLANNING_TAIL_S, _demo_seconds
+    from core.params import parse_hhmm
+
+    params = get_params()
+    opens = parse_hhmm(params.meta.sim_start, field="opens")
+    closes = parse_hhmm(params.meta.sim_end, field="closes")
+
+    start = datetime(2026, 9, 9, tzinfo=timezone.utc)
+    for minutes in range(0, 24 * 60, 7):
+        shown = _demo_seconds(params, start + timedelta(minutes=minutes))
+        assert opens <= shown < closes - DEMO_PLANNING_TAIL_S, (
+            f"{minutes} minutes in, the demo clock left the window"
+        )
+
+
+def test_only_demo_moves_the_clock(app_env, monkeypatch):
+    """
+    dev and pilot tell the real time. A cafe that is actually open must not be
+    told it is mid-morning because the demo needed it to be."""
+    from app.config import DEMO_PLANNING_TAIL_S, day_seconds, local
+    from core.params import parse_hhmm
+
+    params = get_params()
+    here = local(params)
+    midnight = here.replace(hour=0, minute=0, second=0, microsecond=0)
+    wall_s = (here - midnight).total_seconds()
+
+    for env in (Env.DEV, Env.PILOT):
+        monkeypatch.setattr(app_env, "env", env)
+        assert abs(day_seconds(params) - wall_s) < 5, f"{env} should read the wall clock"
+
+    # And demo does not: whatever the hour, it reports one the cafe is open in.
+    monkeypatch.setattr(app_env, "env", Env.DEMO)
+    opens = parse_hhmm(params.meta.sim_start, field="opens")
+    closes = parse_hhmm(params.meta.sim_end, field="closes")
+    assert opens <= day_seconds(params) < closes - DEMO_PLANNING_TAIL_S
+
+
 # --------------------------------------------------------------------------
 # slot plumbing: built now, inert until the findings support it
 # --------------------------------------------------------------------------

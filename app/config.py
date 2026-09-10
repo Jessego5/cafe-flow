@@ -17,7 +17,7 @@ from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from core.params import Params, load_params
+from core.params import Params, load_params, parse_hhmm
 
 __all__ = ["Env", "Settings", "settings", "get_params", "now_utc", "day_seconds", "service_date"]
 
@@ -92,9 +92,47 @@ def local(params: Params, moment: datetime | None = None) -> datetime:
     return (moment or now_utc()).astimezone(cafe_zone(params))
 
 
+# How much of the day the demo clock refuses to run past, so that somebody who
+# opens the link always has room to plan an order into. Without it the loop
+# spends a share of its time in the last minutes before closing, where the
+# planner correctly has nothing to offer and the demo looks broken.
+DEMO_PLANNING_TAIL_S = 2 * 60 * 60
+
+
+def _demo_seconds(params: Params, here: datetime) -> float:
+    """
+    A clock that is always inside opening hours, for `demo` only.
+
+    The cafe is open seven and a half hours a day and a portfolio link is
+    opened at every hour except those. On the real clock a visitor at 9pm gets
+    a correct and useless app: every time today is in the past, so /plan is
+    unachievable and Pay and hold is refused.
+
+    So the demo runs the business day on a loop. Real seconds map onto the open
+    window at real speed, which keeps waits, promises and the release loop
+    behaving exactly as they do on a real clock, and wraps back to opening
+    every few hours. Time therefore jumps backwards once per lap, which is
+    survivable for a demonstration and is why this is not done anywhere else.
+    """
+    opens = parse_hhmm(params.meta.sim_start, field="meta.sim_start")
+    closes = parse_hhmm(params.meta.sim_end, field="meta.sim_end")
+    span = closes - opens - DEMO_PLANNING_TAIL_S
+    if span <= 0:                      # a cafe too short to plan inside
+        return opens
+    return opens + here.timestamp() % span
+
+
 def day_seconds(params: Params, moment: datetime | None = None) -> float:
-    """Seconds since local midnight, the same clock the simulator uses."""
+    """
+    Seconds since local midnight, the same clock the simulator uses.
+
+    `demo` is the exception and loops the business day instead; see
+    `_demo_seconds`. Only when asked for the current time, because converting
+    a moment that was handed in is a different question and has one answer.
+    """
     here = local(params, moment)
+    if moment is None and settings.env is Env.DEMO:
+        return _demo_seconds(params, here)
     midnight = here.replace(hour=0, minute=0, second=0, microsecond=0)
     return (here - midnight).total_seconds()
 
