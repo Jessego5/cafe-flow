@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { STATE_LABEL, elapsed, money } from '../shared/api.js'
 import { milkLabel, title } from './catalog.js'
 
@@ -6,6 +6,11 @@ import { milkLabel, title } from './catalog.js'
 // called by, how far along it is, and how long they have been standing there.
 
 const TRACK = ['placed', 'accepted', 'in_progress', 'ready']
+
+// What `core.states` allows a customer to cancel from. Once it is on the shelf
+// the cup exists and the only honest moves are collecting it or walking away,
+// so the button is gone rather than present and refused.
+const CANCELLABLE = ['placed', 'accepted', 'in_progress']
 
 export const lineText = (item) =>
   [item.variant ? title(item.variant) : null, title(item.drink)]
@@ -19,8 +24,12 @@ export function stateClass(state) {
   return 'state gone'
 }
 
-export function Ticket({ order, since, onChange }) {
+export function Ticket({ order, since, onChange, onCancel }) {
   const reached = TRACK.indexOf(order.state)
+  // Two taps, because this one cannot be undone: `cancelled` is terminal, and
+  // a re-order is a new number and a new place in the line.
+  const [confirming, setConfirming] = useState(false)
+  const [failed, setFailed] = useState(null)
   // `waiting_s` is what the server measured when it answered; `since` is how
   // long ago that was. Same arithmetic the bar view does, and it never has to
   // trust the phone's clock to agree with the cafe's.
@@ -58,13 +67,48 @@ export function Ticket({ order, since, onChange }) {
         {money(order.price_cents)} · payment {order.payment.status}. Pay at the register
       </div>
 
+      {failed && <p className="strike">{failed}</p>}
+
       {/* Only while it is still `placed`. Once a barista has accepted it they
-          are holding the cup, and the server refuses -- so the button goes
-          rather than failing when tapped. */}
-      {onChange && order.state === 'placed' && (
+          are holding the cup and the server refuses, so the button goes rather
+          than failing when tapped. */}
+      {onChange && order.state === 'placed' && !confirming && (
         <button className="drop" onClick={() => onChange(order)}>
           Change this order
         </button>
+      )}
+
+      {onCancel && CANCELLABLE.includes(order.state) && (
+        confirming ? (
+          <div className="confirm">
+            <span className="hint">
+              {order.state === 'placed'
+                ? 'Cancel this order?'
+                : 'The bar has started this one. Cancel it anyway?'}
+            </span>
+            <button
+              className="drop"
+              onClick={() => {
+                setFailed(null)
+                // The bar can move it between this render and this tap, and
+                // then the server is right and the screen was stale.
+                onCancel(order).catch((err) => {
+                  setConfirming(false)
+                  setFailed(err.message)
+                })
+              }}
+            >
+              Yes, cancel
+            </button>
+            <button className="keep" onClick={() => setConfirming(false)}>
+              Keep it
+            </button>
+          </div>
+        ) : (
+          <button className="drop" onClick={() => { setFailed(null); setConfirming(true) }}>
+            Cancel order
+          </button>
+        )
       )}
     </div>
   )

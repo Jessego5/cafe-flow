@@ -61,7 +61,7 @@ $ curl -s localhost:8000/menu | jq '{queue_depth, wait_estimate_s, provenance}'
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt   # app + simulator + tests
-.venv/bin/python -m pytest -q                             # 379 tests, ~50s
+.venv/bin/python -m pytest -q                             # 383 tests, ~50s
 
 cd web && npm install && npm run build && cd ..
 .venv/bin/python -m uvicorn app.main:app --reload
@@ -304,13 +304,13 @@ modelled. Naming that field `serve_style` at the start would have left room.
 ## Testing & reliability
 
 ```bash
-.venv/bin/python -m pytest -q                   # 379 tests
+.venv/bin/python -m pytest -q                   # 383 tests
 .venv/bin/python -m sim.client --drift-check    # app and core agree
 CAFE_PARAMS="params/base.yaml:params/experiments/slots_check.yaml" \
   .venv/bin/python -m sim.client --concurrency  # a slot cannot be overbooked
 ```
 
-- **379 tests** across the core, the app, the simulator, calibration, auth and
+- **383 tests** across the core, the app, the simulator, calibration, auth and
   the deploy scripts. CI runs pytest, builds the three views, builds the image,
   and runs the drift and concurrency checks before it will deploy.
 - **The deploy assertions read values, not strings.** They used to match

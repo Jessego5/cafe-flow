@@ -72,6 +72,52 @@ def test_a_customer_may_cancel_their_own_order(anon, staff_account):
     assert cancelled.json()["state"] == "cancelled"
 
 
+# How to walk an order to each state the Cancel button is drawn in.
+TO_REACH = {
+    "placed": (),
+    "accepted": ("accepted",),
+    "in_progress": ("accepted", "in_progress"),
+}
+
+
+@pytest.mark.parametrize("reached", list(TO_REACH))
+def test_a_customer_may_cancel_up_to_the_shelf(anon, client, staff_account, reached):
+    """
+    The exact set the Cancel button offers, in `web/student/Ticket.jsx`.
+
+    The screen decides whether to draw the button from the order's state, so a
+    state that renders one and then refuses is a button that fails when tapped.
+    These are the three the rulebook allows."""
+    order = place(anon)
+    for state in TO_REACH[reached]:
+        moved = client.post(f"/orders/{order['order_id']}/transition", json={"to": state})
+        assert moved.status_code == 200, moved.text
+    assert client.get(f"/orders/{order['order_id']}").json()["state"] == reached
+
+    cancelled = anon.post(
+        f"/orders/{order['order_id']}/transition",
+        json={"to": "cancelled", "actor": "customer"},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["state"] == "cancelled"
+
+
+def test_a_customer_cannot_cancel_once_it_is_on_the_shelf(anon, client, staff_account):
+    """
+    The cup exists by then, so the only honest moves are collecting it or
+    walking away. The button is not drawn in this state; this is the guard
+    that says the screen and the rulebook agree about why."""
+    order = place(anon)
+    for state in ("accepted", "in_progress", "ready"):
+        client.post(f"/orders/{order['order_id']}/transition", json={"to": state})
+
+    refused = anon.post(
+        f"/orders/{order['order_id']}/transition",
+        json={"to": "cancelled", "actor": "customer"},
+    )
+    assert refused.status_code == 409
+
+
 # --------------------------------------------------------------------------
 # logging in
 # --------------------------------------------------------------------------

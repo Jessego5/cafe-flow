@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { amendOrder, getConfig, getMenu, placeOrder } from '../shared/api.js'
+import { amendOrder, getConfig, getMenu, moveOrder, placeOrder } from '../shared/api.js'
 import { useTicker } from '../shared/useLive.js'
 import { title } from './catalog.js'
 import { Home } from './Home.jsx'
@@ -59,7 +59,7 @@ export function App() {
   const [editing, setEditing] = useState(null)
   // Remembered on the device, like the order ids: somebody who buys a coffee
   // every morning should not retype their own name every morning. It is a
-  // label, not an identity -- nothing is looked up by it.
+  // label, not an identity, and nothing is looked up by it.
   const [name, setName] = useState(() => {
     try {
       return localStorage.getItem('cafe-flow.name.v1') || ''
@@ -134,6 +134,14 @@ export function App() {
       .catch((err) => setError(err.message))
   }
 
+  // Cancelling is the customer's own move: `POST /orders/{id}/transition` lets
+  // it through without a staff session, on the same reasoning as the rest of
+  // the customer side, that holding the unguessable id is what proves the
+  // order is yours. Nothing is set here, because the transition broadcasts and
+  // `useMyOrders` refetches on the event like every other change.
+  const cancelOrder = (order) =>
+    moveOrder(order.order_id, 'cancelled', 'customer')
+
   const dropHold = (heldId) => {
     cancelHold(heldId)
       .then(() => setHolds((current) => current.filter((row) => row.held_id !== heldId)))
@@ -164,7 +172,7 @@ export function App() {
 
   // Load a placed order back into the cart. The server refuses an amendment
   // once the order leaves `placed`, so the button that got here is already gone
-  // by then -- but the request can still lose the race, and says so.
+  // by then, but the request can still lose the race, and says so.
   const startEditing = (order) => {
     setEditing(order.order_id)
     setCart(
@@ -216,6 +224,7 @@ export function App() {
             since={since}
             onOrder={openOrdering}
             onCancelHold={dropHold}
+            onCancelOrder={cancelOrder}
             onChange={startEditing}
           />
         )}
@@ -249,6 +258,7 @@ export function App() {
             since={since}
             onOrder={() => setTab('order')}
             onCancelHold={dropHold}
+            onCancelOrder={cancelOrder}
             onChange={startEditing}
           />
         )}

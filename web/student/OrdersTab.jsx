@@ -57,7 +57,7 @@ function Receipt({ order }) {
   )
 }
 
-export function OrdersTab({ config, menu, hours, orders, holds = [], since, onOrder, onCancelHold, onChange }) {
+export function OrdersTab({ config, menu, hours, orders, holds = [], since, onOrder, onCancelHold, onChange, onCancelOrder }) {
   const done = (orders || []).filter((order) => !isLive(order))
   const live = (orders || []).filter(isLive)
   const items = (orders || []).reduce((sum, order) => sum + order.items.length, 0)
@@ -122,7 +122,13 @@ export function OrdersTab({ config, menu, hours, orders, holds = [], since, onOr
           <h2>Right now</h2>
           <div style={{ display: 'grid', gap: '0.7rem', marginTop: '0.6rem' }}>
             {live.map((order) => (
-              <Ticket key={order.order_id} order={order} since={since} onChange={onChange} />
+              <Ticket
+                key={order.order_id}
+                order={order}
+                since={since}
+                onChange={onChange}
+                onCancel={onCancelOrder}
+              />
             ))}
           </div>
         </>
