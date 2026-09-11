@@ -810,13 +810,6 @@ button:disabled { cursor: default; }
 
 .empty { text-align: center; color: var(--faint); padding: 2.6rem 1rem; }
 .empty .slab { color: var(--ink); }
-.provenance {
-  color: var(--faint);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  padding: 1.8rem var(--pad) 0;
-  text-align: center;
-}
 
 /* ----------------------------------------------------------- sold out */
 /* Shown rather than hidden. Somebody who came in for a bagel needs to know the

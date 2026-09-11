@@ -251,7 +251,6 @@ export function App() {
         {tab === 'mine' && (
           <OrdersTab
             config={config}
-            menu={menu}
             hours={hours}
             orders={orders}
             holds={holds}

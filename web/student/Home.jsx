@@ -129,8 +129,6 @@ export function Home({ config, menu, hours, live, holds = [], since, onOrder, on
           ))}
         </div>
       )}
-
-      <p className="provenance">{menu ? menu.provenance : ''}</p>
     </div>
   )
 }

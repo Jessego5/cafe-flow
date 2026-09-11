@@ -57,7 +57,7 @@ function Receipt({ order }) {
   )
 }
 
-export function OrdersTab({ config, menu, hours, orders, holds = [], since, onOrder, onCancelHold, onChange, onCancelOrder }) {
+export function OrdersTab({ config, hours, orders, holds = [], since, onOrder, onCancelHold, onChange, onCancelOrder }) {
   const done = (orders || []).filter((order) => !isLive(order))
   const live = (orders || []).filter(isLive)
   const items = (orders || []).reduce((sum, order) => sum + order.items.length, 0)
@@ -147,8 +147,6 @@ export function OrdersTab({ config, menu, hours, orders, holds = [], since, onOr
       ) : (
         done.map((order) => <Receipt key={order.order_id} order={order} />)
       )}
-
-      <p className="provenance">{menu ? menu.provenance : ''}</p>
     </div>
   )
 }
