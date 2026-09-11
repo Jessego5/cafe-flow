@@ -215,18 +215,7 @@ export function App() {
     <div className="phone">
       <div className={`pane${tab === 'order' ? ' has-dock' : ''}`} ref={pane}>
         {tab === 'home' && (
-          <Home
-            config={config}
-            menu={menu}
-            hours={hours}
-            live={live}
-            holds={holds}
-            since={since}
-            onOrder={openOrdering}
-            onCancelHold={dropHold}
-            onCancelOrder={cancelOrder}
-            onChange={startEditing}
-          />
+          <Home config={config} menu={menu} hours={hours} onOrder={openOrdering} />
         )}
         {tab === 'order' && (
           <OrderTab

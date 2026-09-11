@@ -2,8 +2,6 @@ import React from 'react'
 import { FEATURE, nameLines, title } from './catalog.js'
 import { Price } from './Price.jsx'
 import cafe from './cafe.webp'
-import { Held } from './Held.jsx'
-import { Ticket } from './Ticket.jsx'
 
 const minutes = (seconds) => Math.max(1, Math.round(seconds / 60))
 
@@ -44,7 +42,7 @@ function Wait({ menu, hours }) {
 // Above this, ordering ahead is the better answer and the screen should say so.
 const PROMOTE_MIN = 8
 
-export function Home({ config, menu, hours, live, holds = [], since, onOrder, onCancelHold, onChange }) {
+export function Home({ config, menu, hours, onOrder }) {
   const byName = new Map((menu?.items || []).map((item) => [item.name, item]))
   const featured = FEATURE.items.map((name) => byName.get(name)).filter(Boolean)
   const [head, tail] = nameLines(config ? config.cafe.name : '')
@@ -111,24 +109,6 @@ export function Home({ config, menu, hours, live, holds = [], since, onOrder, on
           </div>
         ))}
       </div>
-
-      {holds.length > 0 && (
-        <div className="stack">
-          <span className="eyebrow">Held for later</span>
-          {holds.map((row) => (
-            <Held key={row.held_id} held={row} onCancel={onCancelHold} />
-          ))}
-        </div>
-      )}
-
-      {live.length > 0 && (
-        <div className="stack">
-          <span className="eyebrow">In progress</span>
-          {live.map((order) => (
-            <Ticket key={order.order_id} order={order} since={since} onChange={onChange} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

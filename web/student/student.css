@@ -345,7 +345,6 @@ button:disabled { cursor: default; }
 
 /* when the line is long the second door leads, so it gets the width */
 .doors.promote { grid-template-columns: 1fr 1.25fr; }
-.stack { display: grid; gap: 0.7rem; padding: 1.4rem var(--pad) 0; }
 
 .board { display: grid; grid-template-columns: 5.9rem 1fr; align-items: start; }
 
