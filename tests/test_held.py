@@ -211,3 +211,70 @@ def test_a_held_order_keeps_its_name_through_release(client, at):
 
     order_id = client.get(f"/held/{held['held_id']}").json()["order_id"]
     assert client.get(f"/orders/{order_id}").json()["customer_name"] == "Sam"
+
+
+def test_changing_a_hold_re_quotes_and_re_prices_it(client, at):
+    """
+    A new basket at a new time is a new promise. Patching half of the old one
+    would leave a price from one order beside a release time from another."""
+    held = hold(client, "09:00")
+    two = LINES + [{"drink": "latte", "milk_type": "oat", "variant": "hot"}]
+
+    changed = client.patch(
+        f"/held/{held['held_id']}", json={"lines": two, "wanted_at": "10:00"}
+    )
+    assert changed.status_code == 200, changed.text
+    body = changed.json()
+    assert body["held_id"] == held["held_id"]        # same hold, not a new one
+    assert body["wanted_at"] == "10:00"
+    assert len(body["lines"]) == 2
+    assert body["price_cents"] > held["price_cents"]
+    assert body["expected_order_at"] != held["expected_order_at"]
+
+    # and the card the phone reads back agrees with what it was told
+    stored = client.get(f"/held/{held['held_id']}").json()
+    assert stored["wanted_at"] == "10:00" and len(stored["lines"]) == 2
+
+
+def test_a_changed_hold_releases_against_its_new_time(client, at):
+    """The amendment has to reach the release rule, not just the card."""
+    from app.routes.held import release_due
+
+    held = hold(client, "09:00")
+    assert client.patch(
+        f"/held/{held['held_id']}", json={"lines": LINES, "wanted_at": "11:00"}
+    ).status_code == 200
+
+    at(9 * HOUR + 600.0)
+    assert release_due() == []                        # the old time is not due
+    at(11 * HOUR + 600.0)
+    assert release_due() != []
+
+
+def test_a_hold_that_has_gone_in_cannot_be_changed_here(client, at):
+    """
+    Once released it is a live order with a log and a place in the line, and
+    amending it is `PATCH /orders/{id}`, which has the accounting for that."""
+    from app.routes.held import release_due
+
+    held = hold(client, "09:00")
+    at(9 * HOUR + 600.0)
+    assert release_due() != []
+
+    refused = client.patch(
+        f"/held/{held['held_id']}", json={"lines": LINES, "wanted_at": "11:00"}
+    )
+    assert refused.status_code == 409
+    assert client.patch(
+        "/held/never-existed", json={"lines": LINES, "wanted_at": "11:00"}
+    ).status_code == 404
+
+
+def test_a_refused_change_leaves_the_hold_as_it_was(client, at):
+    """The customer still has the order they paid for, at the time they paid for."""
+    held = hold(client, "09:00")
+    for bad in ({"lines": LINES, "wanted_at": "07:30"}, {"lines": [], "wanted_at": "10:00"}):
+        assert client.patch(f"/held/{held['held_id']}", json=bad).status_code == 400
+
+    stored = client.get(f"/held/{held['held_id']}").json()
+    assert stored["wanted_at"] == "09:00" and stored["lines"] == LINES

@@ -181,6 +181,8 @@ function CartSheet({ cart, menu, total, config, nowMinutes, mode, onClose, onRem
               onOrderNow={onPlace}
               placing={placing}
               error={error}
+              editing={editing?.kind === 'hold'}
+              initialAt={editing?.wantedAt}
             />
           ) : (
             <>
@@ -455,7 +457,7 @@ export function OrderTab({
           total={total}
           config={config}
           nowMinutes={hours?.now ?? 0}
-          mode={editing ? 'now' : mode}
+          mode={editing?.kind === 'hold' ? 'ahead' : editing ? 'now' : mode}
           editing={editing}
           name={name}
           onName={onName}

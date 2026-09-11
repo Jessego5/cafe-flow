@@ -102,19 +102,14 @@ def _live_wait_s(session: Session, params: Params) -> float | None:
     return estimate_wait_s(depth, per_order)
 
 
-@router.post("/held", status_code=201)
-async def hold_order(body: HeldIn) -> dict:
+def _quote_or_refuse(body: HeldIn, params: Params, now_s: float):
     """
-    Take payment and hold the order. The server re-derives the timing.
+    Everything a hold has to clear, whether it is being taken or changed.
 
-    No `order_at` is accepted from the caller, for the same reason `POST /orders`
-    does not accept a quoted ready time: this is a time the cafe will act on, and
-    a client should not be able to name it.
+    Both paths ask the same questions in the same order, and a hold that was
+    amended into a basket the cafe cannot make by the time asked for would be
+    the same broken promise as one taken that way.
     """
-    params = get_params()
-    _release_clocks(params)
-    now_s = day_seconds(params)
-
     if not body.lines:
         raise HTTPException(400, "a held order needs at least one line")
 
@@ -150,6 +145,42 @@ async def hold_order(body: HeldIn) -> dict:
         "quote", params, lines=lines, channel=Channel.PREORDER,
         placed_at_s=now_s, customer_id=body.customer_id, is_simulated=False,
     )
+    return wanted_at_s, quote, priced
+
+
+def _card(row: HeldOrderRow) -> dict:
+    """The hold as the card that renders it needs it."""
+    return {
+        "held_id": row.held_id,
+        "wanted_at": format_hhmm(row.wanted_at_s),
+        "wanted_at_s": row.wanted_at_s,
+        # The card shows what was bought; there is nowhere else to read it from
+        # until the hold becomes an order.
+        "lines": json.loads(row.lines_json),
+        # What we expect right now. It moves (that is the feature), so the
+        # screen is told to say "usually around" rather than count down to it.
+        "expected_order_at": format_hhmm(row.quoted_order_at_s),
+        "expected_order_at_s": row.quoted_order_at_s,
+        "ready_at": format_hhmm(row.quoted_ready_at_s),
+        "price_cents": row.price_cents,
+        "state": row.state,
+    }
+
+
+@router.post("/held", status_code=201)
+async def hold_order(body: HeldIn) -> dict:
+    """
+    Take payment and hold the order. The server re-derives the timing.
+
+    No `order_at` is accepted from the caller, for the same reason `POST /orders`
+    does not accept a quoted ready time: this is a time the cafe will act on, and
+    a client should not be able to name it.
+    """
+    params = get_params()
+    _release_clocks(params)
+    now_s = day_seconds(params)
+
+    wanted_at_s, quote, priced = _quote_or_refuse(body, params, now_s)
 
     row = HeldOrderRow(
         held_id=uuid.uuid4().hex[:12],
@@ -168,21 +199,55 @@ async def hold_order(body: HeldIn) -> dict:
         session.commit()
         session.refresh(row)
 
-    return {
-        "held_id": row.held_id,
-        "wanted_at": format_hhmm(row.wanted_at_s),
-        "wanted_at_s": row.wanted_at_s,
-        # The card shows what was bought; there is nowhere else to read it from
-        # until the hold becomes an order.
-        "lines": json.loads(row.lines_json),
-        # What we expect right now. It moves (that is the feature), so the
-        # screen is told to say "usually around" rather than count down to it.
-        "expected_order_at": format_hhmm(row.quoted_order_at_s),
-        "expected_order_at_s": row.quoted_order_at_s,
-        "ready_at": format_hhmm(row.quoted_ready_at_s),
-        "price_cents": row.price_cents,
-        "state": row.state,
-    }
+    return _card(row)
+
+
+@router.patch("/held/{held_id}")
+async def amend_held(held_id: str, body: HeldIn) -> dict:
+    """
+    Change a hold that has not gone in yet: different drinks, different time.
+
+    Nothing has reached the bar, so unlike amending a live order there is no
+    event to write and no barista holding a cup. The row is re-quoted and
+    re-priced from scratch rather than patched, because a new basket at a new
+    time is a new promise, and half of the old one would be a promise nobody
+    made.
+
+    Once it is released the hold is a live order and this refuses: the order's
+    own `PATCH /orders/{id}` is the endpoint for that, and it has the log and
+    the capacity accounting this one has no business duplicating.
+    """
+    params = get_params()
+    _release_clocks(params)
+    now_s = day_seconds(params)
+
+    with session_scope() as session:
+        row = session.get(HeldOrderRow, held_id)
+        if row is None:
+            raise HTTPException(404, f"no held order {held_id!r}")
+        if row.state != "held":
+            raise HTTPException(409, f"this one is already {row.state}")
+
+    wanted_at_s, quote, priced = _quote_or_refuse(body, params, now_s)
+
+    with session_scope() as session:
+        row = session.get(HeldOrderRow, held_id)
+        # Released between the two reads: the bar has it, and the customer is
+        # looking at a screen that is a second out of date.
+        if row is None or row.state != "held":
+            raise HTTPException(409, "this one has gone in already")
+        row.wanted_at_s = wanted_at_s
+        row.quoted_order_at_s = quote.order_at_s
+        row.quoted_ready_at_s = quote.ready_at_s
+        row.lines_json = json.dumps([line.model_dump() for line in body.lines])
+        row.price_cents = priced.price_cents
+        if body.customer_name is not None:
+            row.customer_name = body.customer_name.strip() or None
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+
+    return _card(row)
 
 
 @router.get("/held/{held_id}")

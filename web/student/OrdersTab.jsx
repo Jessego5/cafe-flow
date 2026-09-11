@@ -57,7 +57,7 @@ function Receipt({ order }) {
   )
 }
 
-export function OrdersTab({ config, hours, orders, holds = [], since, onOrder, onCancelHold, onChange, onCancelOrder }) {
+export function OrdersTab({ config, hours, orders, holds = [], since, onOrder, onCancelHold, onChangeHold, onChange, onCancelOrder }) {
   const done = (orders || []).filter((order) => !isLive(order))
   const live = (orders || []).filter(isLive)
   const items = (orders || []).reduce((sum, order) => sum + order.items.length, 0)
@@ -111,7 +111,7 @@ export function OrdersTab({ config, hours, orders, holds = [], since, onOrder, o
           <h2>Held for later</h2>
           <div style={{ display: 'grid', gap: '0.7rem', marginTop: '0.6rem' }}>
             {holds.map((row) => (
-              <Held key={row.held_id} held={row} onCancel={onCancelHold} />
+              <Held key={row.held_id} held={row} onCancel={onCancelHold} onChange={onChangeHold} />
             ))}
           </div>
         </>

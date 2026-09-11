@@ -5,7 +5,7 @@ import { title } from './catalog.js'
 import { Home } from './Home.jsx'
 import { OrderTab, lineKey } from './OrderTab.jsx'
 import { OrdersTab } from './OrdersTab.jsx'
-import { cancel as cancelHold, hold, myHolds, releasedOrderIds } from './held.js'
+import { amend as amendHold, cancel as cancelHold, hold, myHolds, releasedOrderIds } from './held.js'
 import { announceReady, ask } from './notify.js'
 import { serviceHours } from './hours.js'
 import { onLive } from './stream.js'
@@ -53,9 +53,10 @@ export function App() {
   const [mode, setMode] = useState('now')
   const [holds, setHolds] = useState([])
   const [placing, setPlacing] = useState(false)
-  // The order being changed, if any. A cart with this set is an amendment
-  // rather than a new order, which is the only thing that makes `place` two
-  // different verbs.
+  // What is being changed, if anything: `{kind: 'order' | 'hold', id}`, and for
+  // a hold the time it is currently for, so the planner opens on it. A cart
+  // with this set is an amendment rather than a new order, which is the only
+  // thing that makes `place` and `placeHold` two verbs each.
   const [editing, setEditing] = useState(null)
   // Remembered on the device, like the order ids: somebody who buys a coffee
   // every morning should not retype their own name every morning. It is a
@@ -123,15 +124,29 @@ export function App() {
   // is asked at the moment somebody commits to a time, which is the moment it
   // means something.
   const placeHold = (quote) => {
+    setPlacing(true)
     setError(null)
-    hold(cart, quote.wanted_at, name.trim() || null)
+    const changing = editing?.kind === 'hold' ? editing.id : null
+    const sent = changing
+      ? amendHold(changing, cart, quote.wanted_at, name.trim() || null)
+      : hold(cart, quote.wanted_at, name.trim() || null)
+    sent
       .then((row) => {
-        setHolds((current) => [...current, row])
+        // The server re-quotes and re-prices a change, so the card is replaced
+        // rather than edited: a new time beside the old price would be a hold
+        // nobody agreed to.
+        setHolds((current) =>
+          changing
+            ? current.map((held) => (held.held_id === changing ? row : held))
+            : [...current, row],
+        )
         setCart([])
+        setEditing(null)
         ask()
         setTab('mine')
       })
       .catch((err) => setError(err.message))
+      .finally(() => setPlacing(false))
   }
 
   // Cancelling is the customer's own move: `POST /orders/{id}/transition` lets
@@ -174,7 +189,7 @@ export function App() {
   // once the order leaves `placed`, so the button that got here is already gone
   // by then, but the request can still lose the race, and says so.
   const startEditing = (order) => {
-    setEditing(order.order_id)
+    setEditing({ kind: 'order', id: order.order_id })
     setCart(
       order.items.map((item) => ({
         drink: item.drink,
@@ -183,6 +198,23 @@ export function App() {
       })),
     )
     setMode('now')
+    setError(null)
+    setTab('order')
+  }
+
+  // A hold has not reached the bar, so this one is the planner again rather
+  // than the counter: same basket, same picker, and the time it is already for
+  // is the one it opens on.
+  const startEditingHold = (held) => {
+    setEditing({ kind: 'hold', id: held.held_id, wantedAt: held.wanted_at })
+    setCart(
+      held.lines.map((line) => ({
+        drink: line.drink,
+        milk_type: line.milk_type ?? null,
+        variant: line.variant ?? null,
+      })),
+    )
+    setMode('ahead')
     setError(null)
     setTab('order')
   }
@@ -196,8 +228,8 @@ export function App() {
   const place = (close) => {
     setPlacing(true)
     setError(null)
-    const sent = editing
-      ? amendOrder(editing, cart)
+    const sent = editing?.kind === 'order'
+      ? amendOrder(editing.id, cart)
       : placeOrder(cart, { channel: 'walkup', quoted: true, name: name.trim() || null })
     sent
       .then((order) => {
@@ -246,6 +278,7 @@ export function App() {
             since={since}
             onOrder={() => setTab('order')}
             onCancelHold={dropHold}
+            onChangeHold={startEditingHold}
             onCancelOrder={cancelOrder}
             onChange={startEditing}
           />

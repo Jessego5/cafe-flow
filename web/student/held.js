@@ -1,4 +1,4 @@
-// `POST /held`, `GET /held/{id}`, `DELETE /held/{id}`.
+// `POST /held`, `GET /held/{id}`, `PATCH /held/{id}`, `DELETE /held/{id}`.
 //
 // A held order is paid for and not yet in the queue. The server holds it and
 // puts it in when the *live* line says ordering now lands by the time asked
@@ -42,6 +42,15 @@ export async function hold(lines, wantedAt, name = null) {
   })
   remember(row.held_id)
   return row
+}
+
+/** Change a hold that has not gone in yet. The server re-quotes and re-prices
+ *  it, so what comes back replaces the card rather than patching it. */
+export async function amend(heldId, lines, wantedAt, name = null) {
+  return request(`/held/${heldId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ lines, wanted_at: wantedAt, customer_name: name }),
+  })
 }
 
 /** Idempotent, like the endpoint. */

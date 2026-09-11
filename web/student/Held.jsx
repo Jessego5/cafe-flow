@@ -18,7 +18,7 @@ const lineText = (line) =>
   [line.variant ? title(line.variant) : null, title(line.drink)].filter(Boolean).join(' ') +
   (line.milk_type ? ` · ${milkLabel(line.milk_type)}` : '')
 
-export function Held({ held, onCancel }) {
+export function Held({ held, onCancel, onChange }) {
   // Two taps, like a live order. This one is paid for and gone once it is
   // gone, which is not a move a thumb should be able to make in passing.
   const [confirming, setConfirming] = useState(false)
@@ -59,6 +59,9 @@ export function Held({ held, onCancel }) {
         </div>
       ) : (
         <div className="actions">
+          {/* Nothing has reached the bar yet, so unlike a live order this one
+              can be changed for as long as it is still being held. */}
+          {onChange && <button onClick={() => onChange(held)}>Change this order</button>}
           <button className="drop" onClick={() => setConfirming(true)}>
             Cancel order
           </button>

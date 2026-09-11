@@ -97,11 +97,15 @@ function TimeScroll({ options, value, onChange }) {
   )
 }
 
-export function Planner({ lines, config, nowMinutes, onHold, onOrderNow, placing, error }) {
+export function Planner({ lines, config, nowMinutes, onHold, onOrderNow, placing, error, editing = false, initialAt = null }) {
   const options = useMemo(() => slots(config, nowMinutes), [config, nowMinutes])
   // Open on a time far enough out to be worth planning for, so the screen
-  // arrives with a quote rather than an empty picker.
-  const [wantedAt, setWantedAt] = useState(() => options[1] || options[0] || null)
+  // arrives with a quote rather than an empty picker. Changing a hold opens on
+  // the time it is already for, unless that time has since passed, in which
+  // case it is not on the picker to open on.
+  const [wantedAt, setWantedAt] = useState(
+    () => (options.includes(initialAt) ? initialAt : options[1] || options[0] || null),
+  )
   const [now, setNow] = useState(null)          // ordering immediately, for the saving
   const [later, setLater] = useState(null)      // the chosen time
   const [failed, setFailed] = useState(null)
@@ -188,11 +192,17 @@ export function Planner({ lines, config, nowMinutes, onHold, onOrderNow, placing
         disabled={placing || !holdable}
         onClick={() => onHold(later)}
       >
-        {placing ? 'Holding…' : 'Pay and hold'}
+        {placing
+          ? editing ? 'Saving…' : 'Holding…'
+          : editing ? 'Save changes' : 'Pay and hold'}
       </button>
-      <button className="slab wide" style={{ marginTop: '0.5rem' }} disabled={placing} onClick={onOrderNow}>
-        Order now instead
-      </button>
+      {/* Not offered while changing a hold: it would place a second order and
+          leave the paid one sitting there, which is not what "instead" says. */}
+      {!editing && (
+        <button className="slab wide" style={{ marginTop: '0.5rem' }} disabled={placing} onClick={onOrderNow}>
+          Order now instead
+        </button>
+      )}
     </div>
   )
 }
