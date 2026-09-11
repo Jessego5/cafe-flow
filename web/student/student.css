@@ -636,7 +636,6 @@ button:disabled { cursor: default; }
   padding-top: 0.7rem;
   border-top: 1px solid var(--hair);
 }
-.held .drop { border: 0; background: none; color: var(--muted); font-size: 0.82rem; padding: 0; }
 .held .state {
   font-size: 0.7rem;
   letter-spacing: 0.02em;
@@ -784,14 +783,16 @@ button:disabled { cursor: default; }
    the main thing to do on this card: the main thing is waiting for the coffee.
    Cancelling is the one that cannot be undone, so it carries the red and sits
    on the right, away from the thumb that is scrolling. */
-.ticket .actions {
+.ticket .actions,
+.held .actions {
   display: flex;
   gap: 0.5rem;
   margin-top: 0.9rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--hair);
 }
-.ticket .actions button {
+.ticket .actions button,
+.held .actions button {
   flex: 1;
   padding: 0.55rem 0.6rem;
   border: 1px solid var(--line);
@@ -801,12 +802,20 @@ button:disabled { cursor: default; }
   font-size: 0.84rem;
   text-align: center;
 }
-.ticket .actions .drop { color: var(--bad); border-color: #e6d5d5; }
+.ticket .actions .drop,
+.held .actions .drop { color: var(--bad); border-color: #e6d5d5; }
 .ticket .strike { margin: 0.7rem 0 0; }
 
-.ticket .ask { margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--hair); }
-.ticket .ask .hint { display: block; color: var(--ink-soft); }
-.ticket .ask .actions { margin-top: 0.6rem; padding-top: 0; border-top: 0; }
+.ticket .ask,
+.held .ask { margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--hair); }
+.ticket .ask .hint,
+.held .ask .hint { display: block; color: var(--ink-soft); }
+.ticket .ask .actions,
+.held .ask .actions { margin-top: 0.6rem; padding-top: 0; border-top: 0; }
+
+/* The foot above them already draws the rule, so they do not draw a second. */
+.held .actions,
+.held .ask { margin-top: 0.6rem; padding-top: 0; border-top: 0; }
 
 .empty { text-align: center; color: var(--faint); padding: 2.6rem 1rem; }
 .empty .slab { color: var(--ink); }

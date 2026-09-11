@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { money } from '../shared/api.js'
 import { milkLabel, title } from './catalog.js'
 
@@ -19,6 +19,10 @@ const lineText = (line) =>
   (line.milk_type ? ` · ${milkLabel(line.milk_type)}` : '')
 
 export function Held({ held, onCancel }) {
+  // Two taps, like a live order. This one is paid for and gone once it is
+  // gone, which is not a move a thumb should be able to make in passing.
+  const [confirming, setConfirming] = useState(false)
+
   return (
     <div className="held">
       <div className="head">
@@ -41,10 +45,25 @@ export function Held({ held, onCancel }) {
 
       <div className="foot">
         <span className="hint">{money(held.price_cents)} · payment stubbed</span>
-        <button className="drop" onClick={() => onCancel(held.held_id)}>
-          Cancel
-        </button>
       </div>
+
+      {confirming ? (
+        <div className="ask">
+          <span className="hint">Cancel this held order? Ordering again picks a new time.</span>
+          <div className="actions">
+            <button onClick={() => setConfirming(false)}>Keep it</button>
+            <button className="drop" onClick={() => onCancel(held.held_id)}>
+              Yes, cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="actions">
+          <button className="drop" onClick={() => setConfirming(true)}>
+            Cancel order
+          </button>
+        </div>
+      )}
     </div>
   )
 }
