@@ -619,7 +619,6 @@ button:disabled { cursor: default; }
   padding: 1rem 1.05rem;
   background: var(--card);
   border: 1px solid var(--hair);
-  border-left: 2px solid var(--back);      /* gold: promised, not yet working */
 }
 .held .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .held .when { font-size: 1.7rem; font-weight: 600; line-height: 1.1; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
@@ -768,7 +767,6 @@ button:disabled { cursor: default; }
   padding: 1.1rem 1.1rem 1rem;
   background: var(--card);
   border: 1px solid var(--hair);
-  border-left: 2px solid var(--ink);
 }
 .ticket .head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .ticket .no { font-size: 2.3rem; font-weight: 600; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
